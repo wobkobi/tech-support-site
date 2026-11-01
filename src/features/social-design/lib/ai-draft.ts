@@ -25,49 +25,57 @@ export interface PostDraftKind {
 /** Kinds in dialog order. */
 export const POST_DRAFT_KINDS: readonly PostDraftKind[] = [
   {
-    key: "announcement",
-    label: "Announcement",
+    key: "general",
+    label: "General post",
     guide:
-      "Something new or worth knowing: a service, an area, hours or a change. The headline says the news itself, not that there is news.",
+      "A short post about the business: news, a new service or area, or what's happening, and what it means for the reader. The headline says the news itself, not that there is news.",
     example: "I'm now doing home visits in Titirangi and Laingholm, Tuesdays and Thursdays.",
+  },
+  {
+    key: "availability",
+    label: "Availability or booking update",
+    guide:
+      'When I can and can\'t take bookings: time away, a busy stretch or times I have free. The headline says the change with its dates exactly as the brief gives them ("Away 20 to 27 October"); the short line says how to still get a booking.',
+    example: "I'm away 20 to 27 October; book now for the week after.",
   },
   {
     key: "tip",
     label: "Tech tip",
     guide:
       'One practical tip the reader can do themselves. The headline names the problem or the win ("Speed up a slow laptop"); the ticked points are the steps or the signs.',
-    example: "How to tell a fake parcel text from a real one.",
+    example: "Three ways to free up space on a full phone.",
   },
   {
-    key: "review",
-    label: "Review",
+    key: "scam",
+    label: "Scam or security alert",
     guide:
-      "Sharing a review a customer left. The picture shows their own words; the post words thank them and say what the job was, only as far as the brief says.",
-    example:
-      "Paste the review word for word, then who left it, like: Margaret, Titirangi. Nothing else gets made up.",
+      'A warning about a scam going around. The headline names the scam plainly ("Fake parcel texts"); the ticked points are the signs to watch for.',
+    example: "Fake parcel texts asking you to pay a redelivery fee.",
   },
   {
     key: "promo",
-    label: "Promo",
+    label: "Offer or promotion",
     guide:
       "The deal on now: what it's good for and who it suits. The picture's promo layers show the offer and end date, read live.",
     example: "The spring deal - good for a laptop tune-up before the holidays.",
   },
   {
-    key: "general",
-    label: "General post",
-    guide: "A short post about the business: what's happening and what it means for the reader.",
-    example: "I'm away 20 to 27 October; book now for the week after.",
+    key: "review",
+    label: "Client review",
+    guide:
+      "Sharing a review a customer left. The picture shows their own words; the post words thank them and say what the job was, only as far as the brief says.",
+    example:
+      "Paste the review word for word, then who left it, like: Margaret, Titirangi. Nothing else gets made up.",
   },
 ];
 
 /**
- * The dialog's starting kind for a design.
+ * The dialog's starting kind for a design. An announcement design is news, which General covers.
  * @param kind - The design's kind.
  * @returns A {@link POST_DRAFT_KINDS} key.
  */
 export function draftKindFor(kind: DesignKind): string {
-  return kind === "blank" ? "general" : kind;
+  return kind === "blank" || kind === "announcement" ? "general" : kind;
 }
 
 /** Which words a design has somewhere to put. */

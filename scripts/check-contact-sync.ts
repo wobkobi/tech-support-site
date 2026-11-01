@@ -1,6 +1,7 @@
 // scripts/check-contact-sync.ts
 // Pure parts of the contact sync and merge: People API error reading and retry rules, open
-// conflict holds, the merged-id list unsubscribe links follow, and the CSV export's cells.
+// conflict holds, Google's extra addresses, the merged-id list unsubscribe links follow, and
+// the CSV export's cells.
 // Run with: npm test -- contact-sync
 
 import { csvCell, csvPhone } from "@/features/contacts/lib/contacts-csv";
@@ -8,6 +9,7 @@ import {
   googleErrorStatus,
   holdOpenConflict,
   isRetryableStatus,
+  otherGoogleAddresses,
 } from "@/features/contacts/lib/google-contacts";
 import { mergedIdsAfter } from "@/features/contacts/lib/merge-links";
 import { expectEqual, finish } from "./lib/harness.js";
@@ -35,6 +37,60 @@ function main(): void {
   expectEqual("open conflict holds a re-conflict", holdOpenConflict(true, "conflict"), "held");
   expectEqual("values that now agree clear it", holdOpenConflict(true, "noop"), "noop");
   expectEqual("no conflict passes through", holdOpenConflict(false, "pull"), "pull");
+
+  // A merge in Google keeps both contacts' addresses; a repeat of the site's place goes.
+  const site = "17 Nottingham Street, Westmere, Auckland 1022, New Zealand";
+  expectEqual(
+    "repeat of the site's place is dropped",
+    otherGoogleAddresses(
+      [
+        { formattedValue: site },
+        {
+          formattedValue: "17 Nottingham St Westmere, Auckland, New Zealand\nNew Zealand",
+          type: "home",
+          metadata: { source: { type: "CONTACT" } },
+        },
+      ],
+      site,
+    ),
+    { others: [], repeated: true },
+  );
+  expectEqual(
+    "another place stays, without output-only fields",
+    otherGoogleAddresses(
+      [
+        { formattedValue: site },
+        {
+          formattedValue: "1 Work Road, Penrose, Auckland 1061, New Zealand",
+          type: "work",
+          formattedType: "Work",
+          city: "Auckland",
+          metadata: { primary: false },
+        },
+      ],
+      site,
+    ),
+    {
+      others: [
+        {
+          formattedValue: "1 Work Road, Penrose, Auckland 1061, New Zealand",
+          type: "work",
+          city: "Auckland",
+        },
+      ],
+      repeated: false,
+    },
+  );
+  expectEqual(
+    "the first is the site's slot, never an extra",
+    otherGoogleAddresses([{ formattedValue: "9 Old Road, Avondale, Auckland" }], site),
+    { others: [], repeated: false },
+  );
+  expectEqual(
+    "no site address keeps every extra",
+    otherGoogleAddresses([{ formattedValue: site }, { formattedValue: site }], null),
+    { others: [{ formattedValue: site }], repeated: false },
+  );
 
   // A chain of merges still resolves in one lookup.
   expectEqual(

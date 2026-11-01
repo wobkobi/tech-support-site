@@ -813,7 +813,8 @@ export interface ReplySuggestion {
 }
 
 /**
- * Reads the AI's answer: plain punctuation, no hashtags, capped to what the app takes.
+ * Reads the AI's answer: plain punctuation, no hashtags, no opening "Well" (it can sound
+ * sarcastic, though "Well done" and "Well said" stay), capped to what the app takes.
  * @param raw - The parsed JSON.
  * @param platform - The app it's for.
  * @param direct - Whether it answers a direct message.
@@ -832,12 +833,41 @@ export function readReplySuggestion(
             .replace(/(^|\s)#[\p{L}\p{N}_]+/gu, "$1")
             .replace(/[ \t]+\n/g, "\n")
             .replace(/[ \t]{2,}/g, " ")
-            .trim(),
+            .trim()
+            .replace(/^Well,? (?!(?:done|said)\b)(\p{L})/u, (_, c: string) => c.toUpperCase()),
           platform,
           direct,
         )
       : "";
   return { reply, hide: value.hide === true };
+}
+
+/**
+ * Fixes the commas around the reviewer's name in a review reply, which the prompt asks for but
+ * the model still gets wrong now and then:
+ * - a name opening as a sentence of its own joins the next one ("Trish. Thanks so much..." >
+ *   "Trish, thanks so much...");
+ * - a run-on after a name partway in gets a full stop ("Cheers, Alan, I appreciate..." >
+ *   "Cheers, Alan. I appreciate..."), though "Alan, for..." and "Alan, and..." stay one sentence;
+ * - so does a run-on after a thanks with no name ("Thanks so much, I'm glad..." > "Thanks so
+ *   much. I'm glad...").
+ * @param text - The reply.
+ * @param name - Their first name, from {@link firstName}.
+ * @returns The reply, with the first slip of each kind fixed.
+ */
+export function tidyReviewThanks(text: string, name: string): string {
+  // firstName only lets letters, apostrophes and hyphens through, none of them special here.
+  // "Trish. I'm glad" stays: "Trish, I'm glad" would be the run-on the next rule splits.
+  const loneName = new RegExp(`^(${name})\\. (?!I\\b)(\\p{Lu})`, "u");
+  // The leading comma keeps a name that opens the reply ("Trish, thanks so much") out of it.
+  const afterName = new RegExp(`, (${name}), (?!(?:for|and|but|or)\\b)(\\p{Ll}|I\\b)`, "u");
+  // Only "I" after a bare thanks, since "Cheers, mate" is one sentence.
+  const afterThanks =
+    /\b(Thanks(?: heaps| so much)?|Thank you(?: so much)?|Cheers|Much appreciated), (I\b)/;
+  return text
+    .replace(loneName, (_, who: string, next: string) => `${who}, ${next.toLowerCase()}`)
+    .replace(afterName, (_, who: string, next: string) => `, ${who}. ${next.toUpperCase()}`)
+    .replace(afterThanks, "$1. $2");
 }
 
 // --- The inbox's address ---

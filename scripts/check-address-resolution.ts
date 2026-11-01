@@ -1,8 +1,9 @@
 // scripts/check-address-resolution.ts
-// Assert resolveAddress's four statuses against stubbed Geocoding responses (no network).
+// Assert resolveAddress's four statuses against stubbed Geocoding responses (no network), and
+// addressCovers' same-place comparison.
 // Run with: npm test -- address-resolution
 
-import { resolveAddress } from "@/shared/lib/normalise-address";
+import { addressCovers, resolveAddress } from "@/shared/lib/normalise-address";
 import { expectEqual, finish } from "./lib/harness.js";
 
 // Read per request, not at load, so this survives import hoisting
@@ -137,6 +138,39 @@ async function main(): Promise<void> {
   expectEqual("network failure", (await resolveAddress("4 name street")).status, "skipped");
 
   expectEqual("blank input", (await resolveAddress("   ")).status, "skipped");
+
+  console.log("\naddressCovers fixtures\n");
+
+  // Google's country line repeats the one typed into the street line.
+  expectEqual(
+    "doubled country is the same place",
+    addressCovers(
+      "272 Meola Road, Point Chevalier, Auckland 1022, New Zealand",
+      "272 Meola Rd Point Chevalier Auckland 1022 New Zealand\nNew Zealand",
+    ),
+    true,
+  );
+  expectEqual(
+    "St is Saint before a name",
+    addressCovers(
+      "58 Saint Michaels Avenue, Point Chevalier, Auckland 1022, New Zealand",
+      "58 St Michaels Ave Point Chevalier, Auckland, New Zealand\nNew Zealand",
+    ),
+    true,
+  );
+  expectEqual(
+    "a unit the canonical form lacks",
+    addressCovers("12 Foo Street, Onehunga, Auckland 1061, New Zealand", "Unit 5, 12 Foo St"),
+    false,
+  );
+  expectEqual(
+    "a suburb the canonical form lacks",
+    addressCovers(
+      "5 Peet Avenue\nAuckland 1023\nNZ",
+      "5 Peet Ave Royal Oak Auckland 1023 New Zealand\nNew Zealand",
+    ),
+    false,
+  );
 
   finish();
 }

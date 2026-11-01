@@ -120,6 +120,69 @@ async function addressFields(raw: string): Promise<{
 }
 
 /**
+ * Google's addresses after the first, minus repeats of the site's place. A merge in Google keeps
+ * every address from both contacts, so one place can turn up twice in two formats.
+ * @param addresses - The person's addresses as Google returned them; the first pairs with the site's.
+ * @param siteAddress - The site's address.
+ * @returns The other places, stripped to writable fields, and whether a repeat was dropped.
+ */
+export function otherGoogleAddresses(
+  addresses: people_v1.Schema$Address[] | null | undefined,
+  siteAddress: string | null,
+): { others: people_v1.Schema$Address[]; repeated: boolean } {
+  const extras = (addresses ?? []).slice(1);
+  const others = extras
+    .filter((a) => !addressCovers(siteAddress, a.formattedValue ?? null))
+    .map((a) => ({
+      formattedValue: a.formattedValue,
+      type: a.type,
+      streetAddress: a.streetAddress,
+      extendedAddress: a.extendedAddress,
+      poBox: a.poBox,
+      city: a.city,
+      region: a.region,
+      postalCode: a.postalCode,
+      country: a.country,
+      countryCode: a.countryCode,
+    }));
+  return { others, repeated: others.length < extras.length };
+}
+
+/**
+ * Writes a person's addresses back with the site's place once, when Google holds it twice.
+ * Never throws: a failed tidy is retried the next time Google's copy changes.
+ * @param people - People API client.
+ * @param person - The person as Google returned it.
+ * @param siteAddress - The site's address for them, standing in for Google's first.
+ * @returns The person's etag after the write, or the one it had when nothing was written.
+ */
+async function tidyRepeatedAddresses(
+  people: people_v1.People,
+  person: people_v1.Schema$Person,
+  siteAddress: string | null,
+): Promise<string | null> {
+  const etag = person.etag ?? null;
+  const { others, repeated } = otherGoogleAddresses(person.addresses, siteAddress);
+  if (!repeated || !siteAddress || !etag || !person.resourceName) return etag;
+  const resourceName = person.resourceName;
+  try {
+    const updated = await peopleCall(() =>
+      people.people.updateContact({
+        resourceName,
+        updatePersonFields: "addresses",
+        // The etag varies with the field mask; the listing's mask returns the one it will see.
+        personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
+        requestBody: { etag, addresses: [{ formattedValue: siteAddress }, ...others] },
+      }),
+    );
+    return updated.data.etag ?? etag;
+  } catch (err) {
+    console.error(`[google-contacts] Couldn't tidy ${resourceName}'s repeated address:`, err);
+    return etag;
+  }
+}
+
+/**
  * Best-effort deletion of a Google contact by resource name. Never throws, so the
  * local delete or merge still succeeds.
  * @param resourceName - Google People API resource name (e.g. "people/c123").
@@ -410,11 +473,20 @@ export async function importFromGoogleContacts(): Promise<number> {
               Object.assign(updates, await addressFields(address));
             }
             if (company && company !== existing.company) updates.company = company;
+            // Store the post-tidy etag, or the next import re-pulls the tidy as a Google change.
+            const storedEtag = held?.has("address")
+              ? etag
+              : await tidyRepeatedAddresses(
+                  people,
+                  person,
+                  typeof updates.address === "string" ? updates.address : existing.address,
+                );
+            updates.lastGoogleEtag = storedEtag;
             await prisma.contact.update({ where: { id: existing.id }, data: updates });
 
             // Mirror the write onto the index: a second Google person may resolve to this row.
             existing.googleContactId = resourceName;
-            existing.lastGoogleEtag = etag;
+            existing.lastGoogleEtag = storedEtag;
             if (typeof updates.name === "string") existing.name = updates.name;
             if (typeof updates.email === "string") existing.email = updates.email;
             if (typeof updates.phone === "string") existing.phone = updates.phone;
@@ -432,6 +504,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             const addressData = address
               ? await addressFields(address)
               : { address: null as string | null };
+            const storedEtag = await tidyRepeatedAddresses(people, person, addressData.address);
             const created = await prisma.contact.create({
               data: {
                 name: displayName,
@@ -445,7 +518,7 @@ export async function importFromGoogleContacts(): Promise<number> {
                 googleContactId: resourceName,
                 lastSyncedAt: stampedAt,
                 updatedAt: stampedAt,
-                lastGoogleEtag: etag,
+                lastGoogleEtag: storedEtag,
               },
               select: { id: true, name: true, address: true },
             });
@@ -458,7 +531,7 @@ export async function importFromGoogleContacts(): Promise<number> {
               address: created.address,
               company,
               googleContactId: resourceName,
-              lastGoogleEtag: etag,
+              lastGoogleEtag: storedEtag,
             };
             byGoogleId.set(resourceName, row);
             if (email) byEmail.set(email, row);
@@ -605,7 +678,7 @@ export async function syncContactToGoogle(contactId: string): Promise<ContactSyn
       names?: Array<{ displayName?: string | null }> | null;
       emailAddresses?: Array<{ value?: string | null }> | null;
       phoneNumbers?: Array<{ value?: string | null }> | null;
-      addresses?: Array<{ formattedValue?: string | null }> | null;
+      addresses?: people_v1.Schema$Address[] | null;
       organizations?: Array<{ name?: string | null }> | null;
     } | null = null;
 
@@ -773,7 +846,9 @@ export async function syncContactToGoogle(contactId: string): Promise<ContactSyn
       updateFields.push("emailAddresses");
     }
     if (addressAction === "push" && contact.address) {
-      updateBody.addresses = [{ formattedValue: contact.address }];
+      // The write replaces the whole list: Google's other places go back with it, repeats don't.
+      const { others } = otherGoogleAddresses(googlePerson.addresses, contact.address);
+      updateBody.addresses = [{ formattedValue: contact.address }, ...others];
       updateFields.push("addresses");
     }
 

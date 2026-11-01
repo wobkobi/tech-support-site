@@ -97,14 +97,14 @@ async function drawOver(redraw: Redraw, data: DesignData): Promise<SocialDesign 
 }
 
 /**
- * What a look's words are for. Scam and thanks have no post kind of their own, so they get
- * their own lines.
+ * What a look's words are for. Announcement and thanks have no post kind of their own, so they
+ * get their own lines.
  * @param kind - The look.
  * @returns The guide line.
  */
 function guideFor(kind: PictureKind): string {
-  if (kind === "scam") {
-    return 'A warning about a scam going around. The headline names the scam plainly ("Fake parcel texts"); the ticked points are the signs to watch for.';
+  if (kind === "announcement") {
+    return "Something new or worth knowing: a service, an area, hours or a change. The headline says the news itself, not that there is news.";
   }
   if (kind === "thanks") {
     return 'A thank-you to past customers. INVARIANT: the headline starts with "Thank you" ("Thank you for choosing me"). The short line carries the one thing the brief asks of them, if it asks anything (like a Google review); other news in the brief stays in the email.';

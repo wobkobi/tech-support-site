@@ -21,7 +21,7 @@ const CONFLICT_LABEL_CLS = "text-sm font-semibold tracking-wide text-admin-muted
 
 /** What Check all addresses does, for the button's tooltip (the check runs on one click). */
 const ADDRESS_CHECK_NOTE =
-  "Re-checks every stored address and flags the ones that don't match a single Auckland address. Takes a while - one lookup per contact.";
+  "Re-checks every stored address. One that matches a single Auckland address is tidied to the standard form (Google gets it on the next sync); the rest are flagged for a look. Takes a while - one lookup per contact.";
 
 interface ContactsAdminViewProps {
   /** Page title. */
@@ -166,13 +166,13 @@ export function ContactsAdminView({
         ok: boolean;
         checked?: number;
         flagged?: number;
+        tidied?: number;
         error?: string;
       };
       if (data.ok) {
-        setAddressResult(`Checked ${data.checked ?? 0} - ${data.flagged ?? 0} need a look.`);
-        toast(`Address check done - ${data.flagged ?? 0} of ${data.checked ?? 0} need a look.`, {
-          tone: "success",
-        });
+        const summary = `${data.tidied ?? 0} tidied, ${data.flagged ?? 0} need a look`;
+        setAddressResult(`Checked ${data.checked ?? 0} - ${summary}.`);
+        toast(`Address check done - ${summary}.`, { tone: "success" });
         router.refresh();
       } else {
         setAddressResult(`Error: ${data.error ?? "unknown"}`);

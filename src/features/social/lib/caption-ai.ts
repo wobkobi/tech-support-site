@@ -40,12 +40,48 @@ export const CAPTION_ENDINGS = [
   { key: "none", label: "No set ending" },
   { key: "book", label: "Book online" },
   { key: "call", label: "Give me a call" },
-  { key: "visit", label: "Visit my website" },
+  { key: "ask", label: "Ask a question" },
 ] as const;
 export type CaptionEnding = (typeof CAPTION_ENDINGS)[number]["key"];
 
 /** Kinds of post, shared with the post maker's Draft with AI. */
 export const CAPTION_KINDS = POST_DRAFT_KINDS;
+
+/**
+ * The length and ending picking a kind fills in. A review stays medium so the quote and the
+ * thanks both fit.
+ */
+export const CAPTION_KIND_DEFAULTS: Record<
+  string,
+  { length: CaptionLength; ending: CaptionEnding }
+> = {
+  general: { length: "medium", ending: "none" },
+  availability: { length: "short", ending: "book" },
+  tip: { length: "medium", ending: "ask" },
+  scam: { length: "medium", ending: "none" },
+  promo: { length: "short", ending: "book" },
+  review: { length: "medium", ending: "none" },
+};
+
+/**
+ * Whether a kind's words can carry emoji. A scam alert never does, so it reads as serious.
+ * @param kind - A {@link CAPTION_KINDS} key.
+ * @returns True when the Emoji tickbox applies.
+ */
+export function kindAllowsEmoji(kind: string): boolean {
+  return kind !== "scam";
+}
+
+/**
+ * Whether an ending works for the apps picked. A Google post takes no replies, so a question
+ * there goes unanswered.
+ * @param ending - The ending.
+ * @param googleOnly - Whether the words go only to Google.
+ * @returns True when it can be picked.
+ */
+export function endingFits(ending: CaptionEnding, googleOnly: boolean): boolean {
+  return !(googleOnly && ending === "ask");
+}
 
 /** Everything the caption route needs. */
 export interface CaptionRequest {
@@ -81,8 +117,9 @@ function pick<K extends string>(list: readonly { key: K }[], value: unknown, fal
 }
 
 /**
- * Reads the route's body into a request. Words only for Google never get hashtags, and fixing
- * spelling only ever needs one version.
+ * Reads the route's body into a request. Words only for Google never get hashtags or a question
+ * to end on, new words for a scam alert get no emoji, and fixing spelling only ever needs one
+ * version.
  * @param body - Parsed JSON body.
  * @returns The request, or an error to show.
  */
@@ -107,17 +144,20 @@ export function parseCaptionRequest(body: unknown): CaptionRequest | { error: st
       : typeof b.count === "number" && Number.isInteger(b.count)
         ? Math.min(MAX_CAPTION_OPTIONS, Math.max(1, b.count))
         : 1;
+  const kind = pick(CAPTION_KINDS, b.kind, "general");
+  const asked = pick(CAPTION_ENDINGS, b.ending, "none");
+  // Adding an ending with none picked, or one the apps can't take, adds the booking link, the
+  // usual next step.
+  const fallback = action === "cta" ? "book" : "none";
   return {
     mode,
     brief,
     action,
-    kind: pick(CAPTION_KINDS, b.kind, "general"),
+    kind,
     length: pick(CAPTION_LENGTHS, b.length, "medium"),
     hashtags: !googleOnly && (b.hashtags === true || action === "hashtags"),
-    emoji: b.emoji === true,
-    // Adding an ending with none picked adds the booking link, the usual next step.
-    ending:
-      action === "cta" && b.ending === "none" ? "book" : pick(CAPTION_ENDINGS, b.ending, "none"),
+    emoji: b.emoji === true && (mode === "rewrite" || kindAllowsEmoji(kind)),
+    ending: asked !== "none" && endingFits(asked, googleOnly) ? asked : fallback,
     platforms,
     count,
     promoId: typeof b.promoId === "string" && /^[a-f0-9]{24}$/i.test(b.promoId) ? b.promoId : null,

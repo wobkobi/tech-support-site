@@ -22,14 +22,16 @@ import "server-only";
 
 /** What each kind of post is for, written for the words rather than a picture. */
 const KIND_GUIDE: Record<string, string> = {
-  announcement:
-    "Something new or worth knowing: a service, an area, hours or a change. Open with the news itself, not with the fact that there is news.",
+  availability:
+    "When I can and can't take bookings: time away, a busy stretch or times I have free. Open with the change itself, every date and time exactly as the brief gives it (\"I'm away 20 to 27 October\"), then how they can still get a booking. INVARIANT: never fill in a date, weekday or return date the brief doesn't give.",
   tip: "One practical tip the reader can do themselves. Open with the problem or the win, then the steps or the signs in a few short lines.",
+  scam: 'A warning about a scam going around, in this order: name it plainly ("There are fake parcel texts going around"), the signs to watch for, what to do if one turns up, then a last line asking them to pass it on to anyone who might get one. Calm and practical, never alarming. INVARIANT: no price, deal, sales pitch, phone number or web address.',
   review:
     "Sharing a review a customer left. Does the brief hold the customer's own words?\n- YES: quote the strongest one or two sentences exactly, thank them by the first name the brief gives, and say what the job was only as far as the review or the brief says. INVARIANT: only cut a customer's words; never add, reword or tidy them.\n- NO: write a short post asking past customers to leave a review. INVARIANT: never make up a review, a quote or anything a customer said.",
   promo:
     "The deal on now: what it's good for and who it suits. PROMO says how to name it; with no promo running, write about the help itself and mention no deal.",
-  general: "A short post about the business: what's happening and what it means for the reader.",
+  general:
+    "A short post about the business: news, a new service or area, or what's happening, and what it means for the reader. Open with the news itself, not with the fact that there is news.",
 };
 
 /** What each change does to words already written. */
@@ -113,9 +115,14 @@ function endingLines(req: CaptionRequest, phone: string): string {
       return req.platforms.includes("google")
         ? "The last sentence asks them to give me a call. INVARIANT: no phone number, since Google gets these words; the post's Call button does that job."
         : `The last sentence asks them to give me a call on ${phone}, written exactly like that.`;
-    case "visit":
-      return `The last sentence points them to ${site}, written exactly like that. INVARIANT: that address appears once.`;
+    case "ask":
+      // Meta pushes down "engagement bait"; a real question about their own experience isn't.
+      return 'The last sentence asks the reader one real question about their own experience that they can answer in a comment, like "What\'s the one thing your phone does that drives you mad?". INVARIANT: never ask them to like, share, tag someone or comment a set word ("comment YES"). INVARIANT: add no web address or phone number of your own.';
     default:
+      // A real warning is worth passing on, and asking that of one isn't bait.
+      if (req.mode === "write" && req.kind === "scam") {
+        return 'The last sentence asks them to pass it on, like "Pass this on to anyone you know who might get one." INVARIANT: that is the very last sentence; any offer of help goes before it. INVARIANT: add no web address or phone number of your own.';
+      }
       return "Does the brief ask the reader to book, call or visit?\n- YES: end with that, using a web address or number only as BUSINESS FACTS or the brief gives it.\n- NO: end where the post naturally ends. INVARIANT: add no web address or phone number of your own.";
   }
 }

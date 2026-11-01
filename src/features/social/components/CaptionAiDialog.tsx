@@ -17,9 +17,12 @@ import {
   CAPTION_BRIEF_MAX,
   CAPTION_ENDINGS,
   CAPTION_KINDS,
+  CAPTION_KIND_DEFAULTS,
   CAPTION_LENGTHS,
   MAX_CAPTION_OPTIONS,
+  endingFits,
   hashtagsOnByDefault,
+  kindAllowsEmoji,
   type CaptionAction,
   type CaptionEnding,
   type CaptionLength,
@@ -119,6 +122,22 @@ export function CaptionAiDialog({
   const googleOnly = only === "google" || (enabled.length === 1 && enabled[0] === "google");
   const hashtags = !googleOnly && (hashtagsPick ?? hashtagsOnByDefault(setup.hashtags, platforms));
   const example = CAPTION_KINDS.find((k) => k.key === kind)?.example ?? "";
+  const endings = CAPTION_ENDINGS.filter((e) => endingFits(e.key, googleOnly));
+  const endingNow = endingFits(ending, googleOnly) ? ending : "none";
+  const emojiFits = tab === "change" || kindAllowsEmoji(kind);
+
+  /**
+   * Switches the kind and fills in the length and ending that kind usually takes.
+   * @param key - A kind's key.
+   */
+  function pickKind(key: string): void {
+    setKind(key);
+    const fill = CAPTION_KIND_DEFAULTS[key];
+    if (fill) {
+      setLength(fill.length);
+      setEnding(fill.ending);
+    }
+  }
 
   /**
    * Asks for options and shows them.
@@ -133,8 +152,8 @@ export function CaptionAiDialog({
       kind,
       length,
       hashtags,
-      emoji,
-      ending,
+      emoji: emoji && emojiFits,
+      ending: endingNow,
       platforms,
       count: action === "fix" ? 1 : action ? Math.min(count, 2) : count,
       promoId,
@@ -183,10 +202,10 @@ export function CaptionAiDialog({
     <AdminField label="Ending" htmlFor={`${id}-ending`}>
       <AdminSelect
         id={`${id}-ending`}
-        value={ending}
+        value={endingNow}
         onChange={(e) => setEnding(e.target.value as CaptionEnding)}
       >
-        {CAPTION_ENDINGS.map((e) => (
+        {endings.map((e) => (
           <option key={e.key} value={e.key}>
             {e.label}
           </option>
@@ -252,7 +271,7 @@ export function CaptionAiDialog({
                 <AdminSelect
                   id={`${id}-kind`}
                   value={kind}
-                  onChange={(e) => setKind(e.target.value)}
+                  onChange={(e) => pickKind(e.target.value)}
                 >
                   {CAPTION_KINDS.map((k) => (
                     <option key={k.key} value={k.key}>
@@ -297,7 +316,12 @@ export function CaptionAiDialog({
                 onChange={setHashtagsPick}
                 label={googleOnly ? "Hashtags (not on Google)" : "Hashtags"}
               />
-              <AdminCheckbox checked={emoji} onChange={setEmoji} label="Emoji (one or two)" />
+              <AdminCheckbox
+                checked={emoji && emojiFits}
+                disabled={!emojiFits}
+                onChange={setEmoji}
+                label={emojiFits ? "Emoji (one or two)" : "Emoji (not on a scam alert)"}
+              />
             </div>
           </>
         ) : !hasWords ? (

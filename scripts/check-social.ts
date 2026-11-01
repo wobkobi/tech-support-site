@@ -7,6 +7,10 @@
 
 import { BRIEF_MAX, POST_SOURCE_MAX } from "@/features/mailing/lib/ai-draft";
 import {
+  CAPTION_ENDINGS,
+  CAPTION_KIND_DEFAULTS,
+  CAPTION_KINDS,
+  CAPTION_LENGTHS,
   hashtagsOnByDefault,
   parseCaptionRequest,
   readCaptions,
@@ -1469,6 +1473,45 @@ function checkCaptionAi(): void {
     "caption: Add an ending with none picked books",
     captionReq({ mode: "rewrite", action: "cta", ending: "none" }).ending,
     "book",
+  );
+  expectEqual(
+    "caption: an old Announcement kind writes as General",
+    captionReq({ kind: "announcement" }).kind,
+    "general",
+  );
+  expect(
+    "caption: every kind fills in a known length and ending",
+    CAPTION_KINDS.every((k) => {
+      const fill = CAPTION_KIND_DEFAULTS[k.key];
+      return (
+        !!fill &&
+        CAPTION_LENGTHS.some((l) => l.key === fill.length) &&
+        CAPTION_ENDINGS.some((e) => e.key === fill.ending)
+      );
+    }),
+  );
+  expect(
+    "caption: new words for a scam alert get no emoji",
+    !captionReq({ kind: "scam", emoji: true }).emoji,
+  );
+  expect(
+    "caption: changing a scam alert's words keeps the Emoji tick",
+    captionReq({ mode: "rewrite", action: "friendlier", kind: "scam", emoji: true }).emoji,
+  );
+  expectEqual(
+    "caption: a question to end on is dropped for Google only",
+    captionReq({ platforms: ["google"], ending: "ask" }).ending,
+    "none",
+  );
+  expectEqual(
+    "caption: Add an ending as a question on Google only books instead",
+    captionReq({ mode: "rewrite", action: "cta", platforms: ["google"], ending: "ask" }).ending,
+    "book",
+  );
+  expectEqual(
+    "caption: Google among others keeps the question",
+    captionReq({ platforms: ["google", "facebook"], ending: "ask" }).ending,
+    "ask",
   );
   expect(
     "caption: Add hashtags turns hashtags on",
