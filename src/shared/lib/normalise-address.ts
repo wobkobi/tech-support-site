@@ -209,7 +209,8 @@ function addressTokens(value: string | null): Set<string> | null {
     .trim();
   const words = flattened
     .split(" ")
-    .map((word) => STREET_ABBREVIATIONS[word] ?? word)
+    // "St" is Saint as often as Street ("58 St Michaels Ave", "St Heliers"), so Saint reads as St.
+    .map((word) => (word === "saint" ? "street" : (STREET_ABBREVIATIONS[word] ?? word)))
     .filter((word) => word && !ADDRESS_NOISE.has(word));
   return words.length > 0 ? new Set(words) : null;
 }
