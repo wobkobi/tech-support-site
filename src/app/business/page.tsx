@@ -188,6 +188,17 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
     },
   };
 
+  // Mirrors the visible "Common questions" list; voice and AI search read FAQ markup.
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: businessFaq.map(({ q, a }) => ({
+      "@type": "Question",
+      name: q,
+      acceptedAnswer: { "@type": "Answer", text: a },
+    })),
+  };
+
   return (
     <PageShell>
       <PixelEvent event="ViewContent" />
@@ -195,6 +206,11 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
         id="ld-business-offer"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdHtml(businessJsonLd) }}
+      />
+      <script
+        id="ld-faq"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml(faqJsonLd) }}
       />
       <PageHead
         crumbs={[

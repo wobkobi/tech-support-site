@@ -20,9 +20,16 @@ const siteUrl = getSiteUrl();
 /** Portrait, relative to the public directory. */
 const PHOTO_SRC = "/source/harrison-2026.jpg";
 
+/** Degree issuer, shared by the person's alumniOf and the degree credential. */
+const AUT = {
+  "@type": "CollegeOrUniversity",
+  name: "Auckland University of Technology",
+  url: "https://www.aut.ac.nz",
+};
+
 const TITLE = "Harrison Raynes - Auckland Tech Support";
 const DESCRIPTION =
-  "Computer science graduate based in Auckland. I help households and small businesses across Auckland with friendly, jargon-free tech support.";
+  "AUT computer science graduate based in Auckland. I help households and small businesses across Auckland with friendly, jargon-free tech support.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -50,8 +57,30 @@ export default async function AboutPage(): Promise<React.ReactElement> {
     name: "Harrison Raynes",
     jobTitle: "Owner and Technician",
     worksFor: { "@id": `${siteUrl}#business` },
-    knowsAbout: ["Computer Repair", "IT Support", "Networking", "Smart Home Setup"],
+    knowsAbout: [
+      "Computer Repair",
+      "IT Support",
+      "Networking",
+      "Cybersecurity",
+      "Smart Home Setup",
+    ],
     workLocation: { "@type": "City", name: "Auckland" },
+    alumniOf: AUT,
+    hasCredential: [
+      {
+        "@type": "EducationalOccupationalCredential",
+        name: "Bachelor of Computer and Information Science",
+        credentialCategory: "degree",
+        about: ["Networks and Cybersecurity", "Software Development"],
+        recognizedBy: AUT,
+      },
+      {
+        "@type": "EducationalOccupationalCredential",
+        name: "Cisco CCNA certificates (three)",
+        credentialCategory: "certificate",
+        recognizedBy: { "@type": "Organization", name: "Cisco", url: "https://www.cisco.com" },
+      },
+    ],
     url: `${siteUrl}/about`,
     image: `${siteUrl}${PHOTO_SRC}`,
     // Personal profiles only; business profiles go on the LocalBusiness sameAs.
@@ -74,7 +103,7 @@ export default async function AboutPage(): Promise<React.ReactElement> {
           { name: "About", path: "/about" },
         ]}
         title="About Harrison Raynes"
-        intro="I'm Harrison Raynes, a computer science graduate based in Auckland. I started To the Point Tech because plenty of people have a computer problem and no one straightforward to call about it."
+        intro="I'm Harrison Raynes, an AUT computer science graduate based in Auckland. I started To the Point Tech because plenty of people have a computer problem and no one straightforward to call about it."
         note="I come to you and fix it on the spot where I can. You'll know what went wrong and what I changed, in words that actually mean something, so next time it happens you might not need to call me at all."
         action={null}
       />
@@ -95,7 +124,9 @@ export default async function AboutPage(): Promise<React.ReactElement> {
           </p>
           <p className="mt-2 text-xl font-extrabold">Harrison Raynes</p>
           <p className="mt-3 text-seasalt-700">
-            Computer science graduate, Auckland born and raised.
+            Bachelor of Computer and Information Science from AUT, majoring in Networks and
+            Cybersecurity and in Software Development, with three Cisco CCNA certificates. Auckland
+            born and raised.
           </p>
         </div>
       </Section>
