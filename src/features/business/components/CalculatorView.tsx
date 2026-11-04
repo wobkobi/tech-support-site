@@ -96,6 +96,7 @@ import type {
 import { matchedByCompanyOnly } from "@/features/contacts/lib/contact-search";
 import { Notice } from "@/shared/components/Notice";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
+import { displayNZPhone } from "@/shared/lib/normalise-phone";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { nzNowTime } from "@/shared/lib/timezone-utils";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -265,6 +266,10 @@ export function CalculatorView({
   // Normalised on seed too, so the preview shows exactly what gets saved.
   const [clientEmail, setClientEmail] = useState(() =>
     normaliseEmail(eventPrefill?.clientEmail ?? reissue?.clientEmail),
+  );
+  // Mobile as typed, for a client with no email; the save stores it in +64 form.
+  const [clientPhone, setClientPhone] = useState(() =>
+    displayNZPhone(eventPrefill?.clientPhone || reissue?.clientPhone),
   );
   // Address-to choice (Name/Company/Custom) carries through to the invoice.
   const [pickedContactName, setPickedContactName] = useState<string | null>(null);
@@ -576,6 +581,7 @@ export function CalculatorView({
       setAlreadyPaid(draft.alreadyPaid ?? EMPTY_ALREADY_PAID);
       setClientName(draft.clientName ?? "");
       setClientEmail(normaliseEmail(draft.clientEmail));
+      setClientPhone(draft.clientPhone ?? "");
       setPickedContactName(draft.pickedContactName ?? null);
       setPickedContactCompany(draft.pickedContactCompany ?? null);
       setPickedContactGoogleId(draft.pickedContactGoogleId ?? null);
@@ -650,6 +656,7 @@ export function CalculatorView({
           alreadyPaid,
           clientName,
           clientEmail,
+          clientPhone,
           pickedContactName,
           pickedContactCompany,
           pickedContactGoogleId,
@@ -681,6 +688,7 @@ export function CalculatorView({
     alreadyPaid,
     clientName,
     clientEmail,
+    clientPhone,
     pickedContactName,
     pickedContactCompany,
     pickedContactGoogleId,
@@ -797,6 +805,7 @@ export function CalculatorView({
     eventPrefill,
     draftScope,
     pickedContactGoogleId,
+    clientPhone,
     jobDate,
     tripAddress,
     paidCash,
@@ -849,6 +858,7 @@ export function CalculatorView({
     setAlreadyPaid(EMPTY_ALREADY_PAID);
     setClientName("");
     setClientEmail("");
+    setClientPhone("");
     setPickedContactName(null);
     setPickedContactCompany(null);
     setPickedContactGoogleId(null);
@@ -926,6 +936,7 @@ export function CalculatorView({
           name={pickedContactName ?? clientName}
           company={pickedContactCompany}
           email={clientEmail}
+          phone={clientPhone}
           googleContactId={pickedContactGoogleId}
           existingContactName={pendingExistingName}
           existingContactDetail={pendingExistingDetail}
@@ -1207,6 +1218,8 @@ export function CalculatorView({
             onClientNameChange={setClientName}
             clientEmail={clientEmail}
             onClientEmailChange={setClientEmail}
+            clientPhone={clientPhone}
+            onClientPhoneChange={setClientPhone}
             pickedContactName={pickedContactName}
             pickedContactCompany={pickedContactCompany}
             addressMode={addressMode}
@@ -1224,6 +1237,7 @@ export function CalculatorView({
               const byCompany = matchedByCompanyOnly(c, clientName);
               setClientName(byCompany && company ? company : c.name);
               setClientEmail(normaliseEmail(c.email));
+              setClientPhone(displayNZPhone(c.phone));
               setPickedContactName(c.name);
               setPickedContactCompany(company);
               setPickedContactGoogleId(c.id || null);
@@ -1238,6 +1252,7 @@ export function CalculatorView({
               setAddressMode("custom");
               setClientName("");
               setClientEmail("");
+              setClientPhone("");
             }}
           />
 
@@ -1269,6 +1284,7 @@ export function CalculatorView({
             isQuote={quoteMode}
             clientName={clientName}
             clientEmail={clientEmail}
+            clientPhone={clientPhone}
             issueDate={todayISO()}
             dueDate={addDaysISO(identity.paymentTermsDays)}
             jobDate={jobDate}

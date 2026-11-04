@@ -1,5 +1,6 @@
 // src/features/reviews/lib/email-invoice.ts
-// Invoice, quote, reminder, payment-apology and void emails for the business ledger.
+// Invoice, quote, reminder, payment-apology and void emails for the business ledger, plus
+// the text-message version of the invoice email.
 
 import { balanceDue, formatNZD } from "@/features/business/lib/business";
 import {
@@ -33,7 +34,8 @@ export interface InvoiceEmailData {
   total: number;
   /** Money handed over before the invoice went out; the email asks for the rest. */
   alreadyPaid?: number | null;
-  driveWebUrl?: string | null;
+  /** The customer link to the PDF, the same one texts carry; unset leaves the line out. */
+  viewUrl?: string | null;
   /** True when the row is a quote - switches subject/body to quote wording. */
   isQuote?: boolean | null;
   /** Quote validity end; shown in place of the due date. */
@@ -54,6 +56,18 @@ function defaultGreetingFor(invoice: InvoiceEmailData): string {
     invoice.defaultGreeting?.trim() ||
     (invoice.clientName.split(" ")[0] || invoice.clientName).trim()
   );
+}
+
+/**
+ * The "online copy" line pointing at the customer link.
+ * @param url - The customer link, or null when there isn't one.
+ * @param noun - "invoice" or "quote", for the link text.
+ * @returns The paragraph HTML, or "" with no link.
+ */
+function onlineCopyLine(url: string | null | undefined, noun: string): string {
+  return url
+    ? `<p style="margin:0 0 16px;font-size:14px;color:#555">An online copy is also here: <a href="${escapeHtml(url)}" style="color:#43bccd">view ${noun}</a>.</p>`
+    : "";
 }
 
 interface BuildInvoiceEmailArgs {
@@ -94,9 +108,6 @@ export async function buildInvoiceEmail({
       ? `<p style="margin:0 0 4px"><strong>Already paid:</strong> -${escapeHtml(formatNZD(invoice.alreadyPaid))}</p>
       <p style="margin:0 0 4px"><strong>Balance due:</strong> ${escapeHtml(formatNZD(balanceDue(invoice)))}</p>`
       : "";
-  const driveLink = invoice.driveWebUrl
-    ? `<p style="margin:0 0 16px;font-size:14px;color:#555">An online copy is also here: <a href="${escapeHtml(invoice.driveWebUrl)}" style="color:#43bccd">view ${isQuote ? "quote" : "invoice"}</a>.</p>`
-    : "";
 
   // Quotes show validity instead of due date and no bank block.
   const dateLine = isQuote
@@ -138,7 +149,7 @@ export async function buildInvoiceEmail({
       ${dateLine}
     </div>
 
-    ${driveLink}
+    ${onlineCopyLine(invoice.viewUrl, isQuote ? "quote" : "invoice")}
 
     ${paymentBlock}
 
@@ -148,6 +159,47 @@ export async function buildInvoiceEmail({
 `);
 
   return { subject, html };
+}
+
+/** Where an invoice stands, which sets what its text asks for. */
+export type InvoiceTextState = "open" | "overdue" | "paid";
+
+/**
+ * The text-message version of the invoice email, sent from the operator's phone: the
+ * greeting, what it is and what's owed, the customer link on a line of its own (a full stop
+ * touching a link gets pulled into it on some phones), then the sign-off.
+ * @param invoice - Invoice email fields, with the customer link.
+ * @param state - Open, overdue or paid; paid makes it a receipt. Ignored on a quote.
+ * @param identity - Business identity.
+ * @param identity.name - Operator's full name; the text signs off with the first word.
+ * @param identity.company - Business name, for the brand.
+ * @returns The message text.
+ */
+export function buildInvoiceText(
+  invoice: InvoiceEmailData,
+  state: InvoiceTextState,
+  identity: { name: string; company: string },
+): string {
+  const brand = brandName(identity);
+  let intro: string;
+  if (invoice.isQuote) {
+    intro = `here's your quote from ${brand} for ${formatNZD(invoice.total)}. If you're happy with it, just reply or give me a ring and I'll get it booked in.`;
+  } else if (state === "paid") {
+    intro = `here's your receipt from ${brand} for ${formatNZD(invoice.total)} - it's all paid.`;
+  } else {
+    const kind = invoice.replacesNumber ? "corrected invoice" : "invoice";
+    // A part-paid invoice asks for the rest, as the email does.
+    const owed = formatNZD(balanceDue(invoice));
+    const due = formatDateShort(invoice.dueDate);
+    intro =
+      state === "overdue"
+        ? `here's your ${kind} from ${brand}. ${owed} was due on ${due} - the bank details are on it.`
+        : `here's your ${kind} from ${brand}. ${owed} is due by ${due}, and the bank details are on it.`;
+  }
+  const signOff = identity.name.trim().split(/\s+/)[0] || brand;
+  return [`Hi ${defaultGreetingFor(invoice)}, ${intro}`, invoice.viewUrl, `Thanks, ${signOff}`]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 interface SendInvoiceEmailArgs {
@@ -273,6 +325,8 @@ export async function sendInvoiceReminderEmail({
       <p style="margin:0 0 4px"><strong>Amount due:</strong> ${totalLabel}</p>
       <p style="margin:0"><strong>Was due:</strong> ${dueDate}</p>
     </div>
+
+    ${onlineCopyLine(invoice.viewUrl, "invoice")}
 
     <p style="margin:0 0 8px;font-size:14px;color:#333"><strong>Bank transfer:</strong></p>
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">

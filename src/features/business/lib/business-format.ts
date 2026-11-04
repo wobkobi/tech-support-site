@@ -266,6 +266,16 @@ export function settledCallout(
 }
 
 /**
+ * The quote box's first line. A quote goes out by email or by text and the PDF can't tell
+ * which, so the wording fits both.
+ * @param phone - Business phone number to ring.
+ * @returns The line on how to accept the quote.
+ */
+export function quoteAcceptLine(phone: string): string {
+  return `Reply to my message or ring ${phone} to go ahead.`;
+}
+
+/**
  * The quote box's lines under "how to go ahead". Labour bills on the time the job actually
  * takes, so a quote's hours are an estimate and the box says so; a quote of flat lines only
  * has nothing to estimate and skips that line.

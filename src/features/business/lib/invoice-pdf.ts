@@ -7,6 +7,7 @@ import {
   goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
+  quoteAcceptLine,
   quoteCalloutLines,
   settledCallout,
   settlementRows,
@@ -18,6 +19,7 @@ import { bankCode, bankParticulars } from "@/features/business/lib/payment-field
 import type { Invoice } from "@/features/business/types/business";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { displayNZPhone } from "@/shared/lib/normalise-phone";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import fontkit from "@pdf-lib/fontkit";
 import type { Invoice as PrismaInvoice } from "@prisma/client";
@@ -183,6 +185,7 @@ export function serialiseInvoice(inv: PrismaInvoice): Invoice {
     number: inv.number,
     clientName: inv.clientName,
     clientEmail: inv.clientEmail,
+    clientPhone: inv.clientPhone,
     issueDate: inv.issueDate.toISOString(),
     dueDate: inv.dueDate.toISOString(),
     jobDate: inv.jobDate,
@@ -384,7 +387,7 @@ function drawBillToBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
     font: ctx.bold,
     color: DARK,
   });
-  ctx.page.drawText(invoice.clientEmail, {
+  ctx.page.drawText(invoice.clientEmail || displayNZPhone(invoice.clientPhone), {
     x: MARGIN,
     y: infoY - 32,
     size: 12,
@@ -817,7 +820,7 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
 function drawQuoteCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
   const { estimate, terms } = quoteCalloutLines(invoice.lineItems, invoice.quoteValidUntil);
   return drawCallout(ctx, y, "Accepting this quote", [
-    { text: `Reply to the email or ring ${ctx.identity.phone} to go ahead.` },
+    { text: quoteAcceptLine(ctx.identity.phone) },
     ...(estimate ? [{ text: estimate }] : []),
     { text: terms, colour: MID },
   ]);

@@ -1,6 +1,6 @@
 // scripts/check-invoice-pdf.ts
-// The invoice PDF renders macrons, multi-line notes and long invoices (onto a second page),
-// and the paid, voided, couldn't-fix and quote wording it prints reads right.
+// The invoice PDF renders macrons, multi-line notes, long invoices (onto a second page) and a
+// client with only a mobile, and the paid, voided, couldn't-fix and quote wording reads right.
 // Run with: npm test -- invoice-pdf
 // Set INVOICE_PDF_OUT=<dir> to also write the rendered PDFs there for a look.
 
@@ -12,6 +12,7 @@ import {
 } from "@/features/business/lib/business-format";
 import { generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import type { Invoice, LineItem } from "@/features/business/types/business";
+import { displayNZPhone } from "@/shared/lib/normalise-phone";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import fs from "fs";
 import path from "path";
@@ -150,6 +151,26 @@ async function main(): Promise<void> {
     ),
     1,
   );
+  // A client with only a mobile: Bill To prints the number where the email would go.
+  expectEqual(
+    "phone-only quote renders",
+    await render(
+      "phone-only",
+      invoice({
+        number: "Q-202627-0005",
+        isQuote: true,
+        clientEmail: "",
+        clientPhone: "+64211234567",
+      }),
+    ),
+    1,
+  );
+  expectEqual(
+    "stored mobile reads as a local number",
+    displayNZPhone("+64211234567"),
+    "021 123 4567",
+  );
+  expectEqual("no mobile prints nothing", displayNZPhone(null), "");
 
   // Settlement rows: a paid invoice must never ask for money.
   expectEqual("sent, nothing paid: no rows", settlementRows({ status: "SENT", total: 100 }), []);

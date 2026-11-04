@@ -36,7 +36,9 @@ import {
   useGoogleContacts,
 } from "@/features/contacts/components/ContactNameInput";
 import { EmailInput } from "@/shared/components/EmailInput";
+import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
+import { displayNZPhone } from "@/shared/lib/normalise-phone";
 import { addDaysToDateKey } from "@/shared/lib/timezone-utils";
 import type React from "react";
 import { useState } from "react";
@@ -45,6 +47,8 @@ import { useState } from "react";
 export interface InvoiceFormData {
   clientName: string;
   clientEmail: string;
+  /** Mobile as typed; an invoice needs this or the email. */
+  clientPhone: string;
   /** ISO YYYY-MM-DD. */
   issueDate: string;
   /** ISO YYYY-MM-DD. */
@@ -97,7 +101,11 @@ interface InvoiceFormProps {
 }
 
 /** DOM ids of the client fields, for focusing the first bad one. */
-const FIELD_IDS = { name: "invoice-client-name", email: "invoice-client-email" };
+const FIELD_IDS = {
+  name: "invoice-client-name",
+  email: "invoice-client-email",
+  phone: "invoice-client-phone",
+};
 /** DOM ids of the other labelled fields. */
 const OTHER_IDS = { issue: "invoice-issue-date", due: "invoice-due-date", notes: "invoice-notes" };
 
@@ -170,10 +178,12 @@ export function InvoiceForm({
    * Validates the form and hands off to the parent on success.
    */
   function submit(): void {
+    // The email can go blank only when a mobile takes its place.
     const found = checkContactFields(
-      { name: form.clientName, email: form.clientEmail },
-      { emailRequired: true },
+      { name: form.clientName, email: form.clientEmail, phone: form.clientPhone },
+      { emailRequired: !form.clientPhone.trim() },
     );
+    if (found.email && !form.clientEmail.trim()) found.email = "Enter an email or a mobile number.";
     setFieldErrors(found);
     if (focusFirstInvalid(found, FIELD_IDS)) {
       setError(null);
@@ -225,14 +235,17 @@ export function InvoiceForm({
             // One update: update() spreads the render's form, so two in a row lose the first.
             onPick={(c) => {
               const fillEmail = !!c.email && !form.clientEmail.trim();
+              const fillPhone = !!c.phone && !form.clientPhone.trim();
               update({
                 clientName: c.name || c.email,
                 ...(fillEmail && { clientEmail: c.email }),
+                ...(fillPhone && { clientPhone: displayNZPhone(c.phone) }),
               });
               setFieldErrors((prev) => ({
                 ...prev,
                 name: undefined,
-                ...(fillEmail && { email: undefined }),
+                ...((fillEmail || fillPhone) && { email: undefined }),
+                ...(fillPhone && { phone: undefined }),
               }));
             }}
             disabled={busy}
@@ -252,6 +265,21 @@ export function InvoiceForm({
             }}
             error={fieldErrors.email}
             maxLength={320}
+            autoComplete="off"
+            disabled={busy}
+            className={ADMIN_INPUT_CLS}
+          />
+        </AdminField>
+        <AdminField label="Client mobile" htmlFor={FIELD_IDS.phone} optional>
+          <PhoneInput
+            id={FIELD_IDS.phone}
+            value={form.clientPhone}
+            onChange={(v) => {
+              update({ clientPhone: v });
+              // A mobile also lifts the "Enter an email" error.
+              setFieldErrors((prev) => ({ ...prev, phone: undefined, email: undefined }));
+            }}
+            error={fieldErrors.phone ?? null}
             autoComplete="off"
             disabled={busy}
             className={ADMIN_INPUT_CLS}

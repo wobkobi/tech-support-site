@@ -15,6 +15,7 @@ import {
   goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
+  quoteAcceptLine,
   quoteCalloutLines,
   settledCallout,
   settlementRows,
@@ -22,6 +23,7 @@ import {
 } from "@/features/business/lib/business";
 import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
+import { invoiceShareUrl } from "@/features/business/lib/invoice-share";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import { reviewAskClockStart, reviewAskDueAt } from "@/features/reviews/lib/review-ask-rules";
@@ -29,6 +31,7 @@ import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { displayNZPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { ServerTimer } from "@/shared/lib/server-timing";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -261,6 +264,21 @@ async function InvoiceRail({
               <span className="text-admin-faint">None</span>
             )}
           </InfoRow>
+          {/* The link every email and text about this invoice carries. */}
+          <InfoRow label="Customer link">
+            {invoice.shareToken ? (
+              <a
+                href={invoiceShareUrl(invoice.shareToken, invoice.isQuote)}
+                target="_blank"
+                rel="noreferrer"
+                className="break-all text-blue-500 hover:text-blue-700"
+              >
+                {invoiceShareUrl(invoice.shareToken, invoice.isQuote).replace(/^https?:\/\//, "")} ↗
+              </a>
+            ) : (
+              <span className="text-admin-faint">Made when it&apos;s first sent</span>
+            )}
+          </InfoRow>
           <InfoRow label="Drive PDF">
             {invoice.driveWebUrl ? (
               <a
@@ -456,7 +474,9 @@ export default async function InvoiceViewPage({
                 Bill to
               </p>
               <p className="text-base font-bold text-slate-800">{invoice.clientName}</p>
-              <p className="text-sm wrap-break-word text-slate-500">{invoice.clientEmail}</p>
+              <p className="text-sm wrap-break-word text-slate-500">
+                {invoice.clientEmail || displayNZPhone(invoice.clientPhone)}
+              </p>
             </div>
             <div className="space-y-1 self-start text-sm whitespace-nowrap">
               {invoice.jobDate && !invoice.isQuote && (
@@ -601,9 +621,7 @@ export default async function InvoiceViewPage({
           {invoice.isQuote ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
               <p className="mb-1 text-sm font-bold text-russian-violet">Accepting this quote</p>
-              <p className="text-slate-700">
-                Reply to the email or ring {identity.phone} to go ahead.
-              </p>
+              <p className="text-slate-700">{quoteAcceptLine(identity.phone)}</p>
               {quoteLines.estimate && <p className="text-slate-700">{quoteLines.estimate}</p>}
               <p>{quoteLines.terms}</p>
             </div>

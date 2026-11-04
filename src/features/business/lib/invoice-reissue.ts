@@ -15,6 +15,7 @@ export interface ReissuePrefill {
   /** Client details, used when no calendar event backs the job. */
   clientName: string;
   clientEmail: string;
+  clientPhone: string;
   /**
    * NZ date (YYYY-MM-DD) of the voided invoice's job, else the day it was issued; the job date
    * when no event backs it, so a Saturday job invoiced on Monday keeps its weekend rates.
@@ -42,6 +43,7 @@ interface ReissueSource {
   number: string;
   clientName: string;
   clientEmail: string;
+  clientPhone?: string | null;
   issueDate: Date;
   jobDate: string | null;
   lineItems: readonly {
@@ -118,6 +120,7 @@ export function reissuePrefill(
     invoiceNumber: invoice.number,
     clientName: invoice.clientName,
     clientEmail: invoice.clientEmail,
+    clientPhone: invoice.clientPhone ?? "",
     jobDate: invoice.jobDate ?? nzDateKey(invoice.issueDate),
     jobText: invoice.lineItems
       .filter((l) => !isSurcharge(l))

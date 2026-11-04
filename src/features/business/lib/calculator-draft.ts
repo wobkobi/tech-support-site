@@ -64,6 +64,8 @@ export interface CalculatorDraft {
   goldCard?: boolean;
   clientName: string;
   clientEmail: string;
+  /** Mobile as typed. Optional so drafts saved before it existed still load. */
+  clientPhone?: string;
   pickedContactName: string | null;
   pickedContactCompany: string | null;
   pickedContactGoogleId: string | null;
@@ -92,6 +94,7 @@ export function isMeaningfulDraft(d: CalculatorDraft): boolean {
     (d.alreadyPaid?.amount.trim().length ?? 0) > 0 ||
     d.clientName.trim().length > 0 ||
     d.clientEmail.trim().length > 0 ||
+    (d.clientPhone?.trim().length ?? 0) > 0 ||
     d.jobAddress.trim().length > 0 ||
     d.pickedContactName !== null ||
     d.pickedContactCompany !== null ||

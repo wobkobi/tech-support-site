@@ -1,7 +1,9 @@
 // src/app/api/admin/contacts/check/route.ts
 // Contact lookup by email for the "Add to contacts?" popup and invoice linking. A local miss
 // is re-checked against Google; `linkedContactId` is the contact matched by Google link.
+// With no email, that link or a match on the mobile is the whole answer.
 
+import { findContactByPhone } from "@/features/contacts/lib/find-or-create";
 import { importGoogleContactByEmail } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -10,9 +12,11 @@ import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * GET /api/admin/contacts/check?email=...&googleContactId=...
+ * GET /api/admin/contacts/check?email=...&googleContactId=...&phone=...
  * Looks up a contact by email (case-insensitive; invalid gives exists=false), falling back
  * to Google, then to a `googleContactId` match for `existingContactId` and `linkedContactId`.
+ * With no email, the `googleContactId` match is the contact, else one with this mobile
+ * (a landline never matches; a household shares it).
  * The existing contact's phone and address come back too, so the popup can show which of two
  * same-named people the email would go onto.
  * @param request - Incoming request.
@@ -25,11 +29,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const email = normaliseEmail(request.nextUrl.searchParams.get("email"));
-  if (!email || !email.includes("@")) {
+  const googleContactId = request.nextUrl.searchParams.get("googleContactId")?.trim();
+  const phone = request.nextUrl.searchParams.get("phone")?.trim();
+  if (!email && !googleContactId && !phone) {
     return NextResponse.json({ ok: true, exists: false, contactId: null });
   }
 
-  const googleContactId = request.nextUrl.searchParams.get("googleContactId")?.trim();
   const linked = googleContactId
     ? await prisma.contact.findFirst({
         where: { googleContactId, deletedAt: null },
@@ -38,6 +43,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       })
     : null;
   const linkedContactId = linked?.id ?? null;
+
+  // No email (a phone-only client): the picked contact, else whoever has this mobile. The
+  // import keeps Google's phone-only contacts in the table, so there's no Google re-check.
+  if (!email) {
+    const contactId =
+      linkedContactId ??
+      (phone ? ((await findContactByPhone(phone, { mobileOnly: true }))?.id ?? null) : null);
+    return NextResponse.json({
+      ok: true,
+      exists: contactId !== null,
+      contactId,
+      linkedContactId,
+    });
+  }
+  if (!email.includes("@")) {
+    return NextResponse.json({ ok: true, exists: false, contactId: null });
+  }
 
   const hit = await prisma.contact.findFirst({
     where: {

@@ -1,7 +1,8 @@
 "use client";
 // src/features/business/components/AddToContactsModal.tsx
-// Prompt to save an unknown client email as a Contact (and Google Contacts), or to add the
-// email to a known contact missing it. Name and company stay editable for company-named invoices.
+// Prompt to save an unknown client (by email, or mobile when there's no email) as a Contact
+// and in Google Contacts, or to add the email to a known contact missing it. Name and company
+// stay editable for company-named invoices.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -9,6 +10,7 @@ import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { looksLikeBusinessName } from "@/features/business/lib/payment-fields";
+import { displayNZPhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useState } from "react";
 
@@ -20,9 +22,9 @@ interface AddToContactsModalProps {
   name: string;
   /** The picked contact's company; without one, a business-looking `name` seeds Company. */
   company?: string | null;
-  /** Client email - dedup key on the server. */
+  /** Client email - dedup key on the server. Blank for a mobile-only client. */
   email: string;
-  /** Optional phone number (E.164 or local format). */
+  /** Optional phone number (E.164 or local format); the dedup key when there's no email. */
   phone?: string | null;
   /** Optional Google People API resource name (e.g. "people/c1234"). */
   googleContactId?: string | null;
@@ -40,8 +42,8 @@ interface AddToContactsModalProps {
  * @param props - Component props.
  * @param props.name - Client name to seed the new Contact row with.
  * @param props.company - The picked contact's company, when known.
- * @param props.email - Client email; the dedup key on the server.
- * @param props.phone - Optional phone number (E.164 or local format).
+ * @param props.email - Client email; the dedup key on the server. Blank for a mobile-only client.
+ * @param props.phone - Optional phone number; the dedup key when there's no email.
  * @param props.googleContactId - Optional Google People API resource name.
  * @param props.existingContactName - Existing contact that lacks this email, if any.
  * @param props.existingContactDetail - That contact's phone and street, if known.
@@ -163,7 +165,9 @@ export function AddToContactsModal({
             </AdminField>
           </>
         )}
-        <p className="text-sm text-admin-muted">{email}</p>
+        <p className="text-sm text-admin-muted">
+          {[email.trim(), displayNZPhone(phone)].filter(Boolean).join(" · ")}
+        </p>
         {error && <p className="text-sm text-coquelicot-500">{error}</p>}
       </div>
     </Modal>

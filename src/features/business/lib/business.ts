@@ -49,6 +49,7 @@ export {
   minsToHoursLabel,
   promoLineLabel,
   promoRateNote,
+  quoteAcceptLine,
   quoteCalloutLines,
   restatesTaskLine,
   settledCallout,

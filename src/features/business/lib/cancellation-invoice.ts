@@ -9,6 +9,7 @@ import {
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
+import { invoiceShareUrlOrNull } from "@/features/business/lib/invoice-share";
 import {
   assessCancellation,
   calcTravelCharge,
@@ -221,7 +222,7 @@ async function sendCancellationInvoice(
         issueDate: invoice.issueDate,
         dueDate: invoice.dueDate,
         total: invoice.total,
-        driveWebUrl: invoice.driveWebUrl,
+        viewUrl: await invoiceShareUrlOrNull(invoice),
       },
       pdfBytes,
       customBody,

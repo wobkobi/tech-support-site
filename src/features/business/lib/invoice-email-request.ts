@@ -2,6 +2,7 @@
 // Request-side helpers for the invoice email routes: override parsing and the email payload.
 
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
+import { invoiceShareUrlOrNull } from "@/features/business/lib/invoice-share";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import type { Invoice } from "@prisma/client";
@@ -31,13 +32,14 @@ export type InvoiceEmailPayload = Pick<
   | "dueDate"
   | "total"
   | "alreadyPaid"
-  | "driveWebUrl"
   | "isQuote"
   | "quoteValidUntil"
   | "replacesNumber"
 > & {
   /** Who the email greets by default - the person behind a company invoice. */
   defaultGreeting: string;
+  /** The customer link to the PDF; null when it couldn't be made. */
+  viewUrl: string | null;
 };
 
 /**
@@ -68,11 +70,18 @@ export async function parseInvoiceEmailOverrides(
 
 /**
  * Projects an invoice down to the fields the email builders read. Looks up the
- * linked contact so an invoice addressed to "68 Ltd" greets Michael, not "68".
+ * linked contact so an invoice addressed to "68 Ltd" greets Michael, not "68", and makes
+ * the customer link on the first send (a write that bumps the row's updatedAt, so a route
+ * that claims on updatedAt must call this after its claim).
  * @param invoice - The full invoice row.
+ * @param options - Payload options.
+ * @param options.withLink - False leaves the link out (and unmade), for the void notice.
  * @returns The email payload subset.
  */
-export async function toInvoiceEmailPayload(invoice: Invoice): Promise<InvoiceEmailPayload> {
+export async function toInvoiceEmailPayload(
+  invoice: Invoice,
+  { withLink = true }: { withLink?: boolean } = {},
+): Promise<InvoiceEmailPayload> {
   const contact = invoice.contactId
     ? await prisma.contact.findUnique({
         where: { id: invoice.contactId },
@@ -87,10 +96,10 @@ export async function toInvoiceEmailPayload(invoice: Invoice): Promise<InvoiceEm
     dueDate: invoice.dueDate,
     total: invoice.total,
     alreadyPaid: invoice.alreadyPaid,
-    driveWebUrl: invoice.driveWebUrl,
     isQuote: invoice.isQuote,
     quoteValidUntil: invoice.quoteValidUntil,
     replacesNumber: invoice.replacesNumber,
     defaultGreeting: invoiceRecipient(invoice.clientName, contact).greetingName,
+    viewUrl: withLink ? await invoiceShareUrlOrNull(invoice) : null,
   };
 }

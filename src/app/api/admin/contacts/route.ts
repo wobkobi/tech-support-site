@@ -1,8 +1,15 @@
 // src/app/api/admin/contacts/route.ts
 // Admin API for listing and creating contacts.
 
-import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
-import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import {
+  type ContactSeed,
+  findOrCreateContactByEmail,
+  findOrCreateContactByPhone,
+} from "@/features/contacts/lib/find-or-create";
+import {
+  pushPhoneOnlyContactToGoogle,
+  syncContactToGoogle,
+} from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { resolveAddress } from "@/shared/lib/normalise-address";
@@ -40,9 +47,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 /**
  * POST /api/admin/contacts
- * Find-or-creates a Contact by email (attaching it to a `googleContactId` match), then
- * best-effort syncs to Google.
- * @param request - Incoming request with { name, email, phone?, address?, company?, googleContactId? }.
+ * Find-or-creates a Contact by email (attaching it to a `googleContactId` match), or by mobile
+ * for a client with no email, then best-effort pushes it to Google.
+ * @param request - Incoming request with { name, email?, phone?, address?, company?,
+ *   googleContactId? }; an email or a phone is required.
  * @returns JSON { ok, created, emailAttached, contact }.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -59,16 +67,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     googleContactId?: string | null;
   } | null;
 
-  if (!body || !body.name?.trim() || !body.email?.trim()) {
-    return errorResponse("Name and email are required", 400);
+  if (!body || !body.name?.trim()) {
+    return errorResponse("Name is required", 400);
   }
 
   const email = normaliseEmail(body.email);
-  if (!email.includes("@")) {
+  const phoneE164 = body.phone ? toE164NZ(body.phone) || null : null;
+  if (!email && !phoneE164) {
+    return errorResponse("Add an email or a mobile number", 400);
+  }
+  if (email && !email.includes("@")) {
     return errorResponse("Invalid email", 400);
   }
-
-  const phoneE164 = body.phone ? toE164NZ(body.phone) || null : null;
 
   // Canonicalise a typed address; an unconfident match keeps the text and flags it for review.
   const rawAddress = body.address?.trim() || null;
@@ -78,7 +88,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     resolution?.status === "ambiguous" || resolution?.status === "unresolved";
   const addressCandidates = resolution?.status === "ambiguous" ? resolution.candidates : [];
 
-  const { contact, created, emailAttached } = await findOrCreateContactByEmail(email, {
+  const seed: ContactSeed = {
     name: body.name.trim(),
     phone: phoneE164,
     address,
@@ -86,7 +96,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     addressCandidates,
     company: body.company?.trim() || null,
     googleContactId: body.googleContactId?.trim() || null,
-  });
+  };
+  // A client with only a mobile matches on it; a landline gets its own contact.
+  const { contact, created, emailAttached } =
+    phoneE164 && !email
+      ? await findOrCreateContactByPhone(phoneE164, seed, { mobileOnly: true })
+      : await findOrCreateContactByEmail(email, seed);
 
   if (!created && !emailAttached) {
     return NextResponse.json({ ok: true, created: false, contact });
@@ -94,9 +109,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Push to Google; awaited because Vercel freezes after the response, but best-effort.
   try {
-    await syncContactToGoogle(contact.id);
+    if (contact.email) await syncContactToGoogle(contact.id);
+    else await pushPhoneOnlyContactToGoogle(contact.id);
   } catch (err) {
-    console.error("[admin/contacts] syncContactToGoogle failed:", err);
+    console.error("[admin/contacts] Google Contacts push failed:", err);
   }
 
   return NextResponse.json(

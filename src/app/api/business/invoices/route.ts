@@ -42,6 +42,7 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { parseDateKey } from "@/shared/lib/date-format";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
+import { validatePhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
@@ -96,6 +97,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const {
     clientName,
     clientEmail,
+    // A mobile for a client with no email; the Text button sends to it.
+    clientPhone,
     issueDate,
     dueDate,
     lineItems,
@@ -135,6 +138,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } = body as {
     clientName?: string;
     clientEmail?: string;
+    clientPhone?: unknown;
     issueDate?: string;
     dueDate?: string;
     lineItems?: { qty: number; unitPrice: number; description: string; lineTotal: number }[];
@@ -162,8 +166,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     reissueOf?: unknown;
   };
 
-  if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
+  if (!clientName || !Array.isArray(lineItems)) {
     return errorResponse("Missing required fields", 400);
+  }
+  const phone = validatePhone(typeof clientPhone === "string" ? clientPhone : "");
+  if (phone.result === "invalid") {
+    return errorResponse("Enter a valid mobile number", 400);
+  }
+  const emailValue = normaliseEmail(clientEmail);
+  if (!emailValue && !phone.e164) {
+    return errorResponse("Add an email or a mobile number", 400);
   }
   // A non-finite numeric would persist NaN totals.
   if (!lineItems.every(isValidLineItem)) {
@@ -291,7 +303,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           isQuote: isQuote === true ? true : null,
           quoteValidUntil: quoteValidValue,
           clientName,
-          clientEmail: normaliseEmail(clientEmail),
+          clientEmail: emailValue,
+          clientPhone: phone.e164 || null,
           issueDate: issueDateValue,
           dueDate: dueDateValue,
           jobDate:

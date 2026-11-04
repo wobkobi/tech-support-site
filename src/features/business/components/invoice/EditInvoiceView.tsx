@@ -118,6 +118,7 @@ export function EditInvoiceView({
         body: JSON.stringify({
           clientName: data.clientName,
           clientEmail: data.clientEmail,
+          clientPhone: data.clientPhone,
           issueDate: data.issueDate,
           dueDate: data.dueDate,
           lineItems: data.lineItems,
@@ -199,6 +200,7 @@ export function EditInvoiceView({
           number={invoiceNumber}
           clientName={preview.clientName}
           clientEmail={preview.clientEmail}
+          clientPhone={preview.clientPhone}
           issueDate={preview.issueDate}
           dueDate={preview.dueDate}
           jobDate={jobDate}

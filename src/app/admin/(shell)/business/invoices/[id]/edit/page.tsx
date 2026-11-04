@@ -20,6 +20,7 @@ import { isSurchargeLine } from "@/features/business/lib/surcharge-line";
 import type { RateConfig } from "@/features/business/types/business";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { displayNZPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { nzDateKey, nzWeekday } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
@@ -159,6 +160,7 @@ export default async function EditInvoicePage({
   const initial: InvoiceFormData = {
     clientName: invoice.clientName,
     clientEmail: invoice.clientEmail,
+    clientPhone: displayNZPhone(invoice.clientPhone),
     // NZ calendar dates: before midday NZ is still the previous day in UTC.
     issueDate: nzDateKey(invoice.issueDate),
     dueDate: nzDateKey(invoice.dueDate),
