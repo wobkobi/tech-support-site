@@ -842,6 +842,18 @@ export function readReplySuggestion(
   return { reply, hide: value.hide === true };
 }
 
+/** A good review over this many words gets a fuller reply than the short thanks. */
+export const LONG_REVIEW_WORDS = 40;
+
+/**
+ * Whether a review is long enough that a short thanks would read as brushing it off.
+ * @param text - The review's words.
+ * @returns True over {@link LONG_REVIEW_WORDS} words.
+ */
+export function isLongReview(text: string): boolean {
+  return text.split(/\s+/).filter(Boolean).length > LONG_REVIEW_WORDS;
+}
+
 /**
  * Fixes the commas around the reviewer's name in a review reply, which the prompt asks for but
  * the model still gets wrong now and then:
