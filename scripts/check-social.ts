@@ -18,7 +18,7 @@ import {
 } from "@/features/social/lib/caption-ai";
 import { postFromEmail } from "@/features/social/lib/from-email";
 import { googlePostBody } from "@/features/social/lib/google-post";
-import { profileChanges } from "@/features/social/lib/google-profile";
+import { accountPhoto, profileChanges } from "@/features/social/lib/google-profile";
 import { insertableGroups } from "@/features/social/lib/insertables";
 import { mergeTargets, parsePostPatch } from "@/features/social/lib/parse";
 import { byTagName, nextTagColour, tagKey, tagName } from "@/features/social/lib/tags";
@@ -1660,6 +1660,24 @@ function checkProfileSync(): void {
     profileChanges(settings, fresh.body).mask,
     [],
   );
+
+  const pic = "https://lh3.googleusercontent.com/a/ACg8ocAbC-d_E";
+  expectEqual(
+    "picture: the primary one, fetched big",
+    accountPhoto([{ url: `${pic}2=s100` }, { url: `${pic}=s100`, metadata: { primary: true } }]),
+    { key: pic, url: `${pic}=s1024` },
+  );
+  expectEqual(
+    "picture: one with no size options keeps its whole address as the key",
+    accountPhoto([{ url: pic }])?.key,
+    pic,
+  );
+  expectEqual(
+    "picture: Google's letter picture isn't copied",
+    accountPhoto([{ url: `${pic}=s100`, default: true, metadata: { primary: true } }]),
+    null,
+  );
+  expectEqual("picture: none at all", accountPhoto(undefined), null);
 
   const spelled = profileChanges(settings, {
     ...fresh.body,

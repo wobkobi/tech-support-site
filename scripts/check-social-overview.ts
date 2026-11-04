@@ -194,7 +194,12 @@ function permsWith(token: MetaTokenInfo | null): Permissions {
     setUp: { facebook: true, instagram: true, google: true },
     token,
     tokenError: null,
-    google: { posts: { ok: true }, reviews: { ok: true }, performance: { ok: true } },
+    google: {
+      posts: { ok: true },
+      reviews: { ok: true },
+      performance: { ok: true },
+      picture: { ok: true },
+    },
   };
 }
 
@@ -238,6 +243,7 @@ function checkPermissions(): void {
       posts: { ok: true },
       reviews: { ok: true },
       performance: { ok: false, error: "Turn it on." },
+      picture: { ok: false, error: "Reconnect Google." },
     },
   };
   expectEqual("an API that's off says why", featureStatus("stats", offGoogle).google, {
@@ -249,6 +255,18 @@ function checkPermissions(): void {
     featureStatus("comments", offGoogle).google.state,
     "ready",
   );
+  expectEqual("the picture says why it can't sync", featureStatus("picture", offGoogle).google, {
+    state: "off",
+    reason: "Reconnect Google.",
+  });
+  expectEqual("no Facebook picture", featureStatus("picture", today).facebook.state, "none");
+  expectEqual("Google picture ready", featureStatus("picture", today).google.state, "ready");
+  const allScopes = permsWith(tokenWith(ALL_SCOPES));
+  const noPicture: Permissions = {
+    ...allScopes,
+    google: { ...allScopes.google!, picture: { ok: false, error: "Reconnect Google." } },
+  };
+  expectEqual("the set-up list doesn't ask for the picture", coreReady(noPicture), true);
 
   const noInstagram: Permissions = {
     ...permsWith(tokenWith(ALL_SCOPES)),

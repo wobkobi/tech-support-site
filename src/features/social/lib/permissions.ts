@@ -13,10 +13,11 @@ export const FEATURE_KEYS = [
   "comments",
   "cover",
   "messages",
+  "picture",
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
-export const GOOGLE_PROBES = ["posts", "reviews", "performance"] as const;
+export const GOOGLE_PROBES = ["posts", "reviews", "performance", "picture"] as const;
 export type GoogleProbe = (typeof GOOGLE_PROBES)[number];
 
 /** Warn this many days before the Meta token, or its data access, runs out. */
@@ -128,9 +129,15 @@ export const FEATURES: readonly Feature[] = [
       google: null,
     },
   },
+  {
+    key: "picture",
+    label: "Profile picture",
+    detail: "Keep the Business Profile's picture the same as your Google account's.",
+    needs: { facebook: null, instagram: null, google: { probe: "picture" } },
+  },
 ];
 
-/** The features the set-up list asks you to have ready; cover and messages are extras. */
+/** The features the set-up list asks you to have ready; cover, messages and picture are extras. */
 export const CORE_FEATURES: readonly FeatureKey[] = ["publish", "takedown", "stats", "comments"];
 
 /** One cell of the grid. */
