@@ -62,7 +62,7 @@ async function loadReissue(
 /**
  * Job calculator page with AI parsing, time tracking, and rate management.
  * @param props - Page props.
- * @param props.searchParams - Optional `eventId` (schedule's "Bill in calculator"), `eventIds` (merged job), `reissue` (a voided invoice's id) or `quote=1` (the "New quote" shortcut).
+ * @param props.searchParams - Optional `eventId` (schedule's "Bill in calculator"), `eventIds` (merged job), `reissue` (a voided invoice's id) or `quote` (any value; the "New quote" shortcut sends `quote=1`).
  * @returns Calculator page element
  */
 export default async function CalculatorPage({
@@ -75,8 +75,9 @@ export default async function CalculatorPage({
   const reissue = await loadReissue(params.reissue);
   // A re-issue bills the voided invoice's own events; it ignores any event params.
   const eventIds = reissue ? reissue.eventIds : parseEventIds(params);
-  // A re-issue replaces a voided invoice, so it is never a quote.
-  const quoteMode = params.quote === "1" && !reissue;
+  // A re-issue replaces a voided invoice, so it is never a quote. A bare "?quote" (typed or
+  // from browser history) counts the same as "?quote=1".
+  const quoteMode = params.quote !== undefined && !reissue;
   const [identity, policy, rateRows, templateRows, promo, eventPrefill] = await Promise.all([
     getIdentity(),
     getPolicy(),

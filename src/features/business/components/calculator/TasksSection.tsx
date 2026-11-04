@@ -13,7 +13,12 @@ import {
 } from "@/features/business/components/calculator/calculator-classes";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { Combobox } from "@/features/business/components/Combobox";
-import { composeDescription, formatNZD, taskLineTotals } from "@/features/business/lib/business";
+import {
+  composeDescription,
+  formatNZD,
+  isChannelModifier,
+  taskLineTotals,
+} from "@/features/business/lib/business";
 import { unsuccessfulShareLabel } from "@/features/business/lib/pricing-policy";
 import { collectTaxonomyTags } from "@/features/business/lib/task-taxonomy";
 import type { RateConfig, TaskLine, TaskTemplate } from "@/features/business/types/business";
@@ -54,6 +59,20 @@ function tagSuggestions(templates: TaskTemplate[], key: "device" | "action"): st
 }
 
 /**
+ * A modifier's name with what it does to the rate, e.g. "At home -$30" or "Gold Card -10%".
+ * @param m - Modifier rate row.
+ * @returns Text for its chip or dropdown option.
+ */
+function modifierLabel(m: RateConfig): string {
+  if (m.percentDelta !== null) {
+    const pct = Math.round(m.percentDelta * 100);
+    return `${m.label} ${pct >= 0 ? "+" : ""}${pct}%`;
+  }
+  const delta = m.hourlyDelta ?? 0;
+  return `${m.label} ${delta < 0 ? "-" : "+"}$${Math.abs(delta)}`;
+}
+
+/**
  * Tasks list: flat-rate rows with a rate dropdown, or device + action rows priced
  * from saved templates with modifier chips.
  * @param props - Component props.
@@ -66,7 +85,7 @@ function tagSuggestions(templates: TaskTemplate[], key: "device" | "action"): st
  * @param props.onManageTags - Opens the taxonomy manager modal.
  * @param props.taskTemplates - Saved templates used for tag suggestions and price lookup.
  * @param props.baseRates - Base hourly rates available in the rate dropdown.
- * @param props.modifierRates - Modifier chips shown next to the base dropdown.
+ * @param props.modifierRates - Modifiers: At home and Remote fill the Where dropdown, the rest show as chips.
  * @param props.flatRates - Flat-rate options used for flat-rate rows.
  * @param props.unsuccessfulFactor - Labour share charged on an unfinished task, for the chip's tooltip.
  * @returns Tasks section element.
@@ -87,6 +106,9 @@ export function TasksSection({
 }: Props): React.ReactElement {
   // The invoice's cents, not each row rounded alone: timed rows at one rate share them.
   const lineTotals = taskLineTotals(tasks);
+  // Delivery channels (At home, Remote) go in the Where dropdown; the rest stack as chips.
+  const channelRates = modifierRates.filter(isChannelModifier);
+  const stackingRates = modifierRates.filter((r) => !isChannelModifier(r));
   return (
     <Card className="space-y-3">
       <CardHeader
@@ -248,30 +270,50 @@ export function TasksSection({
                   {composed || "Pick device + action"}
                 </p>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <AdminSelect
-                    value={task.baseRateId ?? ""}
-                    onChange={(e) => onSetTaskBase(idx, e.target.value || null)}
-                    aria-label="Base rate"
-                    className="w-auto"
-                  >
-                    <option value="">No base</option>
-                    {baseRates.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.label} ({formatNZD(r.ratePerHour ?? 0)}/hr)
-                      </option>
-                    ))}
-                  </AdminSelect>
-                  {modifierRates.map((m) => {
+                  {/* One base rate leaves nothing to choose: show it as text. A line on
+                      another base (or none) keeps the dropdown so it can be put back. */}
+                  {baseRates.length === 1 && task.baseRateId === baseRates[0]!.id ? (
+                    <span className="text-sm text-admin-text-secondary">
+                      {baseRates[0]!.label} {formatNZD(baseRates[0]!.ratePerHour ?? 0)}/hr
+                    </span>
+                  ) : (
+                    <AdminSelect
+                      value={task.baseRateId ?? ""}
+                      onChange={(e) => onSetTaskBase(idx, e.target.value || null)}
+                      aria-label="Base rate"
+                      className="w-auto"
+                    >
+                      <option value="">No base</option>
+                      {baseRates.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.label} ({formatNZD(r.ratePerHour ?? 0)}/hr)
+                        </option>
+                      ))}
+                    </AdminSelect>
+                  )}
+                  {/* Only one channel applies per line, so it's a single choice; picking one
+                      toggles it on, and the toggle swaps out the other channel. */}
+                  {channelRates.length > 0 && (
+                    <AdminSelect
+                      value={channelRates.find((r) => task.modifierIds?.includes(r.id))?.id ?? ""}
+                      onChange={(e) => {
+                        const current = channelRates.find((r) => task.modifierIds?.includes(r.id));
+                        const picked = e.target.value || current?.id;
+                        if (picked) onToggleTaskModifier(idx, picked);
+                      }}
+                      aria-label="Where"
+                      className="w-auto"
+                    >
+                      <option value="">On site</option>
+                      {channelRates.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {modifierLabel(r)}
+                        </option>
+                      ))}
+                    </AdminSelect>
+                  )}
+                  {stackingRates.map((m) => {
                     const active = task.modifierIds?.includes(m.id) ?? false;
-                    let chipLabel: string;
-                    if (m.percentDelta !== null) {
-                      const pct = Math.round(m.percentDelta * 100);
-                      chipLabel = `${m.label} ${pct >= 0 ? "+" : ""}${pct}%`;
-                    } else {
-                      const delta = m.hourlyDelta ?? 0;
-                      const sign = delta < 0 ? "-" : "+";
-                      chipLabel = `${m.label} ${sign}$${Math.abs(delta)}`;
-                    }
                     return (
                       <button
                         key={m.id}
@@ -280,7 +322,7 @@ export function TasksSection({
                         aria-pressed={active}
                         className={toggleChipClass(active)}
                       >
-                        {chipLabel}
+                        {modifierLabel(m)}
                       </button>
                     );
                   })}

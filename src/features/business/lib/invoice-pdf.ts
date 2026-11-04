@@ -7,6 +7,7 @@ import {
   goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
+  quoteCalloutLines,
   settledCallout,
   settlementRows,
   UNSUCCESSFUL_LINE_LABEL,
@@ -814,14 +815,11 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
  * @returns Y coordinate below the box, including the gap before notes.
  */
 function drawQuoteCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
+  const { estimate, terms } = quoteCalloutLines(invoice.lineItems, invoice.quoteValidUntil);
   return drawCallout(ctx, y, "Accepting this quote", [
     { text: `Reply to the email or ring ${ctx.identity.phone} to go ahead.` },
-    {
-      text: invoice.quoteValidUntil
-        ? `Prices are held until ${formatDateShort(invoice.quoteValidUntil)}.`
-        : "Prices may change if the scope does - anything extra is agreed first.",
-      colour: MID,
-    },
+    ...(estimate ? [{ text: estimate }] : []),
+    { text: terms, colour: MID },
   ]);
 }
 

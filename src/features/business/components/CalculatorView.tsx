@@ -6,6 +6,10 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StickyActionBar } from "@/features/admin/components/ui/StickyActionBar";
+import {
+  SEGMENTED_GROUP_CLS,
+  segmentedButtonClass,
+} from "@/features/admin/components/ui/chip-classes";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
@@ -94,7 +98,7 @@ import { Notice } from "@/shared/components/Notice";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { nzNowTime } from "@/shared/lib/timezone-utils";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -153,6 +157,7 @@ export function CalculatorView({
   quoteMode,
 }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Draft restore runs in the mount effect to keep hydration consistent. The ref marks a
   // restored draft for async callbacks without becoming a dependency.
@@ -311,6 +316,26 @@ export function CalculatorView({
     router.push(`/admin/business/calculator?${query}`);
   }
 
+  /**
+   * Flips between invoice and quote mode, keeping the job's events. Both modes share one
+   * draft; the description also goes through the handoff, so text typed inside the draft
+   * writer's debounce isn't lost.
+   * @param toQuote - Whether to open quote mode.
+   */
+  function switchMode(toQuote: boolean): void {
+    if (toQuote === quoteMode) return;
+    try {
+      if (aiInput.trim()) sessionStorage.setItem(AI_INPUT_HANDOFF_KEY, aiInput);
+    } catch {
+      // Storage unavailable; the saved draft still carries the description.
+    }
+    const params = new URLSearchParams(searchParams.toString());
+    if (toQuote) params.set("quote", "1");
+    else params.delete("quote");
+    const query = params.toString();
+    router.push(`/admin/business/calculator${query ? `?${query}` : ""}`);
+  }
+
   /** Puts the job date and time slots back to the billed events' own windows. */
   function resetToEventTimes(): void {
     if (!eventPrefill) return;
@@ -404,6 +429,7 @@ export function CalculatorView({
     billedToCompany: addressMode === "company",
     // Only a picked Walked; the home-suburb guess gives way to a parsed drive.
     walked: walkedChoice === true,
+    quoteMode,
     setFollowUpMins,
     setTimeRanges,
     setTimesSet,
@@ -493,12 +519,14 @@ export function CalculatorView({
     }
   }
 
-  // A cancellation fee is flat: no date surcharge and no promo redemption.
+  // A cancellation fee is flat: no date surcharge and no promo redemption. A quote has no
+  // surcharge either, since its date is rarely the day the work happens.
   const pricedPromo = cancelMode ? null : activePromo;
   const surchargeOn = surchargeTick?.date === jobDate ? surchargeTick.on : null;
-  const surcharge = cancelMode
-    ? null
-    : chosenSurcharge(dateSurcharge, surchargeOn, pricing.weekendPerHour);
+  const surcharge =
+    cancelMode || quoteMode
+      ? null
+      : chosenSurcharge(dateSurcharge, surchargeOn, pricing.weekendPerHour);
 
   /**
    * Applies a picked Places suggestion and drops the stale trip (manual entries survive).
@@ -932,6 +960,34 @@ export function CalculatorView({
         onCancel={() => setConfirmClearOpen(false)}
       />
 
+      {!reissue && !cancelMode && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div role="group" aria-label="Invoice or quote" className={SEGMENTED_GROUP_CLS}>
+            <button
+              type="button"
+              aria-pressed={!quoteMode}
+              className={segmentedButtonClass(!quoteMode)}
+              onClick={() => switchMode(false)}
+            >
+              Invoice
+            </button>
+            <button
+              type="button"
+              aria-pressed={quoteMode}
+              className={segmentedButtonClass(quoteMode)}
+              onClick={() => switchMode(true)}
+            >
+              Quote
+            </button>
+          </div>
+          <p className="text-sm text-admin-muted">
+            {quoteMode
+              ? "Pricing work not done yet: the AI estimates how long each line will take."
+              : "Billing work that's done: the AI reads the times you worked."}
+          </p>
+        </div>
+      )}
+
       <JobSettingsStrip
         jobDate={jobDate}
         onJobDateChange={(date) => setJobDate(date || todayISO())}
@@ -940,7 +996,9 @@ export function CalculatorView({
         promoCode={promoCode}
         onApplyPromoCode={() => setPromoCode(promoCodeInput.trim())}
         onClearForm={() => setConfirmClearOpen(true)}
-        surchargeOption={cancelMode ? null : surchargeOption(dateSurcharge, pricing.weekendPerHour)}
+        surchargeOption={
+          cancelMode || quoteMode ? null : surchargeOption(dateSurcharge, pricing.weekendPerHour)
+        }
         surchargeOn={surcharge !== null}
         surchargeFromDate={dateSurcharge !== null}
         onSurchargeChange={(on) => setSurchargeTick({ date: jobDate, on })}
@@ -1023,6 +1081,7 @@ export function CalculatorView({
               aiInput={aiInput}
               onAiInputChange={setAiInput}
               showBookedHint={eventPrefill !== null}
+              quoteMode={quoteMode}
               parseError={parseError}
               parsing={parsing}
               hasParsed={hasParsed}
@@ -1039,8 +1098,8 @@ export function CalculatorView({
             />
           )}
 
-          {/* Time */}
-          {!cancelMode && (
+          {/* Time. A quote is priced before the work, so it has no times to enter. */}
+          {!cancelMode && !quoteMode && (
             <JobDetailsSection
               timeRanges={timeRanges}
               onTimeRangesChange={handleTimeRangesChange}
@@ -1054,25 +1113,27 @@ export function CalculatorView({
               inline warning compares their minutes against that job window.
               AI parses auto-collapse in applyParseResult, so the warning only
               fires on manual edits or window changes. Cancel mode has no work
-              lines, so the whole block goes. */}
+              lines, so the whole block goes. A quote has no window to compare. */}
           {!cancelMode && (
             <>
-              <TaskTimeWarning
-                tasks={tasks}
-                windowMin={durationMins}
-                minBillableMins={pricing.minBillableMins}
-                snapMins={pricing.taskTiming?.snapMins}
-                onFix={() =>
-                  setTasks(
-                    fitTasksToWindow(
-                      tasks,
-                      durationMins,
-                      pricing.taskTiming,
-                      pricing.minBillableMins,
-                    ).tasks,
-                  )
-                }
-              />
+              {!quoteMode && (
+                <TaskTimeWarning
+                  tasks={tasks}
+                  windowMin={durationMins}
+                  minBillableMins={pricing.minBillableMins}
+                  snapMins={pricing.taskTiming?.snapMins}
+                  onFix={() =>
+                    setTasks(
+                      fitTasksToWindow(
+                        tasks,
+                        durationMins,
+                        pricing.taskTiming,
+                        pricing.minBillableMins,
+                      ).tasks,
+                    )
+                  }
+                />
+              )}
               <TasksSection
                 tasks={tasks}
                 onTasksChange={setTasks}

@@ -9,6 +9,7 @@ import {
   goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
+  quoteCalloutLines,
   UNSUCCESSFUL_LINE_LABEL,
 } from "@/features/business/lib/business";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
@@ -112,6 +113,7 @@ function InvoicePreviewPanelImpl({
   );
   const showPromoLine = promoDiscount > 0;
   const showUnsuccessfulLine = unsuccessfulDiscount > 0;
+  const quoteLines = quoteCalloutLines(lineItems, null);
   return (
     // Only this frame is admin chrome; the body keeps its own palette and Helvetica, whose
     // letters are as wide as the Arimo the PDF embeds, so lines wrap the same.
@@ -305,9 +307,8 @@ function InvoicePreviewPanelImpl({
             <p className="text-slate-700">
               Reply to the email or ring {identity.phone} to go ahead.
             </p>
-            <p className="text-slate-700">
-              Prices may change if the scope does - anything extra is agreed first.
-            </p>
+            {quoteLines.estimate && <p className="text-slate-700">{quoteLines.estimate}</p>}
+            <p className="text-slate-700">{quoteLines.terms}</p>
           </div>
         ) : (
           <div className="mb-4 space-y-1 rounded-lg border border-slate-200 px-3 py-3 text-[11px]">

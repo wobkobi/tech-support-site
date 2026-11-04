@@ -13,6 +13,8 @@ import {
   JOB_DESCRIPTION_BOOKED_HINT,
   JOB_DESCRIPTION_HINT,
   JOB_DESCRIPTION_PLACEHOLDER,
+  QUOTE_DESCRIPTION_HINT,
+  QUOTE_DESCRIPTION_PLACEHOLDER,
 } from "@/features/business/lib/ai-input-copy";
 import type { ParseJobQuestion, ParseJobResponse } from "@/features/business/types/business";
 import type React from "react";
@@ -21,6 +23,8 @@ interface Props {
   aiInput: string;
   onAiInputChange: (value: string) => void;
   showBookedHint: boolean;
+  /** Pricing a job not done yet: quote wording, and the AI estimates the times. */
+  quoteMode: boolean;
   parseError: string | null;
   parsing: boolean;
   hasParsed: boolean;
@@ -41,6 +45,7 @@ interface Props {
  * @param props.aiInput - The description text.
  * @param props.onAiInputChange - Called with the new description text.
  * @param props.showBookedHint - Whether to add the booked-job hint (billing a schedule event).
+ * @param props.quoteMode - Whether the calculator is making a quote (quote wording).
  * @param props.parseError - Parse failure message, or null.
  * @param props.parsing - True while a parse request is in flight.
  * @param props.hasParsed - Whether a parse has landed this session (relabels the button).
@@ -58,6 +63,7 @@ export function DescribeJobSection({
   aiInput,
   onAiInputChange,
   showBookedHint,
+  quoteMode,
   parseError,
   parsing,
   hasParsed,
@@ -76,11 +82,18 @@ export function DescribeJobSection({
         title="Describe the job"
         className="mb-1"
         description={
-          <>
-            {JOB_DESCRIPTION_HINT}
-            {showBookedHint && ` ${JOB_DESCRIPTION_BOOKED_HINT}`} The AI fills in the time, tasks,
-            travel and parts below for you to check.
-          </>
+          quoteMode ? (
+            <>
+              {QUOTE_DESCRIPTION_HINT} The AI estimates how long each line will take and fills in
+              the tasks, travel and parts below for you to check.
+            </>
+          ) : (
+            <>
+              {JOB_DESCRIPTION_HINT}
+              {showBookedHint && ` ${JOB_DESCRIPTION_BOOKED_HINT}`} The AI fills in the time, tasks,
+              travel and parts below for you to check.
+            </>
+          )
         }
       />
       <AdminTextarea
@@ -90,7 +103,7 @@ export function DescribeJobSection({
           if (clarifyQuestions.length > 0) onSkipClarify();
         }}
         rows={6}
-        placeholder={JOB_DESCRIPTION_PLACEHOLDER}
+        placeholder={quoteMode ? QUOTE_DESCRIPTION_PLACEHOLDER : JOB_DESCRIPTION_PLACEHOLDER}
         className="mt-3"
       />
       {parseError && <p className="mt-1 text-sm text-red-600">{parseError}</p>}

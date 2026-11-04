@@ -15,6 +15,7 @@ import {
   goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
+  quoteCalloutLines,
   settledCallout,
   settlementRows,
   UNSUCCESSFUL_LINE_LABEL,
@@ -325,6 +326,7 @@ export default async function InvoiceViewPage({
     invoice.status === "SENT" && !invoice.isQuote ? await findRecordedPayment(invoice) : null;
   // A paid or voided invoice asks for nothing, so its box says so instead of the bank details.
   const settled = settledCallout(invoice);
+  const quoteLines = quoteCalloutLines(invoice.lineItems, invoice.quoteValidUntil);
 
   return (
     <div>
@@ -602,11 +604,8 @@ export default async function InvoiceViewPage({
               <p className="text-slate-700">
                 Reply to the email or ring {identity.phone} to go ahead.
               </p>
-              <p>
-                {invoice.quoteValidUntil
-                  ? `Prices are held until ${formatDateShort(invoice.quoteValidUntil)}.`
-                  : "Prices may change if the scope does - anything extra is agreed first."}
-              </p>
+              {quoteLines.estimate && <p className="text-slate-700">{quoteLines.estimate}</p>}
+              <p>{quoteLines.terms}</p>
             </div>
           ) : settled ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">

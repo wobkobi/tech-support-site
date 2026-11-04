@@ -49,6 +49,8 @@ interface UseJobParseArgs {
   billedToCompany: boolean;
   /** Whether Walked is picked (by hand or from the schedule), so a parse adds no drive. */
   walked: boolean;
+  /** Making a quote: the server estimates each line's time, so the Time card is left alone. */
+  quoteMode: boolean;
   setFollowUpMins: React.Dispatch<React.SetStateAction<number>>;
   setTimeRanges: React.Dispatch<React.SetStateAction<ParsedRange[]>>;
   setTimesSet: React.Dispatch<React.SetStateAction<boolean>>;
@@ -93,6 +95,7 @@ interface UseJobParse {
  * @param args.timesSet - Whether the Time card's ranges are real times.
  * @param args.billedToCompany - Whether the invoice is addressed to the contact's company.
  * @param args.walked - Whether Walked is picked, so the parsed drive is dropped.
+ * @param args.quoteMode - Whether the calculator is making a quote (estimated times, no window).
  * @param args.setFollowUpMins - Follow-up minutes setter.
  * @param args.setTimeRanges - Time slots setter.
  * @param args.setTimesSet - Setter for whether the Time card's ranges are real times.
@@ -114,6 +117,7 @@ export function useJobParse({
   timesSet,
   billedToCompany,
   walked,
+  quoteMode,
   setFollowUpMins,
   setTimeRanges,
   setTimesSet,
@@ -143,6 +147,7 @@ export function useJobParse({
    * @returns The windows, and whether they are a merged booking to keep as-is.
    */
   function knownWindow(): { slots: WindowSlot[]; merged: boolean } {
+    if (quoteMode) return { slots: [], merged: false };
     if (eventPrefill && eventPrefill.slots.length > 0 && !timesSet) {
       return { slots: eventPrefill.slots, merged: eventPrefill.slots.length > 1 };
     }
@@ -176,13 +181,16 @@ export function useJobParse({
     result: ParseJobResponse,
     known: { slots: WindowSlot[]; merged: boolean },
   ): void {
-    const span = parsedWindow(result, known.slots, nzNowTime(), known.merged);
-    setFollowUpMins(span.followUpMins);
-    // A merged job keeps its calendar times; otherwise the description wins. Only stated
-    // times count as real, so a window made up from a bare duration can't cap a later parse.
-    if (span.timeRanges) {
-      setTimeRanges(span.timeRanges);
-      setTimesSet(span.stated);
+    // A quote has no window: its lines carry the server's estimated times as they are.
+    const span = quoteMode ? null : parsedWindow(result, known.slots, nzNowTime(), known.merged);
+    if (span) {
+      setFollowUpMins(span.followUpMins);
+      // A merged job keeps its calendar times; otherwise the description wins. Only stated
+      // times count as real, so a window made up from a bare duration can't cap a later parse.
+      if (span.timeRanges) {
+        setTimeRanges(span.timeRanges);
+        setTimesSet(span.stated);
+      }
     }
 
     // A reparse replaces the auto travel entry, parsed costs and store runs; manual entries survive.
@@ -219,15 +227,19 @@ export function useJobParse({
       ]);
     }
 
-    const fit = fitTasksToWindow(
-      hydrateParsedTasks(result),
-      span.windowMins,
-      pricing.taskTiming,
-      pricing.minBillableMins,
-    );
-    setTasks(fit.tasks);
-    const fitNote = describeFit(fit, span.windowMins);
-    if (fitNote) toast(fitNote, { tone: "info" });
+    if (span) {
+      const fit = fitTasksToWindow(
+        hydrateParsedTasks(result),
+        span.windowMins,
+        pricing.taskTiming,
+        pricing.minBillableMins,
+      );
+      setTasks(fit.tasks);
+      const fitNote = describeFit(fit, span.windowMins);
+      if (fitNote) toast(fitNote, { tone: "info" });
+    } else {
+      setTasks(hydrateParsedTasks(result));
+    }
     setParts(result.parts.map((p) => ({ description: p.description, cost: p.cost })));
     if (result.notes) setNotes(result.notes);
     // Only ever fills. A stated amount goes in Already paid; cash with no amount is the whole bill.
@@ -260,6 +272,7 @@ export function useJobParse({
       // The route adds Remote to a remote booking's tasks and Business to a company's.
       if (eventPrefill?.meetingType) body.meetingType = eventPrefill.meetingType;
       if (billedToCompany) body.billedToCompany = true;
+      if (quoteMode) body.quote = true;
       if (answers && Object.keys(answers).length > 0) body.answers = answers;
       const res = await fetch("/api/business/parse-job", {
         method: "POST",

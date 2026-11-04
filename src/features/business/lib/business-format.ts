@@ -264,3 +264,25 @@ export function settledCallout(
   }
   return null;
 }
+
+/**
+ * The quote box's lines under "how to go ahead". Labour bills on the time the job actually
+ * takes, so a quote's hours are an estimate and the box says so; a quote of flat lines only
+ * has nothing to estimate and skips that line.
+ * @param lineItems - The quote's lines; hourly ones carry minutes.
+ * @param validUntil - Date the rates are held until, or null when the quote sets none.
+ * @returns The estimate line (null with no hourly line) and the line on how long rates hold.
+ */
+export function quoteCalloutLines(
+  lineItems: readonly { minutes?: number | null }[],
+  validUntil: Date | string | null | undefined,
+): { estimate: string | null; terms: string } {
+  return {
+    estimate: lineItems.some((l) => l.minutes != null)
+      ? "The times above are my best estimate. I charge for the time the job actually takes, so the final bill may be a little more or less. If it looks like taking much longer, I'll check with you before carrying on."
+      : null,
+    terms: validUntil
+      ? `These rates are held until ${formatDateShort(validUntil)}.`
+      : "Prices may change if the scope does - anything extra is agreed first.",
+  };
+}
