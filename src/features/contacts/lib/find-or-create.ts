@@ -152,22 +152,41 @@ export async function attachEmailIfMissing(
 }
 
 /**
- * Finds a live Contact by phone (normalised to E.164), creating one with `seed` if none exists.
+ * Finds a live Contact by phone (normalised to E.164).
  * @param phone - Phone number to match on (normalised internally).
- * @param seed - Fields used if a new row is created.
- * @returns The contact and whether it was newly created.
+ * @param options - Lookup options.
+ * @param options.mobileOnly - Never match a landline, which a household shares.
+ * @returns The contact, or null when none has this number.
  */
-export async function findOrCreateContactByPhone(
+export async function findContactByPhone(
   phone: string,
-  seed: ContactSeed,
-): Promise<FindOrCreateResult> {
-  const normalisedPhone = normaliseContactPhone(phone) ?? phone;
-  const existing = await prisma.contact.findFirst({
+  { mobileOnly = false }: { mobileOnly?: boolean } = {},
+): Promise<Contact | null> {
+  const normalisedPhone = normaliseContactPhone(phone) ?? phone.trim();
+  if (!normalisedPhone || (mobileOnly && !isNZMobileKey(normalisedPhone))) return null;
+  return prisma.contact.findFirst({
     where: {
       OR: [{ phone: normalisedPhone }, { altPhones: { has: normalisedPhone } }],
       deletedAt: null,
     },
   });
+}
+
+/**
+ * Finds a live Contact by phone (normalised to E.164), creating one with `seed` if none exists.
+ * @param phone - Phone number to match on (normalised internally).
+ * @param seed - Fields used if a new row is created.
+ * @param options - Lookup options.
+ * @param options.mobileOnly - A landline never matches, so it always gets a new contact.
+ * @returns The contact and whether it was newly created.
+ */
+export async function findOrCreateContactByPhone(
+  phone: string,
+  seed: ContactSeed,
+  options: { mobileOnly?: boolean } = {},
+): Promise<FindOrCreateResult> {
+  const normalisedPhone = normaliseContactPhone(phone) ?? phone;
+  const existing = await findContactByPhone(phone, options);
   if (existing) return { contact: existing, created: false };
   const contact = await prisma.contact.create({
     data: {

@@ -929,7 +929,8 @@ export interface ReplyCase {
   forbid?: { pattern: RegExp; why: string }[];
 }
 
-// Suggest a reply: review stars both ways (praise never handed back), a price question, spam, an Instagram question, an
+// Suggest a reply: review stars both ways (praise never handed back, the job never named, a
+// recommendation thanked), a price question, spam, an Instagram question, an
 // injection, a follow-up in a thread, stars with no words, Messenger and Instagram messages
 // (a price question, a booking with a problem, spam), and the emoji rule (casual message, comment
 // and review get one; a formal review gets none). The shared rules (name, apology and phone, no
@@ -944,7 +945,10 @@ export const REPLY_CASES: ReplyCase[] = [
       author: "Mary Smith",
       text: "Harrison sorted out my email on the laptop and showed me how to use it. Very patient and friendly.",
     },
-    forbid: [{ pattern: /\b(?:patient|friendly)\b/i, why: "hands their praise back to them" }],
+    forbid: [
+      { pattern: /\b(?:patient|friendly)\b/i, why: "hands their praise back to them" },
+      { pattern: /\b(?:e-?mail|laptop|sorted)\b/i, why: "names the job" },
+    ],
   },
   {
     id: "reply-review-vague-job",
@@ -960,6 +964,7 @@ export const REPLY_CASES: ReplyCase[] = [
         pattern: /\b(?:few|those|the) (?:little )?(?:problems|issues)\b/i,
         why: "repeats their vague words back",
       },
+      { pattern: /\bsorted\b/i, why: "names the job" },
     ],
   },
   {
@@ -980,6 +985,55 @@ export const REPLY_CASES: ReplyCase[] = [
         pattern:
           /pass(?:ing|ed) (?:it|the word) (?:on|along)|back on track|come right|at your end|good to hear from you/i,
         why: "says more than the review does",
+      },
+    ],
+    want: [{ pattern: /recommend/i, why: "thanks them for the recommendation" }],
+  },
+  {
+    // A real review's wording: a list of jobs over several visits, ending in a recommendation.
+    id: "reply-review-several-jobs",
+    request: {
+      platform: "google",
+      kind: "review",
+      rating: 5,
+      author: "Jan Wilson",
+      text: "I can highly recommend Harrison for all things technical. He is reliable (local) friendly and explains computer language clearly and easily. He has been to my home several times to help me with storage, transferring photos over and general maintenance on my computer. I really appreciate his knowledge, ease of use and friendliness. You should give him a call",
+    },
+    forbid: [
+      { pattern: /\b(?:storage|photos?|maintenance|computer|sorted)\b/i, why: "names the job" },
+      { pattern: /\b(?:reliable|friendly|knowledge)\b/i, why: "hands their praise back to them" },
+    ],
+    want: [
+      { pattern: /recommend/i, why: "thanks them for the recommendation" },
+      {
+        pattern: /\bvisits?\b|coming round|pop over|coming to see/i,
+        why: "a long review gets the line about the visits",
+      },
+      {
+        pattern: /\bcall\b|whenever|next time|come back/i,
+        why: "a long review ends on being there next time",
+      },
+    ],
+  },
+  {
+    // Long, one visit, no recommendation: the fuller reply without thanks for a recommendation.
+    id: "reply-review-long-one-visit",
+    request: {
+      platform: "google",
+      kind: "review",
+      rating: 5,
+      author: "Helen Price",
+      text: "Harrison came to my house last week when my printer stopped talking to the computer and nothing I tried would fix it. He took his time, worked out what was wrong and set everything up again so it all prints from the laptop and my phone. Very happy with the visit.",
+    },
+    forbid: [
+      { pattern: /\b(?:printer|prints?|laptop|computer|phone|sorted)\b/i, why: "names the job" },
+      { pattern: /\bworking\b/i, why: "says how it's going for them now" },
+      { pattern: /recommend/i, why: "thanks a recommendation they didn't make" },
+    ],
+    want: [
+      {
+        pattern: /\bcall\b|whenever|next time|come back/i,
+        why: "a long review ends on being there next time",
       },
     ],
   },
@@ -1169,6 +1223,7 @@ export const REPLY_CASES: ReplyCase[] = [
       text: "Harrison was awesome!! Had my new phone all set up in no time 👍",
     },
     wantEmoji: true,
+    forbid: [{ pattern: /\b(?:phone|set up|sorted)\b/i, why: "names the job" }],
   },
   {
     id: "reply-review-formal",
@@ -1180,5 +1235,6 @@ export const REPLY_CASES: ReplyCase[] = [
       text: "I wish to commend Mr Harrison on his professional and courteous service. He resolved our network difficulties promptly and explained the work clearly.",
     },
     noEmoji: true,
+    forbid: [{ pattern: /\b(?:network|resolved|sorted)\b/i, why: "names the job" }],
   },
 ];

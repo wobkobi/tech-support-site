@@ -72,7 +72,7 @@ export async function POST(
   let notified = false;
   if (sendNotification && pdfBytes && updated.clientEmail) {
     notified = await sendVoidNotification({
-      invoice: await toInvoiceEmailPayload(updated),
+      invoice: await toInvoiceEmailPayload(updated, { withLink: false }),
       pdfBytes,
       greetingName,
       customBody,

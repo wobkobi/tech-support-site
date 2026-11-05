@@ -9,12 +9,15 @@ import {
   goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
+  quoteAcceptLine,
+  quoteCalloutLines,
   UNSUCCESSFUL_LINE_LABEL,
 } from "@/features/business/lib/business";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import type { LineItem } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { displayNZPhone } from "@/shared/lib/normalise-phone";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import Image from "next/image";
 import type React from "react";
@@ -27,6 +30,8 @@ interface Props {
   number: string;
   clientName: string;
   clientEmail: string;
+  /** Mobile, printed under the name in place of a blank email. */
+  clientPhone?: string | null;
   /** ISO YYYY-MM-DD. */
   issueDate: string;
   /** ISO YYYY-MM-DD. */
@@ -65,6 +70,7 @@ interface Props {
  * @param props.number - Invoice number to display ("DRAFT" for unsaved).
  * @param props.clientName - Client name shown on the invoice header.
  * @param props.clientEmail - Client email shown on the invoice header.
+ * @param props.clientPhone - Client mobile, shown when there's no email.
  * @param props.issueDate - ISO YYYY-MM-DD issue date.
  * @param props.dueDate - ISO YYYY-MM-DD due date.
  * @param props.jobDate - NZ date the work was done, or null to hide the "Work done" row.
@@ -88,6 +94,7 @@ function InvoicePreviewPanelImpl({
   number,
   clientName,
   clientEmail,
+  clientPhone = null,
   issueDate,
   dueDate,
   jobDate = null,
@@ -112,6 +119,7 @@ function InvoicePreviewPanelImpl({
   );
   const showPromoLine = promoDiscount > 0;
   const showUnsuccessfulLine = unsuccessfulDiscount > 0;
+  const quoteLines = quoteCalloutLines(lineItems, null);
   return (
     // Only this frame is admin chrome; the body keeps its own palette and Helvetica, whose
     // letters are as wide as the Arimo the PDF embeds, so lines wrap the same.
@@ -158,7 +166,9 @@ function InvoicePreviewPanelImpl({
               Bill to
             </p>
             <p className="text-sm font-bold text-slate-800">{clientName || "Client name"}</p>
-            <p className="text-xs text-slate-500">{clientEmail || "client@email.com"}</p>
+            <p className="text-xs text-slate-500">
+              {clientEmail || displayNZPhone(clientPhone) || "client@email.com"}
+            </p>
           </div>
           <div className="space-y-1 text-[11px]">
             {jobDate && !isQuote && (
@@ -302,12 +312,9 @@ function InvoicePreviewPanelImpl({
         {isQuote ? (
           <div className="mb-4 space-y-1 rounded-lg border border-slate-200 px-3 py-3 text-[11px]">
             <p className="text-xs font-bold text-russian-violet">Accepting this quote</p>
-            <p className="text-slate-700">
-              Reply to the email or ring {identity.phone} to go ahead.
-            </p>
-            <p className="text-slate-700">
-              Prices may change if the scope does - anything extra is agreed first.
-            </p>
+            <p className="text-slate-700">{quoteAcceptLine(identity.phone)}</p>
+            {quoteLines.estimate && <p className="text-slate-700">{quoteLines.estimate}</p>}
+            <p className="text-slate-700">{quoteLines.terms}</p>
           </div>
         ) : (
           <div className="mb-4 space-y-1 rounded-lg border border-slate-200 px-3 py-3 text-[11px]">

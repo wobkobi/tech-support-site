@@ -29,6 +29,7 @@ import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
+import { validatePhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -120,6 +121,8 @@ export async function PATCH(
       isQuote: true,
       total: true,
       alreadyPaid: true,
+      clientEmail: true,
+      clientPhone: true,
     },
   });
   if (!current) {
@@ -130,6 +133,7 @@ export async function PATCH(
   if (
     body.clientName !== undefined ||
     body.clientEmail !== undefined ||
+    body.clientPhone !== undefined ||
     body.issueDate !== undefined ||
     body.dueDate !== undefined ||
     body.lineItems !== undefined ||
@@ -146,6 +150,7 @@ export async function PATCH(
     const editsContent =
       body.clientName !== undefined ||
       body.clientEmail !== undefined ||
+      body.clientPhone !== undefined ||
       body.issueDate !== undefined ||
       body.dueDate !== undefined ||
       body.lineItems !== undefined ||
@@ -157,6 +162,21 @@ export async function PATCH(
       );
     }
     const { clientName, clientEmail, issueDate, dueDate, lineItems, notes } = body;
+    const phone =
+      body.clientPhone !== undefined
+        ? validatePhone(typeof body.clientPhone === "string" ? body.clientPhone : "")
+        : undefined;
+    if (phone?.result === "invalid") {
+      return errorResponse("Enter a valid mobile number", 400);
+    }
+    // Either can be cleared, but not both, or the invoice has nowhere to go. Checked only
+    // when one changes, so a notes edit on an imported invoice with neither still saves.
+    const emailAfter =
+      clientEmail !== undefined ? normaliseEmail(clientEmail) : current.clientEmail;
+    const phoneAfter = phone ? phone.e164 : current.clientPhone;
+    if ((clientEmail !== undefined || phone) && !emailAfter && !phoneAfter) {
+      return errorResponse("Add an email or a mobile number", 400);
+    }
     // A non-finite numeric would persist NaN totals.
     if (
       lineItems !== undefined &&
@@ -227,7 +247,8 @@ export async function PATCH(
       where: { id },
       data: {
         ...(clientName !== undefined && { clientName }),
-        ...(clientEmail !== undefined && { clientEmail: normaliseEmail(clientEmail) }),
+        ...(clientEmail !== undefined && { clientEmail: emailAfter }),
+        ...(phone && { clientPhone: phone.e164 || null }),
         ...(issueDateValue && { issueDate: issueDateValue }),
         ...(dueDateValue && { dueDate: dueDateValue }),
         ...(lines !== undefined && {

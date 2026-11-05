@@ -13,8 +13,9 @@ import { goldCardOffText } from "@/features/business/lib/business";
 import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
 import { EmailInput } from "@/shared/components/EmailInput";
+import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
-import { formatNZPhone } from "@/shared/lib/normalise-phone";
+import { displayNZPhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useMemo, useRef, useState } from "react";
 
@@ -25,6 +26,8 @@ interface Props {
   onClientNameChange: (value: string) => void;
   clientEmail: string;
   onClientEmailChange: (value: string) => void;
+  clientPhone: string;
+  onClientPhoneChange: (value: string) => void;
   pickedContactName: string | null;
   pickedContactCompany: string | null;
   addressMode: AddressMode;
@@ -45,13 +48,15 @@ interface Props {
 const MAX_SUGGESTIONS = 6;
 
 /**
- * Right-rail "Client" card. Name searches saved contacts; a pick fills name + email
+ * Right-rail "Client" card. Name searches saved contacts; a pick fills name, email and mobile
  * and shows the Name/Company/Custom control.
  * @param props - Component props.
  * @param props.clientName - Current Name value.
  * @param props.onClientNameChange - Name setter; fires on every keystroke.
  * @param props.clientEmail - Current Email value.
  * @param props.onClientEmailChange - Email setter.
+ * @param props.clientPhone - Current Mobile value, as typed.
+ * @param props.onClientPhoneChange - Mobile setter.
  * @param props.pickedContactName - Picked contact's name, or null.
  * @param props.pickedContactCompany - Picked contact's company (drives Company availability).
  * @param props.addressMode - Current segmented-control selection.
@@ -72,6 +77,8 @@ export function ClientPickerSection({
   onClientNameChange,
   clientEmail,
   onClientEmailChange,
+  clientPhone,
+  onClientPhoneChange,
   pickedContactName,
   pickedContactCompany,
   addressMode,
@@ -181,8 +188,8 @@ export function ClientPickerSection({
           })}
         </div>
       )}
-      {/* Name and email side by side on 2xl; the rename tick keeps its place after the name
-          in the DOM but drops to a row of its own under both. */}
+      {/* Name and email side by side on 2xl, mobile on the next row; the rename tick keeps
+          its place after the name in the DOM but drops to a row of its own under both. */}
       <div className="grid gap-3 2xl:grid-cols-2">
         <div className="relative">
           <AdminInput
@@ -228,9 +235,10 @@ export function ClientPickerSection({
                     {c.company && (
                       <span className="ml-2 text-sm text-admin-muted">{c.company}</span>
                     )}
-                    {c.phone && sharedNames.has(c.name.trim().toLowerCase()) && (
+                    {/* A phone-only contact shows its number, the only way to tell it's them. */}
+                    {c.phone && (!c.email || sharedNames.has(c.name.trim().toLowerCase())) && (
                       <span className="ml-2 text-sm text-admin-muted">
-                        {formatNZPhone(c.phone.replace(/^\+64/, "0"))}
+                        {displayNZPhone(c.phone)}
                       </span>
                     )}
                   </button>
@@ -262,6 +270,14 @@ export function ClientPickerSection({
             className={ADMIN_INPUT_CLS}
           />
         </div>
+        {/* Either email or mobile will do; a mobile-only client gets the quote by text. */}
+        <PhoneInput
+          id="calculator-client-phone"
+          placeholder="Mobile"
+          value={clientPhone}
+          onChange={onClientPhoneChange}
+          className={ADMIN_INPUT_CLS}
+        />
       </div>
       {goldCardPercent != null && (
         <AdminCheckbox

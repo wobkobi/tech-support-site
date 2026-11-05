@@ -757,7 +757,11 @@ model Invoice {
   id                   String            @id @default(auto()) @map("_id") @db.ObjectId
   number               String            @unique
   clientName           String
+  // Blank for a client who only gave a phone number; clientPhone carries them instead.
   clientEmail          String
+  // E.164 mobile the Text button sends to ahead of the linked contact's phone. Every
+  // invoice and quote has this or clientEmail.
+  clientPhone          String?
   issueDate            DateTime
   dueDate              DateTime
   // NZ date the work was done (YYYY-MM-DD), from the calculator. Editing a draft
@@ -808,6 +812,11 @@ model Invoice {
   calendarEventIds     String[]
   driveFileId          String?
   driveWebUrl          String?
+  // Code in the customer's link to the PDF (/i/<code>, /q/<code> for a quote), which
+  // every email and text about this invoice carries (the void notice aside). Made by
+  // ensureInvoiceShareUrl the first time one is written or previewed. Not @unique
+  // because MongoDB's unique index rejects multiple nulls.
+  shareToken           String?
   // Stamped when status transitions to VOIDED. Audit trail + powers "Voided
   // on DD MMM" on the detail page. Null on pre-VOIDED-feature rows and on
   // any invoice that was never voided.

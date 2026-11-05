@@ -35,7 +35,7 @@ export async function POST(
 
   const { greetingName, customBody } = await parseInvoiceEmailOverrides(request);
 
-  const payload = await toInvoiceEmailPayload(invoice);
+  const payload = await toInvoiceEmailPayload(invoice, { withLink: false });
   const { subject, html } = await buildVoidEmail({
     invoice: payload,
     greetingName,

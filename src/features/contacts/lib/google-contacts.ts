@@ -9,7 +9,7 @@ import { addressCovers, resolveAddress } from "@/shared/lib/normalise-address";
 import { isNZMobileKey, normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { people as googlePeople, type people_v1 } from "@googleapis/people";
-import type { ContactField } from "@prisma/client";
+import type { Contact, ContactField } from "@prisma/client";
 import {
   clearContactConflict,
   recordContactConflict,
@@ -643,6 +643,74 @@ function mergePhones(sitePhones: Array<string | null>, googlePhones: string[]): 
 }
 
 /**
+ * Creates the Google contact for a site contact with all its values, then stamps the link.
+ * @param people - People API client.
+ * @param contact - The site contact; one without an email goes in without one.
+ * @returns "created", or the failure outcome.
+ */
+async function createGoogleContact(
+  people: people_v1.People,
+  contact: Contact,
+): Promise<ContactSyncOutcome> {
+  try {
+    const { givenName, familyName } = splitName(contact.name);
+    // Retried only on a rate limit: after a server error Google may have made it anyway.
+    const created = await peopleCall(
+      () =>
+        people.people.createContact({
+          requestBody: {
+            names: [{ displayName: contact.name, givenName, familyName }],
+            ...(contact.email ? { emailAddresses: [{ value: contact.email }] } : {}),
+            ...(contact.phone ? { phoneNumbers: [{ value: contact.phone }] } : {}),
+            ...(contact.address ? { addresses: [{ formattedValue: contact.address }] } : {}),
+            ...(contact.company ? { organizations: [{ name: contact.company }] } : {}),
+          },
+        }),
+      (status) => status === 429,
+    );
+    if (created.data.resourceName) {
+      // Same-instant stamp: see the pushOk stamp in syncContactToGoogle for why.
+      const stampedAt = new Date();
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          googleContactId: created.data.resourceName,
+          lastSyncedAt: stampedAt,
+          updatedAt: stampedAt,
+          lastGoogleEtag: created.data.etag ?? null,
+        },
+      });
+    }
+    return "created";
+  } catch (err) {
+    console.error("[google-contacts] Failed to create new Google contact:", err);
+    return failureOutcome(err);
+  }
+}
+
+/**
+ * Puts a phone-only contact the operator has just added into Google Contacts, so it shows in
+ * the invoice calculator's picker and on their phone. {@link syncContactToGoogle} leaves
+ * phone-only contacts to the import, so this is their one push; Google owns them after it.
+ * The caller has already ruled out a contact with this mobile in the site's table, which the
+ * import fills from Google.
+ * @param contactId - The new contact.
+ * @returns "created", "skipped" when it has an email or a Google link already, or the failure.
+ */
+export async function pushPhoneOnlyContactToGoogle(contactId: string): Promise<ContactSyncOutcome> {
+  try {
+    const contact = await prisma.contact.findUnique({ where: { id: contactId } });
+    if (!contact?.phone || contact.deletedAt || contact.email || contact.googleContactId) {
+      return "skipped";
+    }
+    return await createGoogleContact(getPeopleClient(), contact);
+  } catch (err) {
+    console.error(`[google-contacts] pushPhoneOnlyContactToGoogle failed for ${contactId}:`, err);
+    return failureOutcome(err);
+  }
+}
+
+/**
  * Two-way sync between a site Contact and its Google counterpart (policy in the file header).
  * Company only flows Google > site, except on first create. A field with an open conflict is
  * left alone on both sides until it's resolved. Never throws.
@@ -729,43 +797,8 @@ export async function syncContactToGoogle(contactId: string): Promise<ContactSyn
       }
     }
 
-    if (!resourceName || !googlePerson) {
-      // No Google contact found - create a new one with all site values.
-      try {
-        const { givenName, familyName } = splitName(contact.name);
-        // Retried only on a rate limit: after a server error Google may have made it anyway.
-        const created = await peopleCall(
-          () =>
-            people.people.createContact({
-              requestBody: {
-                names: [{ displayName: contact.name, givenName, familyName }],
-                emailAddresses: [{ value: email }],
-                ...(contact.phone ? { phoneNumbers: [{ value: contact.phone }] } : {}),
-                ...(contact.address ? { addresses: [{ formattedValue: contact.address }] } : {}),
-                ...(contact.company ? { organizations: [{ name: contact.company }] } : {}),
-              },
-            }),
-          (status) => status === 429,
-        );
-        if (created.data.resourceName) {
-          // Same-instant stamp: see the pushOk stamp below for why.
-          const stampedAt = new Date();
-          await prisma.contact.update({
-            where: { id: contactId },
-            data: {
-              googleContactId: created.data.resourceName,
-              lastSyncedAt: stampedAt,
-              updatedAt: stampedAt,
-              lastGoogleEtag: created.data.etag ?? null,
-            },
-          });
-        }
-        return "created";
-      } catch (err) {
-        console.error("[google-contacts] Failed to create new Google contact:", err);
-        return failureOutcome(err);
-      }
-    }
+    // No Google contact found - create a new one with all site values.
+    if (!resourceName || !googlePerson) return await createGoogleContact(people, contact);
 
     // Both sides exist - decide who changed since last sync, then act.
     const currentEtag = googlePerson.etag ?? null;

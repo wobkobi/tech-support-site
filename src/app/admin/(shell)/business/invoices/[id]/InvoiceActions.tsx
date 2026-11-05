@@ -1,7 +1,8 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/InvoiceActions.tsx
-// Action buttons and modals for the invoice detail page (PDF, payment, send, void, re-issue,
-// delete). Below lg, unpaid invoices pin Mark as paid and Send to the screen bottom.
+// Action buttons and modals for the invoice detail page (PDF, payment, send, text, void,
+// re-issue, delete). Below lg, unpaid invoices pin Mark as paid, Text and Send to the screen
+// bottom.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
@@ -20,6 +21,7 @@ import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
 import { SendInvoiceModal, useInvoiceSend } from "./SendInvoiceModal";
+import { TextInvoiceModal } from "./TextInvoiceModal";
 import { type LinkedIncome, useInvoiceVoid, VoidInvoiceModal } from "./VoidInvoiceModal";
 
 interface InvoiceActionsProps {
@@ -75,7 +77,8 @@ const headers = { "Content-Type": "application/json" };
  * @param props.sentAt - First-sent stamp; drives the Send/Re-send label.
  * @param props.paidAt - Payment stamp, passed to the payment dialog.
  * @param props.linkedIncome - Linked income count + total for the void warning.
- * @param props.autoOpenSend - Open the send preview on mount when true.
+ * @param props.autoOpenSend - Open the send preview on mount when true (the Text modal when
+ *   there's no email).
  * @param props.isOverdue - Whether the invoice is SENT and past due.
  * @param props.reminderCount - Reminders already sent (null reads as 0).
  * @param props.reminderLastSentAt - Last reminder stamp, passed to the payment dialog.
@@ -139,6 +142,13 @@ export function InvoiceActions({
   // Overdue-reminder confirm + busy state.
   const [confirmReminderOpen, setConfirmReminderOpen] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
+
+  // Text modal; the key remounts it per open, so each open writes a fresh message. "Save &
+  // send" for a client with no email lands here instead of on the email preview.
+  const [textOpen, setTextOpen] = useState(
+    () => autoOpenSend && !clientEmail && status !== "VOIDED",
+  );
+  const [textKey, setTextKey] = useState(0);
 
   // Edit-notes modal (SENT/PAID quick edit; notes stay editable post-send).
   const [notesOpen, setNotesOpen] = useState(false);
@@ -375,6 +385,20 @@ export function InvoiceActions({
           )}
           {!isVoided && (
             <AdminButton
+              variant="secondary"
+              onClick={() => {
+                setTextKey((k) => k + 1);
+                setTextOpen(true);
+              }}
+              className={cn(showPhoneBar && "max-lg:flex-1")}
+            >
+              <span>
+                Text<span className="max-sm:hidden"> to client</span>
+              </span>
+            </AdminButton>
+          )}
+          {!isVoided && (
+            <AdminButton
               onClick={() => void sendFlow.openPreview()}
               disabled={!clientEmail}
               aria-label={!clientEmail ? "Add a client email to enable sending" : undefined}
@@ -492,6 +516,20 @@ export function InvoiceActions({
         invoiceId={invoiceId}
         clientName={clientName}
         clientEmail={clientEmail}
+      />
+
+      <TextInvoiceModal
+        key={textKey}
+        open={textOpen}
+        onClose={() => setTextOpen(false)}
+        invoiceId={invoiceId}
+        clientName={clientName}
+        isQuote={isQuote}
+        alreadySent={alreadySent || isPaid}
+        onSent={() => {
+          if (isDraft) setCurrentStatus("SENT");
+          router.refresh();
+        }}
       />
 
       {/* Void invoice / resend-notification modal. */}

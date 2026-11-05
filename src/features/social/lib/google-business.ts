@@ -2,14 +2,17 @@
 // Publishes to and deletes from the Google Business Profile via the v4 localPosts API, using the
 // shared Google OAuth refresh token with the business.manage scope, checks which of its APIs
 // answer for the permissions grid, reads the profile's daily figures for Analytics, reads and
-// answers its reviews for the Inbox, and keeps its phone, website and hours in step with Settings.
+// answers its reviews for the Inbox, keeps its phone, website and hours in step with Settings,
+// and copies the connected Google account's picture to it as the profile picture.
 
 import { withRetry } from "@/features/business/lib/google-retry";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import type { PlatformAdapter, PublishInput, PublishResult } from "@/features/social/lib/adapter";
 import { googlePostBody } from "@/features/social/lib/google-post";
 import {
+  accountPhoto,
   profileChanges,
+  type AccountPhoto,
   type ProfileDetails,
   type ProfileSyncResult,
 } from "@/features/social/lib/google-profile";
@@ -22,6 +25,7 @@ import { addDaysToDateKey, dateKeyParts, nzDateKey } from "@/shared/lib/timezone
 const V4_BASE = "https://mybusiness.googleapis.com/v4";
 const INFO_BASE = "https://mybusinessbusinessinformation.googleapis.com/v1";
 const PERFORMANCE_BASE = "https://businessprofileperformance.googleapis.com/v1";
+const PEOPLE_BASE = "https://people.googleapis.com/v1";
 
 /**
  * Reads the Business Profile env vars.
@@ -55,6 +59,18 @@ interface GaxiosLike {
 }
 
 /**
+ * The message Google sent with a failed request, else the request's own.
+ * @param error - What the request threw.
+ * @returns The message, or "" when there's none.
+ */
+function googleMessage(error: unknown): string {
+  const e = error as GaxiosLike;
+  const data = e.response?.data?.error;
+  const detail = typeof data === "object" ? data : undefined;
+  return detail?.message ?? e.message ?? "";
+}
+
+/**
  * Turns a Google API failure into an actionable error: invalid_grant (token revoked),
  * PERMISSION_DENIED scope (token predates business.manage), SERVICE_DISABLED (API off).
  * @param error - What the request threw.
@@ -64,14 +80,12 @@ interface GaxiosLike {
 function toGoogleError(error: unknown, api = "Google My Business API"): Error {
   const e = error as GaxiosLike;
   const status = e.response?.status;
-  const data = e.response?.data?.error;
-  if (data === "invalid_grant") {
+  if (e.response?.data?.error === "invalid_grant") {
     return new Error(
       "Google connection expired - re-run scripts/reauth-google.ts and update GOOGLE_OAUTH_REFRESH_TOKEN.",
     );
   }
-  const detail = typeof data === "object" ? data : undefined;
-  const message = detail?.message ?? e.message ?? "";
+  const message = googleMessage(error);
   if (/insufficient authentication scopes/i.test(message)) {
     return new Error(
       "The Google token can't manage the Business Profile - re-run scripts/reauth-google.ts and update GOOGLE_OAUTH_REFRESH_TOKEN.",
@@ -154,15 +168,64 @@ async function probe(read: () => Promise<unknown>, api: string): Promise<ProbeRe
 export async function probeGoogle(now: Date): Promise<Record<GoogleProbe, ProbeResult>> {
   const path = locationPath();
   const end = addDaysToDateKey(nzDateKey(now), -3);
-  const [posts, reviews, performance] = await Promise.all([
+  const [posts, reviews, performance, picture] = await Promise.all([
     probe(() => call(`${V4_BASE}/${path}/localPosts?pageSize=1`, "GET"), "Google My Business API"),
     probe(() => call(`${V4_BASE}/${path}/reviews?pageSize=1`, "GET"), "Google My Business API"),
     probe(
       () => call(dailyMetricsUrl(addDaysToDateKey(end, -6), end, ["WEBSITE_CLICKS"]), "GET"),
       "Business Profile Performance API",
     ),
+    // Already a readable error, which probe() would wrap a second time.
+    readAccountPhoto().then(
+      (): ProbeResult => ({ ok: true }),
+      (error: Error): ProbeResult => ({ ok: false, error: error.message }),
+    ),
   ]);
-  return { posts, reviews, performance };
+  return { posts, reviews, performance, picture };
+}
+
+/**
+ * The connected Google account's own picture, for the profile picture sync.
+ * @returns The picture to copy, or null when the account only has Google's letter picture.
+ */
+export async function readAccountPhoto(): Promise<{ key: string; url: string } | null> {
+  try {
+    const me = await withRetry(
+      () =>
+        call<{ photos?: AccountPhoto[] }>(`${PEOPLE_BASE}/people/me?personFields=photos`, "GET"),
+      { label: "gbp" },
+    );
+    return accountPhoto(me.photos);
+  } catch (error) {
+    // People API names the scope it wants ("requires one of the following scopes: [profile]").
+    if (/following scopes|insufficient authentication scopes/i.test(googleMessage(error))) {
+      throw new Error(
+        "The Google token can't see your account's picture - re-run scripts/reauth-google.ts and update GOOGLE_OAUTH_REFRESH_TOKEN.",
+      );
+    }
+    throw toGoogleError(error, "People API");
+  }
+}
+
+/**
+ * Makes a picture the profile's picture. Sent as a LOGO, which Google files as the profile
+ * photo in place of the last one, so sending the same picture twice changes nothing.
+ * @param sourceUrl - A public address Google fetches the picture from.
+ */
+export async function setProfilePhoto(sourceUrl: string): Promise<void> {
+  try {
+    await withRetry(
+      () =>
+        call(`${V4_BASE}/${locationPath()}/media`, "POST", {
+          mediaFormat: "PHOTO",
+          locationAssociation: { category: "LOGO" },
+          sourceUrl,
+        }),
+      { label: "gbp" },
+    );
+  } catch (error) {
+    throw toGoogleError(error);
+  }
 }
 
 /**

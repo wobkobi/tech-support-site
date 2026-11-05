@@ -47,7 +47,10 @@ export interface Invoice {
   id: string;
   number: string;
   clientName: string;
+  /** Blank for a client who only gave a phone number. */
   clientEmail: string;
+  /** E.164 mobile; printed under the name when there's no email. */
+  clientPhone?: string | null;
   issueDate: string;
   dueDate: string;
   /** NZ date the work was done (YYYY-MM-DD), printed as "Work done"; null on older invoices. */
@@ -318,6 +321,8 @@ export interface EventPrefill {
   slots: EventPrefillSlot[];
   clientName: string;
   clientEmail: string;
+  /** The booking's phone, so a client with no email can be texted; empty when none. */
+  clientPhone: string;
   jobAddress: string;
   /** How the booking was met (cancel mode bills no trip for remote); null with no Booking row. */
   meetingType: CancelMeetingType | null;

@@ -13,6 +13,7 @@ const BOOKING_SELECT = {
   id: true,
   name: true,
   email: true,
+  phone: true,
   address: true,
   unit: true,
   meetingType: true,
@@ -44,6 +45,7 @@ interface ResolvedEvent {
     id: string;
     name: string;
     email: string;
+    phone: string | null;
     address: string | null;
     unit: string | null;
     meetingType: string | null;
@@ -175,6 +177,7 @@ export async function buildEventPrefill(eventIds: string[]): Promise<EventPrefil
     slots,
     clientName: booking?.name ?? withBooking.summary ?? "",
     clientEmail: booking?.email ?? "",
+    clientPhone: booking?.phone ?? "",
     jobAddress: addressOf(withBooking) || addressOf(first),
     // Prisma enum > client form; null lets the calculator infer from the address.
     meetingType:

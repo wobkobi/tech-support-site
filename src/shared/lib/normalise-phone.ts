@@ -54,6 +54,16 @@ export function formatNZPhone(raw: string): string {
   return [a, b, c].filter(Boolean).join(" ");
 }
 
+/**
+ * Shows a stored phone the way it's dialled here: "+64211234567" > "021 123 4567". Overseas
+ * numbers keep their +.
+ * @param raw - Stored (E.164) or typed phone.
+ * @returns Display-formatted phone, or an empty string when blank.
+ */
+export function displayNZPhone(raw: string | null | undefined): string {
+  return raw?.trim() ? formatNZPhone(raw.trim().replace(/^\+64/, "0")) : "";
+}
+
 /** National part after +64: mobile 2 + 7-9 digits, landline 3/4/6/7/9 + 7, freephone 800 + 6-7 or 508 + 6. */
 const NZ_NATIONAL_NUMBER = /^(?:2\d{7,9}|[34679]\d{7}|800\d{6,7}|508\d{6})$/;
 

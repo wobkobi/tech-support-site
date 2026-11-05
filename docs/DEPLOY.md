@@ -119,7 +119,7 @@ non-blank in each Vercel environment.
   as the app. Without them the Page token inspects itself, which works while the token does; with
   them, a dead token still shows why.
 - **Optional:** `MAILING_FROM` - sender for mailing-list emails, like
-  `Harrison at To The Point Tech <news@tothepoint.co.nz>`; falls back to `EMAIL_FROM`. A separate
+  `Harrison at To the Point Tech <news@tothepoint.co.nz>`; falls back to `EMAIL_FROM`. A separate
   address means a reader who blocks the list or reports it as spam still gets booking emails. Any
   address on the domain verified in Resend works; replies go to `ADMIN_EMAIL`.
 - **Optional:** `RESEND_MARKETING_API_KEY` - a Resend key with **Full access**, used only for the

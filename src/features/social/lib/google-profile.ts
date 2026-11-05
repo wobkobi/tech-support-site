@@ -1,8 +1,9 @@
 // src/features/social/lib/google-profile.ts
 // Works out which Google Business Profile details differ from Settings: the phone number,
-// website and opening hours. Pure, so the check script covers it; google-business.ts reads the
-// profile and sends the changes. The name and address are never written: a name edit can send
-// the profile back through Google's verification, and the base address is the owner's home.
+// website and opening hours, plus which Google account picture to copy as the profile picture.
+// Pure, so the check script covers it; google-business.ts reads the profile and sends the
+// changes. The name and address are never written: a name edit can send the profile back
+// through Google's verification, and the base address is the owner's home.
 
 import { advertisedHours } from "@/shared/lib/advertised-hours";
 import type { Settings } from "@/shared/lib/settings/types";
@@ -134,4 +135,31 @@ export function profileChanges(settings: Settings, current: ProfileDetails): Pro
   }
 
   return changes;
+}
+
+/** Size the account picture is fetched at; the profile takes 250 to 5000 pixels a side. */
+const PHOTO_SIZE = 1024;
+
+/** One of the account's pictures (People API v1 Photo). */
+export interface AccountPhoto {
+  url?: string;
+  /** True for Google's letter picture, when the account has none of its own. */
+  default?: boolean;
+  metadata?: { primary?: boolean };
+}
+
+/**
+ * The account picture to copy to the profile: the primary one, fetched big enough.
+ * @param photos - The photos people/me answers with.
+ * @returns The picture's key (its address without size options) and the address to send, or
+ *   null when the account only has Google's letter picture.
+ */
+export function accountPhoto(
+  photos: readonly AccountPhoto[] | undefined,
+): { key: string; url: string } | null {
+  const photo = photos?.find((p) => p.metadata?.primary) ?? photos?.[0];
+  if (!photo?.url || photo.default) return null;
+  // Google picture addresses end in size options after "=", like "=s100"; the rest names it.
+  const key = photo.url.replace(/=[^/=]*$/, "");
+  return { key, url: `${key}=s${PHOTO_SIZE}` };
 }

@@ -29,7 +29,7 @@ import type {
   TaskTemplate,
 } from "@/features/business/types/business";
 import { roundCents } from "@/shared/lib/money";
-import { formatNZPhone } from "@/shared/lib/normalise-phone";
+import { displayNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
@@ -44,10 +44,9 @@ const CASH: (typeof INCOME_METHODS)[number] = "Cash";
  * @returns The tag, or null when the contact has neither.
  */
 function contactDetail(phone?: string | null, address?: string | null): string | null {
-  const parts = [
-    phone?.trim() ? formatNZPhone(phone.trim().replace(/^\+64/, "0")) : null,
-    address?.split(",")[0]?.trim() || null,
-  ].filter(Boolean);
+  const parts = [displayNZPhone(phone) || null, address?.split(",")[0]?.trim() || null].filter(
+    Boolean,
+  );
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
@@ -71,6 +70,8 @@ interface UseCalculatorSaveArgs {
   draftScope: string | null;
   /** Google id of the picked contact, for the contact check. */
   pickedContactGoogleId: string | null;
+  /** Client's mobile as typed; stands in for the email on a client who only has a phone. */
+  clientPhone: string;
   /** New name for the picked contact, set when the operator edited it and kept the box ticked. */
   renameContactTo: string | null;
   /** Job date the income entry is recorded against, and the logged trip's date. */
@@ -126,6 +127,7 @@ interface UseCalculatorSave {
  * @param args.eventPrefill - Schedule-event prefill, or null.
  * @param args.draftScope - The calculator's draft scope, cleared on save.
  * @param args.pickedContactGoogleId - Google id of the picked contact, or null.
+ * @param args.clientPhone - Client's mobile as typed.
  * @param args.renameContactTo - New name for the picked contact on invoice save, or null.
  * @param args.jobDate - Job date for the income entry and the logged trip.
  * @param args.tripAddress - Where you drove for the job, or null for no trip.
@@ -147,6 +149,7 @@ export function useCalculatorSave({
   eventPrefill,
   draftScope,
   pickedContactGoogleId,
+  clientPhone,
   renameContactTo,
   jobDate,
   tripAddress,
@@ -352,10 +355,16 @@ export function useCalculatorSave({
       setSaveInvoiceError("The amount already paid is more than the invoice total.");
       return;
     }
-    // Check the email before the POST, or the draft saves and the bad email surfaces later.
+    // Check the email and mobile before the POST, or the draft saves and a bad one surfaces
+    // later. Either will do: a client with only a phone gets it by text.
+    const phoneCheck = validatePhone(clientPhone);
+    if (phoneCheck.result === "invalid") {
+      setSaveInvoiceError("Enter a valid mobile number.");
+      return;
+    }
     const emailCheck = validateEmail(clientEmail);
-    if (emailCheck === "empty") {
-      setSaveInvoiceError("Client email is required.");
+    if (emailCheck === "empty" && phoneCheck.result === "empty") {
+      setSaveInvoiceError("Add the client's email or mobile number.");
       return;
     }
     if (emailCheck === "invalid") {
@@ -387,6 +396,7 @@ export function useCalculatorSave({
         body: JSON.stringify({
           clientName,
           clientEmail,
+          clientPhone: phoneCheck.e164 || null,
           lineItems,
           notes: notes || null,
           promoTitle: promoActive ? activePromo.title : null,
@@ -464,11 +474,13 @@ export function useCalculatorSave({
         await markPaid(invoiceId, paidCash ? CASH : alreadyPaid.method, paidCash || !reissueOf);
       }
       // Add-to-contacts gate: defer nav until the modal closes so handleAddContactClose can
-      // backfill contactId. Link a known contact here whether or not the prompt fires.
-      if (clientEmail.trim()) {
+      // backfill contactId. Link a known contact here whether or not the prompt fires; with
+      // no email, the contact is found by its Google id or the mobile.
+      if (clientEmail.trim() || pickedContactGoogleId || phoneCheck.e164) {
         try {
           const checkParams = new URLSearchParams({ email: clientEmail.trim() });
           if (pickedContactGoogleId) checkParams.set("googleContactId", pickedContactGoogleId);
+          if (phoneCheck.e164) checkParams.set("phone", phoneCheck.e164);
           const checkRes = await fetch(`/api/admin/contacts/check?${checkParams.toString()}`);
           const checkData = (await checkRes.json()) as {
             exists?: boolean;
@@ -487,8 +499,13 @@ export function useCalculatorSave({
             const existingId = checkData.existingContactId ?? null;
             if (checkData.contactId) {
               await linkInvoiceToContact(invoiceId, checkData.contactId);
-            } else if (checkData.exists === false && (!send || existingId)) {
-              // Unknown email: defer nav so handleAddContactClose can create and link the
+            } else if (
+              checkData.exists === false &&
+              // Save & send skips it for a new email, as the send preview asks; a mobile-only
+              // client lands on the Text box, which doesn't.
+              (!clientEmail.trim() || !send || existingId)
+            ) {
+              // Unknown client: defer nav so handleAddContactClose can create and link the
               // contact. A picked contact is never linked without asking, Save & send
               // included - picking the wrong same-named person would hand them this email.
               setPendingExistingName(checkData.existingContactName ?? null);

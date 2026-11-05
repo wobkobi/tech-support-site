@@ -8,6 +8,7 @@ import {
   isChannelModifier,
   restatesTaskLine,
 } from "@/features/business/lib/business";
+import { estimateQuoteLines } from "@/features/business/lib/estimate-duration.server";
 import { isBusinessModifier, withJobModifiers } from "@/features/business/lib/job-modifiers";
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import {
@@ -73,7 +74,8 @@ function findTemplateByTags<T extends { device: string | null; action: string | 
 
 /**
  * POST /api/business/parse-job - Parses a plain-English job description.
- * `fallbackDestination` is used when the text names no address.
+ * `fallbackDestination` is used when the text names no address. `quote: true` prices work not
+ * done yet: lines with no stated time get the public estimator's time.
  * @param request - Incoming Next.js request with input string in body
  * @returns JSON with structured ParseJobResponse or a 422 error
  */
@@ -87,14 +89,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (body === null || typeof body !== "object") {
     return errorResponse("Invalid request body", 400);
   }
-  const { input, answers, jobDate, fallbackDestination, meetingType, billedToCompany } = body as {
-    input: unknown;
-    answers?: Record<string, unknown>;
-    jobDate?: unknown;
-    fallbackDestination?: unknown;
-    meetingType?: unknown;
-    billedToCompany?: unknown;
-  };
+  const { input, answers, jobDate, fallbackDestination, meetingType, billedToCompany, quote } =
+    body as {
+      input: unknown;
+      answers?: Record<string, unknown>;
+      jobDate?: unknown;
+      fallbackDestination?: unknown;
+      meetingType?: unknown;
+      billedToCompany?: unknown;
+      quote?: unknown;
+    };
+  // A quote prices work not done yet: no time question, estimated line times.
+  const isQuote = quote === true;
   // Facts the calculator knows that the description may not say.
   const remoteBooked = meetingType === "remote";
   const companyBill = billedToCompany === true;
@@ -201,6 +207,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     if (companyBill) {
       userContent += `\n\n[Invoice: billed to the client's company]`;
+    }
+    if (isQuote) {
+      userContent += `\n\n[Quote: this job has not been done yet - the operator is pricing it for the client]`;
     }
 
     // gpt-4.1, not -mini: mini obeys an injected negative-duration correction. One attempt,
@@ -676,15 +685,61 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       parsed.durationMins = maxJobMins + outOfSessionMins;
     }
 
-    // Fit task quantities to the billable total. `isExplicit` and `isShort` tasks are
-    // pinned; the floating set snaps to the billing grid (no 0.85h nobody worked).
-    if (
+    const incMins = settings.pricing.billingIncrementMins;
+    /**
+     * Model qty as grid minutes, at least one increment. Stated durations round UP
+     * ("took 12 mins" never bills 10); the epsilon stops 0.25h * 60 = 15.000000000000002
+     * ceiling to the next step.
+     * @param qty - Task quantity in decimal hours, as the model emitted it.
+     * @param explicit - Whether the operator stated this task's duration.
+     * @returns Billed minutes, a multiple of the billing increment.
+     */
+    const snapTaskMins = (qty: number, explicit: boolean): number => {
+      const steps = ((qty || 0) * 60) / incMins;
+      return Math.max(incMins, (explicit ? Math.ceil(steps - 1e-9) : Math.round(steps)) * incMins);
+    };
+
+    // A quote states a total only through times or a whole-job figure ("about 2 hours"); a
+    // durationMins no bigger than the lines' own stated times is just their sum.
+    const explicitMins = (parsed.tasks ?? [])
+      .filter((t) => t.isExplicit)
+      .reduce((s, t) => s + snapTaskMins(t.qty, true), 0);
+    const statedTotal =
+      hasSession || (typeof parsed.durationMins === "number" && parsed.durationMins > explicitMins);
+
+    if (isQuote && parsed.tasks?.length > 0 && !statedTotal) {
+      // Untimed quote lines take the public estimator's time, so a quote matches /pricing.
+      // A failed estimate leaves each line at the quick-task time rather than failing the parse.
+      const estimate = await estimateQuoteLines(
+        input.trim(),
+        parsed.tasks.map((t) => t.description),
+        maxJobMins,
+      ).catch((err: unknown) => {
+        console.error("[parse-job] quote estimate failed:", err);
+        return null;
+      });
+      parsed.tasks = parsed.tasks.map((t, i) => {
+        const mins = t.isExplicit
+          ? snapTaskMins(t.qty, true)
+          : (estimate?.mins[i] ?? settings.pricing.shortTaskMins);
+        return { ...t, minutes: mins, qty: mins / 60, isShort: false };
+      });
+      parsed.durationMins = parsed.tasks.reduce((s, t) => s + (t.minutes ?? 0), 0);
+      parsed.confidence = estimate?.confidence ?? "low";
+      parsed.warnings = [
+        ...(parsed.warnings ?? []),
+        estimate
+          ? "Times are estimated from your typical task times - change any line you know better."
+          : `Couldn't estimate the times, so each line is set to ${settings.pricing.shortTaskMins} min. Set them by hand.`,
+      ];
+    } else if (
+      // Fit task quantities to the billable total. `isExplicit` and `isShort` tasks are
+      // pinned; the floating set snaps to the billing grid (no 0.85h nobody worked).
       parsed.tasks?.length > 0 &&
       typeof parsed.durationMins === "number" &&
       parsed.durationMins > 0
     ) {
       // Same billable rule as the calculator, so AI and invoice agree on the target.
-      const incMins = settings.pricing.billingIncrementMins;
       const incHours = incMins / 60;
       const targetMins = clampBillableMins(
         parsed.durationMins,
@@ -693,21 +748,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
       const targetHours = Math.round((targetMins / 60) * 100) / 100;
       // Snap to whole minutes up front: a 2 dp qty can't hold a 5-min step (0.17h = 10.2 min).
-      /**
-       * Model qty as grid minutes, at least one increment. Stated durations round UP
-       * ("took 12 mins" never bills 10); the epsilon stops 0.25h * 60 = 15.000000000000002
-       * ceiling to the next step.
-       * @param qty - Task quantity in decimal hours, as the model emitted it.
-       * @param explicit - Whether the operator stated this task's duration.
-       * @returns Billed minutes, a multiple of the billing increment.
-       */
-      const snapTaskMins = (qty: number, explicit: boolean): number => {
-        const steps = ((qty || 0) * 60) / incMins;
-        return Math.max(
-          incMins,
-          (explicit ? Math.ceil(steps - 1e-9) : Math.round(steps)) * incMins,
-        );
-      };
       parsed.tasks = parsed.tasks.map((t) => {
         const mins = snapTaskMins(t.qty, !!(t as { isExplicit?: boolean }).isExplicit);
         return { ...t, minutes: mins, qty: mins / 60 };

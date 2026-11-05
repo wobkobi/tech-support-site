@@ -26,6 +26,8 @@ const SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/drive",
   "https://www.googleapis.com/auth/business.manage",
+  // Reads the account's own picture, which the profile picture sync copies to the profile.
+  "https://www.googleapis.com/auth/userinfo.profile",
 ];
 
 /**

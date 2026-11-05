@@ -7,6 +7,8 @@ import {
   goldCardLineLabel,
   lineItemQtyLabel,
   promoLineLabel,
+  quoteAcceptLine,
+  quoteCalloutLines,
   settledCallout,
   settlementRows,
   UNSUCCESSFUL_LINE_LABEL,
@@ -17,6 +19,7 @@ import { bankCode, bankParticulars } from "@/features/business/lib/payment-field
 import type { Invoice } from "@/features/business/types/business";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { displayNZPhone } from "@/shared/lib/normalise-phone";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import fontkit from "@pdf-lib/fontkit";
 import type { Invoice as PrismaInvoice } from "@prisma/client";
@@ -182,6 +185,7 @@ export function serialiseInvoice(inv: PrismaInvoice): Invoice {
     number: inv.number,
     clientName: inv.clientName,
     clientEmail: inv.clientEmail,
+    clientPhone: inv.clientPhone,
     issueDate: inv.issueDate.toISOString(),
     dueDate: inv.dueDate.toISOString(),
     jobDate: inv.jobDate,
@@ -383,7 +387,7 @@ function drawBillToBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
     font: ctx.bold,
     color: DARK,
   });
-  ctx.page.drawText(invoice.clientEmail, {
+  ctx.page.drawText(invoice.clientEmail || displayNZPhone(invoice.clientPhone), {
     x: MARGIN,
     y: infoY - 32,
     size: 12,
@@ -814,14 +818,11 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
  * @returns Y coordinate below the box, including the gap before notes.
  */
 function drawQuoteCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
+  const { estimate, terms } = quoteCalloutLines(invoice.lineItems, invoice.quoteValidUntil);
   return drawCallout(ctx, y, "Accepting this quote", [
-    { text: `Reply to the email or ring ${ctx.identity.phone} to go ahead.` },
-    {
-      text: invoice.quoteValidUntil
-        ? `Prices are held until ${formatDateShort(invoice.quoteValidUntil)}.`
-        : "Prices may change if the scope does - anything extra is agreed first.",
-      colour: MID,
-    },
+    { text: quoteAcceptLine(ctx.identity.phone) },
+    ...(estimate ? [{ text: estimate }] : []),
+    { text: terms, colour: MID },
   ]);
 }
 

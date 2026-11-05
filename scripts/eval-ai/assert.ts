@@ -13,6 +13,7 @@ import {
 import type { CaptionRequest } from "@/features/social/lib/caption-ai";
 import {
   firstName,
+  isLongReview,
   replyLength,
   replyLimit,
   tidyReviewThanks,
@@ -405,15 +406,17 @@ export function replyProblems(
 
   // A sentence ends at . ! or ? followed by a space or the end; a trailing emoji isn't one.
   const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => /\p{L}/u.test(s)).length;
-  // A 4 or 5 star review gets a short thanks (two sentences and a closing line); a lower one
-  // room to say sorry and give the phone.
+  // A 4 or 5 star review gets a short thanks (two sentences and a closing line), or three and a
+  // closing line when the review is long; a lower one room to say sorry and give the phone.
   const praise = req.kind === "review" && (req.rating ?? 0) >= 4;
-  const most = praise ? 3 : req.kind === "review" ? 4 : direct ? 3 : 2;
+  const long = praise && isLongReview(req.text);
+  const most = praise ? (long ? 4 : 3) : req.kind === "review" ? 4 : direct ? 3 : 2;
   if (sentences > most + 1) hard.push(`${sentences} sentences, at most ${most}`);
   else if (sentences > most) soft.push(`${sentences} sentences, at most ${most}`);
   if (req.kind === "review" && !praise && sentences < 2) soft.push("one sentence for a review");
   const words = text.split(/\s+/).filter(Boolean).length;
-  if (praise && words > 20) soft.push(`${words} words, a thanks takes 20 at most`);
+  const cap = long ? 40 : 20;
+  if (praise && words > cap) soft.push(`${words} words, a thanks takes ${cap} at most`);
 
   if (req.kind === "review" && req.rating !== null) {
     const name = firstName("google", req.author);
