@@ -19,7 +19,6 @@ import {
 } from "@/features/contacts/components/ContactCard";
 import {
   ContactListToolbar,
-  type ContactSort,
   type SyncFilter,
 } from "@/features/contacts/components/ContactListToolbar";
 import {
@@ -27,6 +26,13 @@ import {
   ContactMergeDialog,
 } from "@/features/contacts/components/ContactMergePrompts";
 import { ContactTable } from "@/features/contacts/components/ContactTable";
+import {
+  compareContacts,
+  CONTACT_SORT_KEYS,
+  type ContactSortKey,
+  firstDir,
+  type SortDir,
+} from "@/features/contacts/lib/contact-sort";
 import { cn } from "@/shared/lib/cn";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
@@ -85,10 +91,15 @@ export function ContactAdminList({
   const [retainerOnly, setRetainerOnly] = useState(() => queryValue(pageQuery, "retainer") === "1");
   const [noEmail, setNoEmail] = useState(() => queryValue(pageQuery, "noemail") === "1");
   const [noPhone, setNoPhone] = useState(() => queryValue(pageQuery, "nophone") === "1");
-  const [sort, setSort] = useState<ContactSort>(() => {
+  const [sortKey, setSortKey] = useState<ContactSortKey>(() => {
     const v = queryValue(pageQuery, "sort");
-    return v === "newest" || v === "oldest" ? v : "name";
+    return CONTACT_SORT_KEYS.find((k) => k === v) ?? "name";
   });
+  const [sortDir, setSortDir] = useState<SortDir>(() => {
+    const v = queryValue(pageQuery, "dir");
+    return v === "asc" || v === "desc" ? v : firstDir(sortKey);
+  });
+  // Name A-Z is the default, and `dir` only shows when it isn't the key's starting one.
   useQuerySync({
     q: query,
     sync: syncFilter === "all" ? "" : syncFilter,
@@ -96,7 +107,8 @@ export function ContactAdminList({
     retainer: retainerOnly ? "1" : "",
     noemail: noEmail ? "1" : "",
     nophone: noPhone ? "1" : "",
-    sort: sort === "name" ? "" : sort,
+    sort: sortKey === "name" && sortDir === "asc" ? "" : sortKey,
+    dir: sortDir === firstDir(sortKey) ? "" : sortDir,
   });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   // Ticked by default: a surviving Google entry would let the sync pull them back.
@@ -112,26 +124,37 @@ export function ContactAdminList({
   const NEW_CONTACT_MS = 7 * 24 * 60 * 60 * 1000;
 
   /**
-   * Sorts contacts alphabetically by name (case-insensitive).
-   * @param a - First contact.
-   * @param b - Second contact.
-   * @returns Negative, zero, or positive sort order.
-   */
-  function alphSort(a: ContactRow, b: ContactRow): number {
-    return a.name.localeCompare(b.name, "en", { sensitivity: "base" });
-  }
-
-  /**
-   * Sorts contacts by the chosen order: name, or created date newest/oldest.
+   * Orders contacts by the chosen key and direction.
    * @param a - First contact.
    * @param b - Second contact.
    * @returns Comparator result.
    */
   function bySort(a: ContactRow, b: ContactRow): number {
-    if (sort === "name") return alphSort(a, b);
-    const at = new Date(a.createdAt).getTime();
-    const bt = new Date(b.createdAt).getTime();
-    return sort === "newest" ? bt - at : at - bt;
+    return compareContacts(a, b, sortKey, sortDir);
+  }
+
+  /**
+   * Sorts on a column from its header: a repeat click reverses it, a new column starts
+   * in its own direction (A-Z, or most reviews first).
+   * @param key - Column to sort on.
+   */
+  function sortOnColumn(key: ContactSortKey): void {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(firstDir(key));
+  }
+
+  /**
+   * Applies a sort picked from the dropdown.
+   * @param key - Sort key.
+   * @param dir - Sort direction.
+   */
+  function setSort(key: ContactSortKey, dir: SortDir): void {
+    setSortKey(key);
+    setSortDir(dir);
   }
 
   /**
@@ -177,7 +200,7 @@ export function ContactAdminList({
   const syncedPager = useShowMore(
     synced,
     BATCH,
-    [q, syncFilter, reviewedOnly, retainerOnly, noEmail, noPhone, sort].join("|"),
+    [q, syncFilter, reviewedOnly, retainerOnly, noEmail, noPhone, sortKey, sortDir].join("|"),
   );
 
   /**
@@ -536,7 +559,13 @@ export function ContactAdminList({
             <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
           ))}
         </div>
-        <ContactTable contacts={list} cardProps={buildCardProps} />
+        <ContactTable
+          contacts={list}
+          cardProps={buildCardProps}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={sortOnColumn}
+        />
       </>
     );
   }
@@ -576,8 +605,9 @@ export function ContactAdminList({
               setNoEmail(false);
               setNoPhone(false);
             }}
-            sort={sort}
-            setSort={setSort}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSortChange={setSort}
           />
         </div>
       }
@@ -614,19 +644,22 @@ export function ContactAdminList({
           <p className="text-sm text-admin-muted">All contacts are synced to Google.</p>
         )}
 
-        {/* Synced contacts - collapsible */}
+        {/* Synced contacts - collapsible. Hide/Show is a word, not an arrow, so it doesn't
+            read as a sort control beside the sortable column names. */}
         {synced.length > 0 && (
           <section className="flex flex-col gap-3">
             <button
               type="button"
               onClick={() => setSyncedOpen((o) => !o)}
               aria-expanded={syncedOpen}
-              className="flex items-center gap-2 self-start text-left"
+              className="group flex items-center gap-2 self-start text-left"
             >
               <span className={cn(SECTION_HEADING_CLS, "text-admin-muted")}>
                 Synced contacts ({synced.length})
               </span>
-              <span className="text-sm text-admin-muted">{syncedOpen ? "▲" : "▼"}</span>
+              <span className="text-sm font-semibold text-russian-violet group-hover:underline">
+                {syncedOpen ? "Hide" : "Show"}
+              </span>
             </button>
             {syncedOpen && (
               <div className="flex flex-col gap-3">

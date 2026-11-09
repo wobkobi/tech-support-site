@@ -8,13 +8,15 @@ import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
 import { ListToolbar } from "@/features/admin/components/ui/ListToolbar";
+import {
+  CONTACT_SORT_OPTIONS,
+  type ContactSortKey,
+  type SortDir,
+} from "@/features/contacts/lib/contact-sort";
 import type React from "react";
 
 /** Sync filter: tri-state, since a contact is exactly one of synced or not. */
 export type SyncFilter = "all" | "synced" | "unsynced";
-
-/** List order. */
-export type ContactSort = "name" | "newest" | "oldest";
 
 /** Props for {@link ContactListToolbar}. */
 interface ContactListToolbarProps {
@@ -34,8 +36,9 @@ interface ContactListToolbarProps {
   setNoPhone: React.Dispatch<React.SetStateAction<boolean>>;
   anyFilter: boolean;
   onClearFilters: () => void;
-  sort: ContactSort;
-  setSort: (value: ContactSort) => void;
+  sortKey: ContactSortKey;
+  sortDir: SortDir;
+  onSortChange: (key: ContactSortKey, dir: SortDir) => void;
 }
 
 /**
@@ -57,8 +60,9 @@ interface ContactListToolbarProps {
  * @param props.setNoPhone - Sets the "No phone" chip.
  * @param props.anyFilter - Whether any chip is on, which shows Clear.
  * @param props.onClearFilters - Turns every chip off.
- * @param props.sort - Current order.
- * @param props.setSort - Sets the order.
+ * @param props.sortKey - What the list is sorted on.
+ * @param props.sortDir - Current sort direction.
+ * @param props.onSortChange - Sets the sort key and direction together.
  * @returns The toolbar element.
  */
 export function ContactListToolbar({
@@ -78,8 +82,9 @@ export function ContactListToolbar({
   setNoPhone,
   anyFilter,
   onClearFilters,
-  sort,
-  setSort,
+  sortKey,
+  sortDir,
+  onSortChange,
 }: ContactListToolbarProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-3">
@@ -156,15 +161,22 @@ export function ContactListToolbar({
             Clear
           </AdminButton>
         )}
+        {/* Mirrors the table's column headers, and is the only sort on phones and for the
+            date added. */}
         <AdminSelect
           aria-label="Sort contacts"
-          value={sort}
-          onChange={(e) => setSort(e.target.value as ContactSort)}
+          value={`${sortKey}:${sortDir}`}
+          onChange={(e) => {
+            const picked = CONTACT_SORT_OPTIONS.find((o) => `${o.key}:${o.dir}` === e.target.value);
+            if (picked) onSortChange(picked.key, picked.dir);
+          }}
           className="ml-auto h-10 w-auto"
         >
-          <option value="name">Name A-Z</option>
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
+          {CONTACT_SORT_OPTIONS.map((o) => (
+            <option key={`${o.key}:${o.dir}`} value={`${o.key}:${o.dir}`}>
+              {o.label}
+            </option>
+          ))}
         </AdminSelect>
       </div>
     </div>
