@@ -113,7 +113,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Unsuccessful-work snapshot, so the dashboard can count the half-price clause.
     unsuccessful,
     unsuccessfulDiscount,
-    // "Couldn't be fixed: Laptop repair, so $25.00 of labour is half price.", under its row.
+    // "Laptop repair: $25.00 at half price", under its row.
     unsuccessfulNote,
     // Gold Card holder: the share off labour and the dollars it came to.
     goldCardPercent,

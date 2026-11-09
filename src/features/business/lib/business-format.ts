@@ -174,8 +174,9 @@ export const UNSUCCESSFUL_LINE_LABEL = "Discount for work that couldn't be fixed
 
 /**
  * The line under an invoice's couldn't-fix row, so the customer can check the discount:
- * "Couldn't be fixed: Laptop repair, so $25.00 of labour is half price." The colon form
- * reads right for verb-phrase lines too ("Install Office").
+ * "Laptop repair: $25.00 at half price". The row's label already says the work couldn't be
+ * fixed, so the note only names the task and the sum. The colon form reads right for
+ * verb-phrase lines too ("Install Office").
  * @param tasks - The lines that couldn't be fixed; empty when the whole visit couldn't.
  * @param base - Labour the discount came off, after any promo and Gold Card.
  * @param factor - Share of that labour still charged (0.5 = half).
@@ -186,17 +187,17 @@ export function unsuccessfulNote(tasks: string[], base: number, factor: number):
   const names = [...new Set(tasks.map((t) => t.trim()).filter(Boolean))];
   const subject =
     names.length === 0
-      ? "The problem couldn't be fixed"
+      ? "All labour"
       : names.length === 1
-        ? `Couldn't be fixed: ${names[0]}`
-        : `Couldn't be fixed: ${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+        ? names[0]
+        : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
   const share =
     factor <= 0
-      ? "isn't charged"
+      ? "not charged"
       : factor === 0.5
-        ? "is half price"
-        : `is charged at ${Math.round(factor * 100)}%`;
-  return `${subject}, so ${formatNZD(base)} of labour ${share}.`;
+        ? "at half price"
+        : `charged at ${Math.round(factor * 100)}%`;
+  return `${subject}: ${formatNZD(base)} ${share}`;
 }
 
 /** The invoice fields that say what's been paid. */
