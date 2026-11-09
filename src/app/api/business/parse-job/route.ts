@@ -332,6 +332,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           `Couldn't look up the drive to ${parsed.destination}, so no travel was charged. Check the address or add travel by hand.`,
         ];
       }
+    } else if (!parsed.noTravelCharge && !remoteBooked && parsed.storeRuns.length === 0) {
+      // The model never sees the booking's address, so only the server knows none was sent.
+      // A store run's own warning below already asks for the address.
+      parsed.warnings = [
+        ...(parsed.warnings ?? []),
+        "No address for this job, so the drive wasn't measured. Add the address, or a travel line by hand.",
+      ];
     }
 
     // Each store run is timed from the client's place, so it needs that address.
