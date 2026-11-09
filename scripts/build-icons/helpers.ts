@@ -19,12 +19,13 @@ export async function ensureDir(dir: string): Promise<void> {
  * @param w - Canvas width in pixels.
  * @param h - Canvas height in pixels.
  * @param logoScale - Scale factor of the logo (to size the card appropriately).
+ * @param boxH - Height of the centred band the card must fit inside; defaults to the full canvas.
  * @returns SVG buffer.
  */
-export function makeFrostedCard(w: number, h: number, logoScale: number): Buffer {
+export function makeFrostedCard(w: number, h: number, logoScale: number, boxH = h): Buffer {
   // Card should be slightly larger than the logo with minimal padding
   const cardWidth = Math.round(w * logoScale * 1.05);
-  const cardHeight = Math.round(h * logoScale * 1.05);
+  const cardHeight = Math.round(boxH * logoScale * 1.05);
   const cardX = Math.round((w - cardWidth) / 2);
   const cardY = Math.round((h - cardHeight) / 2);
   const borderRadius = Math.max(16, Math.round(cardWidth * 0.03));
