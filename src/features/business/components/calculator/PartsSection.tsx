@@ -4,6 +4,7 @@
 
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card } from "@/features/admin/components/ui/Card";
+import { MoneyInput } from "@/features/admin/components/ui/MoneyInput";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import {
   REMOVE_ROW_CLS,
@@ -71,12 +72,11 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                 }
                 className="col-span-2 sm:col-span-1"
               />
-              <AdminInput
-                type="number"
+              <MoneyInput
                 min="0"
                 step="0.01"
                 placeholder="Cost"
-                value={part.cost || ""}
+                amount={part.cost}
                 onPaste={(e) => {
                   // Intercept only pastes with "$", commas or other junk; plain numbers
                   // fall through to the native input.

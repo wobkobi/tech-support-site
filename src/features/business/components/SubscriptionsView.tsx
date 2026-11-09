@@ -24,6 +24,7 @@ import {
 import { isGstRegisteredOn } from "@/features/business/lib/tax/gst-basis";
 import type { GstStatus } from "@/features/business/lib/tax/types";
 import type { Subscription } from "@/features/business/types/business";
+import { moneyInputText } from "@/shared/lib/money";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -115,7 +116,7 @@ export function SubscriptionsView({
       description: sub.description,
       supplier: sub.supplier,
       category: sub.category,
-      amountIncl: String(sub.amountIncl),
+      amountIncl: moneyInputText(sub.amountIncl),
       gstRate: String(sub.gstRate),
       method: sub.method,
       frequency: sub.frequency,

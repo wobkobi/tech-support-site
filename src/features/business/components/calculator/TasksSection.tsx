@@ -6,6 +6,7 @@
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { MoneyInput } from "@/features/admin/components/ui/MoneyInput";
 import {
   REMOVE_ROW_CLS,
   TEXT_ACTION_CLS,
@@ -494,12 +495,11 @@ function TaskTotalsRow({
         <span className="text-sm font-medium tracking-wide text-admin-muted uppercase sm:hidden">
           {spread ? "$/hr" : "$/unit"}
         </span>
-        <AdminInput
-          type="number"
+        <MoneyInput
           min="0"
           step="0.01"
           inputMode="decimal"
-          value={task.unitPrice || ""}
+          amount={task.unitPrice}
           // min="0" isn't enforced on typing; a negative rate would bill a negative surcharge.
           onChange={(e) => onPrice(Math.max(0, parseFloat(e.target.value) || 0))}
           aria-label="Unit price"

@@ -12,7 +12,7 @@ import { useToast } from "@/features/admin/components/ui/Toast";
 import { DEFAULT_RATE_ROWS } from "@/features/business/lib/pricing-policy";
 import type { RateConfig } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
-import { roundCents } from "@/shared/lib/money";
+import { moneyInputText, roundCents } from "@/shared/lib/money";
 import type React from "react";
 import { useState } from "react";
 
@@ -78,11 +78,11 @@ function kindOf(r: RateConfig): RateKind {
  */
 function amountOf(r: RateConfig): string {
   const kind = kindOf(r);
-  if (kind === "hourly") return String(r.ratePerHour);
-  if (kind === "delta") return String(r.hourlyDelta);
+  if (kind === "hourly") return moneyInputText(r.ratePerHour ?? 0);
+  if (kind === "delta") return moneyInputText(r.hourlyDelta ?? 0);
   // Stored as a fraction (0.25); round off float noise from the x100.
   if (kind === "percent") return String(Math.round((r.percentDelta ?? 0) * 10000) / 100);
-  return String(r.flatRate ?? "");
+  return r.flatRate != null ? moneyInputText(r.flatRate) : "";
 }
 
 /**

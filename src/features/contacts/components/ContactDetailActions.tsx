@@ -24,6 +24,7 @@ import AddressAutocomplete from "@/features/booking/components/AddressAutocomple
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
+import { moneyInputText } from "@/shared/lib/money";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
@@ -112,7 +113,7 @@ export function ContactDetailActions({
     phone: phone ?? "",
     address: address ?? "",
     retainerTier: retainerTier ?? "",
-    retainerPrice: retainerPrice !== null ? String(retainerPrice) : "",
+    retainerPrice: retainerPrice !== null ? moneyInputText(retainerPrice) : "",
     retainerHours: retainerHours !== null ? String(retainerHours) : "",
     retainerSince: retainerSince ?? "",
     retainerNotes: retainerNotes ?? "",

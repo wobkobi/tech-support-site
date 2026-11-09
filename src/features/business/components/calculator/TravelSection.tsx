@@ -6,6 +6,7 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { MoneyInput } from "@/features/admin/components/ui/MoneyInput";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {
   SEGMENTED_GROUP_CLS,
@@ -290,11 +291,10 @@ export function TravelSection({
                     <span className="flex items-center rounded-l-md border border-r-0 border-admin-border-strong bg-admin-bg px-2 text-sm text-admin-muted">
                       $
                     </span>
-                    <AdminInput
-                      type="number"
+                    <MoneyInput
                       min="0"
                       step="0.01"
-                      value={entry.cost || ""}
+                      amount={entry.cost}
                       onPaste={(e) => {
                         // Intercept only pastes with "$", commas or other junk.
                         const text = e.clipboardData.getData("text");

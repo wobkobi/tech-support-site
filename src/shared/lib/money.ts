@@ -24,6 +24,16 @@ export function toCents(n: number): number {
 }
 
 /**
+ * A dollar amount as money-box text: cents always two digits ("12.50", never "12.5"), whole
+ * dollars left bare ("10").
+ * @param amount - Amount in dollars.
+ * @returns The text for the input.
+ */
+export function moneyInputText(amount: number): string {
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+}
+
+/**
  * Parses a pasted money string, refusing to guess on ambiguity. "$1,089.00" > 1089; null for
  * negatives, accounting parentheses, multiple decimal points or no digits.
  * @param raw - Raw pasted or typed text.

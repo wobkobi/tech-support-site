@@ -35,6 +35,7 @@ import { expenseTaxBasis, isGstRegisteredOn } from "@/features/business/lib/tax/
 import type { GstStatus } from "@/features/business/lib/tax/types";
 import type { ExpenseEntry, Subscription } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { moneyInputText } from "@/shared/lib/money";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -278,7 +279,7 @@ export function ExpensesView({
       supplier: entry.supplier,
       description: entry.description,
       category: entry.category,
-      amountIncl: String(entry.amountIncl),
+      amountIncl: moneyInputText(entry.amountIncl),
       gstRate: entry.gstAmount > 0 ? "0.15" : "0",
       method: entry.method,
       receipt: entry.receipt,

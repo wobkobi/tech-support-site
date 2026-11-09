@@ -4,6 +4,7 @@
 
 import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import type { ActivePromo } from "@/features/business/lib/promos";
+import { moneyInputText } from "@/shared/lib/money";
 import {
   addDaysToDateKey,
   dateKeyParts,
@@ -95,12 +96,12 @@ export function promoTypeOf(p: PromoRow): PromoType {
 function amountFor(p: PromoRow): number | string {
   switch (promoTypeOf(p)) {
     case "flat":
-      return p.flatHourlyRate ?? "";
+      return p.flatHourlyRate != null ? moneyInputText(p.flatHourlyRate) : "";
     case "percent":
       // 2dp so a fractional discount like 13.33% survives a round trip.
       return p.percentDiscount !== null ? Math.round(p.percentDiscount * 10000) / 100 : "";
     case "fixed":
-      return p.fixedAmount ?? "";
+      return p.fixedAmount != null ? moneyInputText(p.fixedAmount) : "";
     case "travel":
       // Stored as the fraction still charged; shown as the discount.
       return p.travelPercent !== null ? Math.round((1 - p.travelPercent) * 10000) / 100 : "";
@@ -325,9 +326,9 @@ export function formFromPromo(p: PromoRow): FormState {
     activeWeekdays: p.activeWeekdays,
     activeFrom: fromMinuteOfDay(p.activeFromMinute),
     activeTo: fromMinuteOfDay(p.activeToMinute),
-    minSpend: p.minSpend != null ? String(p.minSpend) : "",
+    minSpend: p.minSpend != null ? moneyInputText(p.minSpend) : "",
     tiers: [...p.tiers]
       .sort((a, b) => a.minSpend - b.minSpend)
-      .map((t) => ({ minSpend: String(t.minSpend), amount: String(tierAmountFor(t, p)) })),
+      .map((t) => ({ minSpend: moneyInputText(t.minSpend), amount: String(tierAmountFor(t, p)) })),
   };
 }
