@@ -1,14 +1,12 @@
 "use client";
 // src/features/business/components/calculator/JobSettingsStrip.tsx
-// Top strip of the calculator: job date, promo code, form tools, surcharge tick and the
-// resolved promo with its skip toggle.
+// Top strip of the calculator: job date, promo code, form tools and the resolved promo with
+// its skip toggle.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card } from "@/features/admin/components/ui/Card";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
-import { SurchargeToggle } from "@/features/business/components/SurchargeToggle";
-import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -21,17 +19,14 @@ interface Props {
   promoCode: string;
   onApplyPromoCode: () => void;
   onClearForm: () => void;
-  surchargeOption: DateSurcharge | null;
-  surchargeOn: boolean;
-  surchargeFromDate: boolean;
-  onSurchargeChange: (on: boolean) => void;
   activePromo: ActivePromo | null;
   skipPromo: boolean;
   onSkipPromoChange: (skip: boolean) => void;
 }
 
 /**
- * Job settings strip in one compact box. The date drives the surcharge and promo lookup.
+ * Job settings strip in one compact box. The date drives the surcharge and promo lookup;
+ * the surcharge tick itself sits in the Tasks card with the labour it adds to.
  * @param props - Component props.
  * @param props.jobDate - Selected job date (YYYY-MM-DD).
  * @param props.onJobDateChange - Called with the picked date, or "" when the input is cleared.
@@ -40,11 +35,6 @@ interface Props {
  * @param props.promoCode - The applied promo code, or "".
  * @param props.onApplyPromoCode - Applies the box text as the promo code.
  * @param props.onClearForm - Opens the clear-form confirm.
- * @param props.surchargeOption - The surcharge the tick switches (the date's, else after
- * hours), or null to hide it.
- * @param props.surchargeOn - Whether the job bills the surcharge.
- * @param props.surchargeFromDate - Whether the job date bills it by default.
- * @param props.onSurchargeChange - Called with the new tick.
  * @param props.activePromo - Promo resolved for the job date, or null.
  * @param props.skipPromo - Whether the promo is skipped for this job.
  * @param props.onSkipPromoChange - Toggles the per-job promo skip.
@@ -58,10 +48,6 @@ export function JobSettingsStrip({
   promoCode,
   onApplyPromoCode,
   onClearForm,
-  surchargeOption,
-  surchargeOn,
-  surchargeFromDate,
-  onSurchargeChange,
   activePromo,
   skipPromo,
   onSkipPromoChange,
@@ -127,17 +113,9 @@ export function JobSettingsStrip({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-sm text-admin-muted">
-        <span>The job date sets which promo and weekend or public-holiday rate apply.</span>
-        {surchargeOption && (
-          <SurchargeToggle
-            option={surchargeOption}
-            on={surchargeOn}
-            fromDate={surchargeFromDate}
-            onChange={onSurchargeChange}
-          />
-        )}
-      </div>
+      <p className="text-sm text-admin-muted">
+        The job date sets which promo and weekend or public-holiday rate apply.
+      </p>
 
       {/* Verdict is for the job date: a code valid today may not have been then. */}
       {promoCode !== "" && activePromo?.code !== promoCode && (

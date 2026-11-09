@@ -18,6 +18,7 @@ import {
   type GstStatus,
 } from "@/features/business/lib/tax";
 import { parseDateKey } from "@/shared/lib/date-format";
+import { moneyInputText } from "@/shared/lib/money";
 
 /** Class key stored when the operator types a rate instead of picking an IR265 class. */
 export const CUSTOM_CLASS_KEY = "custom";
@@ -130,7 +131,7 @@ export function formFromAsset(a: AssetView): AssetFormState {
     classKey: a.classKey,
     origin: a.origin,
     inServiceDate: a.inServiceDate,
-    costBase: String(a.costBase),
+    costBase: moneyInputText(a.costBase),
     supplier: a.supplier ?? "",
     valuationNote: a.valuationNote ?? "",
     method: a.method,
@@ -141,7 +142,7 @@ export function formFromAsset(a: AssetView): AssetFormState {
     expenseId: a.expenseId ?? "",
     disposed: a.disposedAt !== null,
     disposedAt: a.disposedAt ?? "",
-    disposalAmount: a.disposalAmount === null ? "" : String(a.disposalAmount),
+    disposalAmount: a.disposalAmount === null ? "" : moneyInputText(a.disposalAmount),
     notes: a.notes ?? "",
   };
 }
@@ -157,7 +158,7 @@ export function formFromPrefill(p: AssetPrefill): AssetFormState {
     name: p.name,
     origin: "purchased",
     inServiceDate: p.inServiceDate,
-    costBase: String(p.costBase),
+    costBase: moneyInputText(p.costBase),
     supplier: p.supplier,
     expenseId: p.expenseId,
   };

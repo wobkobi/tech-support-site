@@ -1,5 +1,6 @@
 // scripts/build-ads.ts
-// Render Meta ad creatives (1:1, 4:5, 9:16, 1.91:1) with Puppeteer into marketing/ads/.
+// Render Meta ad creatives (1:1, 4:5, 9:16, 1.91:1) with Puppeteer into ../marketing/ads/,
+// beside the repo rather than inside it.
 // One message per image: logo, headline, support line - no fake buttons (Meta review).
 // Run with: npm run build:ads
 
@@ -35,7 +36,7 @@ type LogoKind = "square" | "wordmark";
 
 /** One ad creative to render. */
 interface AdSpec {
-  /** Output filename (written into marketing/ads/). */
+  /** Output filename (written into ../marketing/ads/). */
   name: string;
   /** Canvas width in pixels (CSS layout size; output is SCALE x this). */
   width: number;
@@ -47,7 +48,7 @@ interface AdSpec {
   logo: LogoKind;
 }
 
-const OUTPUT_DIR = "marketing/ads";
+const OUTPUT_DIR = "../marketing/ads";
 
 // 2x for crisp text on high-DPI phones; Meta downsizes per placement
 const SCALE = 2;

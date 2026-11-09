@@ -33,6 +33,7 @@ import {
   useGoogleContacts,
 } from "@/features/contacts/components/ContactNameInput";
 import { cn } from "@/shared/lib/cn";
+import { moneyInputText } from "@/shared/lib/money";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -157,7 +158,7 @@ export function IncomeView(): React.ReactElement {
       date: entry.date.slice(0, 10),
       customer: entry.customer,
       description: entry.description,
-      amount: String(entry.amount),
+      amount: moneyInputText(entry.amount),
       method: entry.method,
       notes: entry.notes ?? "",
     });

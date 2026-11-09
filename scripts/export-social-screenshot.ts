@@ -1,6 +1,6 @@
 // scripts/export-social-screenshot.ts
 // Exports /intro as organic social JPEGs (1080x1350 at 2x, a 1x copy under Instagram's
-// 1440px cap, and 1200x900 for Google) into gitignored marketing/posts/.
+// 1440px cap, and 1200x900 for Google) into ../marketing/posts/, beside the repo.
 // Run with: npm run build:social
 // Pass flags via npx tsx directly (PowerShell strips the bare `--`): --url=<url>, --output-dir=<dir>.
 
@@ -27,7 +27,7 @@ interface SocialSpec {
 // Capture the dev server by default; pass --url for a deployed copy.
 const DEFAULT_URL = "http://localhost:3000/intro";
 
-const OUTPUT_DIR = "marketing/posts";
+const OUTPUT_DIR = "../marketing/posts";
 
 // Meta's recommended 4:5 feed size; 2x keeps text crisp on phones.
 const FEED = { width: 1080, height: 1350 };

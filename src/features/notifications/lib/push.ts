@@ -3,7 +3,7 @@
 // can't fail the customer action behind it.
 
 import { prisma } from "@/shared/lib/prisma";
-import webpush from "web-push";
+import { sendNotification, setVapidDetails } from "web-push";
 
 /**
  * Idle cap on each push-service call. Booking and review requests await the push, so a
@@ -104,7 +104,7 @@ function configureVapid(): boolean {
     console.warn("[push] VAPID keys not configured - skipping owner push.");
     return false;
   }
-  webpush.setVapidDetails(subject, publicKey, privateKey);
+  setVapidDetails(subject, publicKey, privateKey);
   return true;
 }
 
@@ -127,7 +127,7 @@ export async function sendOwnerPush(input: OwnerPushInput): Promise<OwnerPushRes
     await Promise.all(
       devices.map(async (device) => {
         try {
-          await webpush.sendNotification(
+          await sendNotification(
             {
               endpoint: device.endpoint,
               keys: { p256dh: device.p256dh, auth: device.auth },

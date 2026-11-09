@@ -2,8 +2,9 @@
 // src/features/contacts/components/ContactTable.tsx
 // Desktop (lg+) table for one contacts section; rows take ContactCard props and open
 // editors and panels in an expanding row. The actions cell is pinned right, and from xl
-// the column names pin under the list's toolbar.
+// the column names pin under the list's toolbar. Column names sort the whole list.
 
+import { SortableTh } from "@/features/admin/components/ui/SortableTh";
 import {
   PINNED_CELL_CLS,
   ROW_CLS,
@@ -29,6 +30,7 @@ import {
   ContactSyncConfirm,
   ContactSyncStatus,
 } from "@/features/contacts/components/ContactRowParts";
+import type { ContactSortKey, SortDir } from "@/features/contacts/lib/contact-sort";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { formatNZPhone } from "@/shared/lib/normalise-phone";
@@ -198,15 +200,43 @@ function ContactTableRow({
  * @param props - Component props.
  * @param props.contacts - Contacts to show, already filtered, sorted and paged.
  * @param props.cardProps - Builds the ContactCard props for one contact.
+ * @param props.sortKey - What the list is sorted on.
+ * @param props.sortDir - Current sort direction.
+ * @param props.onSort - Sorts on a column; the list decides what a repeat click does.
  * @returns The table element.
  */
 export function ContactTable({
   contacts,
   cardProps,
+  sortKey,
+  sortDir,
+  onSort,
 }: {
   contacts: ContactRow[];
   cardProps: (c: ContactRow) => Omit<ContactCardProps, "c">;
+  sortKey: ContactSortKey;
+  sortDir: SortDir;
+  onSort: (key: ContactSortKey) => void;
 }): React.ReactElement {
+  /**
+   * A sortable column name for `key`.
+   * @param key - The sort key this column sorts on.
+   * @param label - Column name.
+   * @param className - Padding to match the column's cells.
+   * @returns The header cell.
+   */
+  function sortableHead(key: ContactSortKey, label: string, className: string): React.ReactElement {
+    return (
+      <SortableTh
+        label={label}
+        active={sortKey === key}
+        dir={sortDir}
+        onSort={() => onSort(key)}
+        className={className}
+      />
+    );
+  }
+
   return (
     // @container: the full-width rows size themselves to this box with cqw units.
     <div
@@ -229,12 +259,12 @@ export function ContactTable({
         </colgroup>
         <thead className={cn(THEAD_CLS, STICKY_THEAD_CLS)}>
           <tr>
-            <th className={HEAD_CLS}>Name</th>
-            <th className={HEAD_CLS}>Email</th>
-            <th className={HEAD_CLS}>Phone</th>
-            <th className={HEAD_CLS}>Address</th>
+            {sortableHead("name", "Name", "px-3")}
+            {sortableHead("email", "Email", "px-3")}
+            {sortableHead("phone", "Phone", "px-3")}
+            {sortableHead("address", "Address", "px-3")}
             <th className={cn(HEAD_CLS, "px-2")}>Sync</th>
-            <th className={cn(HEAD_CLS, "px-2")}>Reviewed</th>
+            {sortableHead("reviewed", "Reviewed", "px-2")}
             <th className={cn(HEAD_CLS, PINNED_CELL_CLS, "bg-admin-bg px-2 text-right")}>
               Actions
             </th>

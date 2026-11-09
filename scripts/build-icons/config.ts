@@ -77,6 +77,11 @@ export interface SocialSpec {
   quality: number;
   /** Use square logo mark instead of full wordmark. */
   useMarkLogo?: boolean;
+  /**
+   * Width:height of the full-width centred strip the platform crops the image to. The card
+   * and logo fit inside that strip instead of the whole canvas.
+   */
+  safeAspect?: number;
   /** Directory the image is written to. */
   outDir: string;
   /** Extra directory to copy the finished image to. */
@@ -84,10 +89,10 @@ export interface SocialSpec {
 }
 
 // Upload-only images (banners and profile pictures pasted into each platform by hand)
-// go to the gitignored marketing/ folder next to the ad creatives, not public/, so the
+// go to ../marketing/ beside the repo, next to the ad creatives, not public/, so the
 // site only serves what it actually links to.
-const MARKETING_BANNERS = "marketing/banners";
-const MARKETING_PROFILES = "marketing/profiles";
+const MARKETING_BANNERS = "../marketing/banners";
+const MARKETING_PROFILES = "../marketing/profiles";
 
 export const SOCIAL_SPECS: SocialSpec[] = [
   // Open Graph (Facebook, LinkedIn, Discord, etc.). Every page's og:image and the
@@ -248,6 +253,19 @@ export const SOCIAL_SPECS: SocialSpec[] = [
     quality: 90,
     useMarkLogo: true,
     outDir: MARKETING_PROFILES,
+  },
+  // Apple Business place card cover: 2x Apple's 1600x1040 minimum, same 20:13 shape, so a
+  // size check that rejects the exact limit still passes. Maps and Wallet crop it to a
+  // full-width 2.5:1 strip (the middle 8/13 of the height), so the card fits inside that.
+  {
+    name: "apple-business-cover-3200x2080",
+    width: 3200,
+    height: 2080,
+    blur: 64,
+    logoScale: 0.7,
+    quality: 90,
+    safeAspect: 2.5,
+    outDir: MARKETING_BANNERS,
   },
 ];
 

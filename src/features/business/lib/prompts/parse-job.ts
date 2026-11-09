@@ -305,6 +305,9 @@ OTHER RULES:
 - warnings[]: Flag anything ambiguous, assumed, or conflicting in plain English. Is the server's "[Quote: ...]" annotation present?
   - YES: the job has not happened yet, so an unstated travel mode, time or duration is expected. Never warn about one, and never mention the quote or that the server estimates the times.
   - NO: flag as above.
+  TRAVEL - did the destination decision below stop at STEP 1 (travel never mentioned)?
+    - YES: write NO warning about travel, the location, a travel charge or a delivery modifier. The server holds the booking's address and bills the drive from it, or notes itself that it had none - a warning saying no travel was charged contradicts the invoice.
+    - NO: flag travel as above.
 - trips[]: write this list FIRST - storeRuns and the destination decision below both read from it. LIST every trip the description names, in the order it names them. Read to the final sentence before listing - a supply run is normally named after the visit it followed. One entry per trip:
   - to: the place, kept WHOLE ("their place", "Papakura", "PB Tech St Lukes").
   - mode: "foot", "bicycle", "vehicle" (car, van, drove) or "public transport"; "unstated" when the description names the place but not how he got there.

@@ -264,16 +264,16 @@ async function InvoiceRail({
               <span className="text-admin-faint">None</span>
             )}
           </InfoRow>
-          {/* The link every email and text about this invoice carries. */}
+          {/* The link every email and text about this invoice carries; only its code is shown. */}
           <InfoRow label="Customer link">
             {invoice.shareToken ? (
               <a
                 href={invoiceShareUrl(invoice.shareToken, invoice.isQuote)}
                 target="_blank"
                 rel="noreferrer"
-                className="break-all text-blue-500 hover:text-blue-700"
+                className="text-blue-500 hover:text-blue-700"
               >
-                {invoiceShareUrl(invoice.shareToken, invoice.isQuote).replace(/^https?:\/\//, "")} ↗
+                {invoice.shareToken} ↗
               </a>
             ) : (
               <span className="text-admin-faint">Made when it&apos;s first sent</span>

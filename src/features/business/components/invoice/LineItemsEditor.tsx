@@ -4,6 +4,7 @@
 // withSplitLineTotals on every change. The parent owns and validates the array.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { MoneyInput } from "@/features/admin/components/ui/MoneyInput";
 import { REMOVE_ROW_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { formatNZD, withSplitLineTotals } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
@@ -116,11 +117,12 @@ export function LineItemsEditor({
           </label>
           <label className="flex min-w-0 flex-col gap-1">
             <span className="text-sm font-semibold text-admin-muted sm:hidden">Unit price</span>
-            <input
-              type="number"
+            <MoneyInput
+              bare
+              showZero
               inputMode="decimal"
               step="0.01"
-              value={item.unitPrice}
+              amount={item.unitPrice}
               onChange={(e) => updateRow(idx, { unitPrice: parseNum(e.target.value) })}
               disabled={disabled}
               className={cn("text-right", INPUT_CLS)}

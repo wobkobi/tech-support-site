@@ -1,11 +1,12 @@
 "use client";
 // src/features/business/components/calculator/TasksSection.tsx
 // Tasks list for the job calculator: flat-rate lines or device + action tasks priced from
-// saved templates, with modifier chips on the hourly rate.
+// saved templates, with modifier chips on the hourly rate and the job-wide surcharge tick.
 
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { MoneyInput } from "@/features/admin/components/ui/MoneyInput";
 import {
   REMOVE_ROW_CLS,
   TEXT_ACTION_CLS,
@@ -45,6 +46,8 @@ interface Props {
   flatRates: RateConfig[];
   /** Share of the labour still charged on an unfinished task (0.5 = half price). */
   unsuccessfulFactor: number;
+  /** The after-hours, weekend or holiday tick, shown above the tasks; null hides it. */
+  surchargeToggle: React.ReactNode;
 }
 
 /**
@@ -88,6 +91,7 @@ function modifierLabel(m: RateConfig): string {
  * @param props.modifierRates - Modifiers: At home and Remote fill the Where dropdown, the rest show as chips.
  * @param props.flatRates - Flat-rate options used for flat-rate rows.
  * @param props.unsuccessfulFactor - Labour share charged on an unfinished task, for the chip's tooltip.
+ * @param props.surchargeToggle - The job-wide labour surcharge tick, or null to hide it.
  * @returns Tasks section element.
  */
 export function TasksSection({
@@ -103,6 +107,7 @@ export function TasksSection({
   modifierRates,
   flatRates,
   unsuccessfulFactor,
+  surchargeToggle,
 }: Props): React.ReactElement {
   // The invoice's cents, not each row rounded alone: timed rows at one rate share them.
   const lineTotals = taskLineTotals(tasks);
@@ -125,6 +130,8 @@ export function TasksSection({
           </div>
         }
       />
+      {/* Job-wide, so it sits once above the per-task rate chips rather than on each row. */}
+      {surchargeToggle && <div className="flex flex-wrap items-center">{surchargeToggle}</div>}
       {tasks.map((task, idx) => {
         // Flat-rate rows are single-line; task rows use the combobox layout.
         const isFlatRate = task.rateConfigId != null;
@@ -488,12 +495,11 @@ function TaskTotalsRow({
         <span className="text-sm font-medium tracking-wide text-admin-muted uppercase sm:hidden">
           {spread ? "$/hr" : "$/unit"}
         </span>
-        <AdminInput
-          type="number"
+        <MoneyInput
           min="0"
           step="0.01"
           inputMode="decimal"
-          value={task.unitPrice || ""}
+          amount={task.unitPrice}
           // min="0" isn't enforced on typing; a negative rate would bill a negative surcharge.
           onChange={(e) => onPrice(Math.max(0, parseFloat(e.target.value) || 0))}
           aria-label="Unit price"

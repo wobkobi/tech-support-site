@@ -159,6 +159,11 @@ export async function buildSocialImages(): Promise<void> {
     const outPath = `${outDir}/${name}.jpg`;
     await ensureDir(outDir);
 
+    // Card and logo size off the centred band the platform crops to, not the whole canvas
+    const boxHeight = spec.safeAspect
+      ? Math.min(height, Math.round(width / spec.safeAspect))
+      : height;
+
     // Create blurred background
     const bg = await sharp(BACKDROP)
       .resize(width, height, { fit: "cover", position: "centre" })
@@ -166,7 +171,7 @@ export async function buildSocialImages(): Promise<void> {
       .toBuffer();
 
     // Create frosted card box
-    const frostedCard = await sharp(makeFrostedCard(width, height, logoScale))
+    const frostedCard = await sharp(makeFrostedCard(width, height, logoScale, boxHeight))
       .resize(width, height)
       .png()
       .toBuffer();
@@ -178,7 +183,7 @@ export async function buildSocialImages(): Promise<void> {
     const logo = await sharp(logoSource)
       .resize({
         width: Math.round(width * logoScale),
-        height: Math.round(height * logoScale),
+        height: Math.round(boxHeight * logoScale),
         fit: "inside",
       })
       .png()

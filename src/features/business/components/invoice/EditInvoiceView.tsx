@@ -159,7 +159,8 @@ export function EditInvoiceView({
   }
 
   return (
-    <div className="lg:grid lg:grid-cols-[minmax(20rem,1fr)_minmax(24rem,36rem)] lg:items-start lg:gap-6">
+    // No items-start: the preview's column stretches to the form's height so it can stay pinned.
+    <div className="lg:grid lg:grid-cols-[minmax(20rem,1fr)_minmax(24rem,36rem)] lg:gap-6">
       <div className="min-w-0">
         <InvoiceForm
           initial={initial}

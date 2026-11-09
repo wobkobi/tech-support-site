@@ -6,7 +6,10 @@
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
-import { adminChipClass } from "@/features/admin/components/ui/chip-classes";
+import {
+  SEGMENTED_GROUP_CLS,
+  segmentedButtonClass,
+} from "@/features/admin/components/ui/chip-classes";
 import { ADMIN_CHECKBOX_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { TEXT_ACTION_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { goldCardOffText } from "@/features/business/lib/business";
@@ -154,9 +157,10 @@ export function ClientPickerSection({
 
   return (
     <Card className="space-y-3">
+      {/* No rule under the heading: Address to and the fields read as one block with it. */}
       <CardHeader
         title="Client"
-        className="mb-0 items-center"
+        className="mb-0 items-center border-b-0 pb-0"
         actions={
           pickedContactName && (
             <button type="button" onClick={onClearContact} className={TEXT_ACTION_CLS}>
@@ -168,24 +172,27 @@ export function ClientPickerSection({
       {pickedContactName && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-admin-text-secondary">Address to:</span>
-          {(["name", "company", "custom"] as const).map((mode) => {
-            const disabled = mode === "company" && !pickedContactCompany;
-            const active = addressMode === mode;
-            const label = mode === "name" ? "Name" : mode === "company" ? "Company" : "Custom";
-            return (
-              <button
-                key={mode}
-                type="button"
-                disabled={disabled}
-                onClick={() => onAddressModeChange(mode)}
-                title={disabled ? "Picked contact has no company" : undefined}
-                aria-pressed={active}
-                className={adminChipClass(active)}
-              >
-                {label}
-              </button>
-            );
-          })}
+          {/* One of three, so the same joined control as Invoice | Quote and Cash | Bank. */}
+          <div role="group" aria-label="Address to" className={SEGMENTED_GROUP_CLS}>
+            {(["name", "company", "custom"] as const).map((mode) => {
+              const disabled = mode === "company" && !pickedContactCompany;
+              const active = addressMode === mode;
+              const label = mode === "name" ? "Name" : mode === "company" ? "Company" : "Custom";
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onAddressModeChange(mode)}
+                  title={disabled ? "Picked contact has no company" : undefined}
+                  aria-pressed={active}
+                  className={segmentedButtonClass(active)}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
       {/* Name and email side by side on 2xl, mobile on the next row; the rename tick keeps
