@@ -12,6 +12,7 @@ import {
 } from "@/features/admin/components/ui/chip-classes";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
+import { SurchargeToggle } from "@/features/business/components/SurchargeToggle";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
 import { CancelFeeSection } from "@/features/business/components/calculator/CancelFeeSection";
 import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
@@ -532,6 +533,9 @@ export function CalculatorView({
     cancelMode || quoteMode
       ? null
       : chosenSurcharge(dateSurcharge, surchargeOn, pricing.weekendPerHour);
+  // What the tick switches: the date's surcharge, else after hours. None on a cancel or quote.
+  const surchargeChoice =
+    cancelMode || quoteMode ? null : surchargeOption(dateSurcharge, pricing.weekendPerHour);
 
   /**
    * Applies a picked Places suggestion and drops the stale trip (manual entries survive).
@@ -1007,12 +1011,6 @@ export function CalculatorView({
         promoCode={promoCode}
         onApplyPromoCode={() => setPromoCode(promoCodeInput.trim())}
         onClearForm={() => setConfirmClearOpen(true)}
-        surchargeOption={
-          cancelMode || quoteMode ? null : surchargeOption(dateSurcharge, pricing.weekendPerHour)
-        }
-        surchargeOn={surcharge !== null}
-        surchargeFromDate={dateSurcharge !== null}
-        onSurchargeChange={(on) => setSurchargeTick({ date: jobDate, on })}
         activePromo={pricedPromo}
         skipPromo={skipPromo}
         onSkipPromoChange={setSkipPromo}
@@ -1164,6 +1162,16 @@ export function CalculatorView({
                 modifierRates={modifierRates}
                 flatRates={flatRates}
                 unsuccessfulFactor={pricing.unsuccessfulFactor ?? 0.5}
+                surchargeToggle={
+                  surchargeChoice && (
+                    <SurchargeToggle
+                      option={surchargeChoice}
+                      on={surcharge !== null}
+                      fromDate={dateSurcharge !== null}
+                      onChange={(on) => setSurchargeTick({ date: jobDate, on })}
+                    />
+                  )
+                }
               />
             </>
           )}

@@ -125,13 +125,17 @@ function InvoicePreviewPanelImpl({
     // letters are as wide as the Arimo the PDF embeds, so lines wrap the same.
     <div
       className={cn(
-        "flex flex-col overflow-hidden rounded-lg border border-admin-border bg-admin-surface",
-        "lg:sticky lg:top-18 lg:aspect-210/297 lg:overflow-y-auto",
+        "overflow-hidden rounded-lg border border-admin-border bg-admin-surface",
+        // Pinned on lg+ and no taller than the screen above the save bar, so the header, lines
+        // and totals stay in view while the form scrolls; the bank box and footer scroll inside.
+        // 12rem = the 4.5rem pin offset + the save bar, its gap and the page's bottom padding.
+        "lg:sticky lg:top-18 lg:max-h-[calc(100dvh-12rem)] lg:overflow-y-auto",
         // Print: defeat sticky + scroll so the browser captures the full invoice.
-        "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0",
+        "print:static print:max-h-none print:overflow-visible print:rounded-none print:border-0",
       )}
     >
-      <div className="flex flex-1 flex-col px-5 pt-6 pb-6 font-[Helvetica,Arial,sans-serif] sm:px-10 sm:pt-10 sm:pb-10">
+      {/* The A4 sheet: its footer sits at the foot of the page, as on the PDF. */}
+      <div className="flex flex-col px-5 pt-6 pb-6 font-[Helvetica,Arial,sans-serif] sm:px-10 sm:pt-10 sm:pb-10 lg:aspect-210/297 print:aspect-auto">
         {/* Header row: chip + wordmark on the left, INVOICE block on the right. */}
         <div className="mb-8 flex items-start justify-between gap-4">
           <Image
