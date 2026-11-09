@@ -226,17 +226,17 @@ async function main(): Promise<void> {
   expectEqual(
     "one task at half price",
     unsuccessfulNote(["Laptop repair"], 25, 0.5),
-    "Couldn't be fixed: Laptop repair, so $25.00 of labour is half price.",
+    "Laptop repair: $25.00 at half price",
   );
   expectEqual(
     "two tasks, not charged",
     unsuccessfulNote(["Printer", "Scanner", "Printer"], 40, 0),
-    "Couldn't be fixed: Printer and Scanner, so $40.00 of labour isn't charged.",
+    "Printer and Scanner: $40.00 not charged",
   );
   expectEqual(
     "no task names, other factor",
     unsuccessfulNote([], 30, 0.25),
-    "The problem couldn't be fixed, so $30.00 of labour is charged at 25%.",
+    "All labour: $30.00 charged at 25%",
   );
   expectEqual("no base: no note", unsuccessfulNote(["Laptop"], 0, 0.5), null);
 
