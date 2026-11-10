@@ -6,6 +6,8 @@
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import type { BookingAddressState } from "@/features/booking/hooks/use-booking-address";
 import { BOOKING_FIELD_LIMITS, unitMatchesStreetNumber } from "@/features/booking/lib/booking";
+import { FIELD_INPUT, FIELD_LABEL } from "@/features/booking/lib/form-styles";
+import { Notice } from "@/shared/components/Notice";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { FaCheck } from "react-icons/fa6";
@@ -67,7 +69,7 @@ export function BookingAddressFields({
     >
       <div className={cn(visible ? "overflow-visible" : "overflow-hidden")}>
         <div className="pt-0.5 pb-0.5">
-          <div className="mb-2 block text-base font-semibold text-rich-black">
+          <div className={`mb-2 ${FIELD_LABEL}`}>
             Address <span className="text-error">*</span>
           </div>
           {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
@@ -128,14 +130,14 @@ export function BookingAddressFields({
                   (addressVerified ? (
                     <p
                       className={cn(
-                        "text-sm font-medium text-green-700",
+                        "text-base font-medium text-green-700",
                         "flex items-center gap-1",
                       )}
                     >
                       <FaCheck className="h-4 w-4" aria-hidden /> Address verified
                     </p>
                   ) : (
-                    <p className="text-base text-slate-600">
+                    <p className="text-base text-rich-black/70">
                       Pick a suggestion from the dropdown to verify your address.
                     </p>
                   ))}
@@ -184,19 +186,16 @@ export function BookingAddressFields({
                     autoComplete="off"
                     maxLength={8}
                     aria-describedby="booking-unit-hint"
-                    className={cn(
-                      "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-                      "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                    )}
+                    className={FIELD_INPUT}
                   />
-                  <p id="booking-unit-hint" className="text-base text-slate-600">
+                  <p id="booking-unit-hint" className="text-base text-rich-black/70">
                     Only for apartments, units or flats - leave blank for a house.
                   </p>
                   {unitMatchesStreetNumber(unit, address) && (
-                    <p className="text-sm font-medium text-amber-700">
+                    <Notice tone="warn" className="px-4 py-3">
                       That looks like your street number. If this is a standalone house, leave Apt /
                       Unit blank.
-                    </p>
+                    </Notice>
                   )}
                 </div>
               ) : (
@@ -217,7 +216,7 @@ export function BookingAddressFields({
                   tabIndex={-1}
                   role="group"
                   aria-labelledby="booking-address-candidates"
-                  className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-base"
+                  className="flex flex-col gap-2 border-l-4 border-coquelicot-600 bg-seasalt px-5 py-4 text-base"
                 >
                   <p id="booking-address-candidates" className="font-medium text-rich-black">
                     {addressCandidates.length === 1
@@ -231,7 +230,7 @@ export function BookingAddressFields({
                         type="button"
                         onClick={() => applyAddressCandidate(candidate)}
                         className={cn(
-                          "min-h-11 rounded-md border border-russian-violet/40 bg-white px-3 py-2 text-left text-rich-black",
+                          "min-h-11 border border-russian-violet/40 bg-white px-3 py-2 text-left text-rich-black",
                           "hover:border-russian-violet hover:bg-russian-violet/5 focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                         )}
                       >

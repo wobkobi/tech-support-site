@@ -3,7 +3,7 @@
 
 /** Text input, select and textarea: 17px text, a solid border, and a teal focus outline. */
 export const FIELD_INPUT =
-  "w-full rounded-md border border-seasalt-300 bg-white px-3.5 py-3 text-[1.0625rem] text-rich-black focus:border-russian-violet focus:outline-3 focus:outline-offset-1 focus:outline-moonstone-500";
+  "w-full border border-seasalt-300 bg-white px-3.5 py-3 text-[1.0625rem] text-rich-black focus:border-russian-violet focus:outline-3 focus:outline-offset-1 focus:outline-moonstone-500";
 
 /** Field label above an input. */
 export const FIELD_LABEL = "text-[1.0625rem] font-bold text-rich-black";
@@ -17,8 +17,12 @@ export const FIELD_LEGEND = "mb-2 text-[1.0625rem] font-bold text-rich-black";
 /** Title of a form section ("Your details", "Describe the issue", "Schedule"). */
 export const FORM_SECTION_TITLE = "mb-1 text-xl font-extrabold text-rich-black";
 
-/** Every choice chip (duration, day, hour, minute, meeting type). */
-export const CHOICE_BASE = "rounded-md border-2 font-bold transition-colors";
+/**
+ * Every choice: chips (day, hour, minute, meeting type, name display) and the two-line cards
+ * (appointment length, meeting place). Card text inherits the colour, so a card's description
+ * turns white with it when selected.
+ */
+export const CHOICE_BASE = "border-2 font-bold transition-colors";
 /** Chip not selected. */
 export const CHOICE_IDLE =
   "border-seasalt-300 bg-white text-rich-black hover:border-russian-violet";
@@ -27,3 +31,5 @@ export const CHOICE_ON = "border-russian-violet bg-russian-violet text-white";
 /** Chip unavailable. */
 export const CHOICE_OFF =
   "cursor-not-allowed border-seasalt-100 bg-seasalt text-seasalt-700 line-through";
+/** Time already booked: stays in the grid, greyed, with "Booked" under the time. */
+export const CHOICE_BOOKED = "cursor-not-allowed border-seasalt-200 bg-seasalt text-rich-black/60";

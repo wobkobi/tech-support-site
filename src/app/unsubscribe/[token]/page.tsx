@@ -37,9 +37,7 @@ export default async function UnsubscribePage({
   return (
     <CardPage maxWidth="40rem">
       <section className={CARD}>
-        <h1 className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl">
-          Unsubscribe
-        </h1>
+        <h1 className="mb-4 text-2xl font-extrabold text-rich-black sm:text-3xl">Unsubscribe</h1>
         {isPreview && (
           <p className="text-base text-rich-black/80">
             This is the unsubscribe link from a test email, so there&apos;s nothing to change. In a

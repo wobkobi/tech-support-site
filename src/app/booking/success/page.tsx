@@ -10,7 +10,7 @@ import { googleCalendarUrl } from "@/features/booking/lib/ics";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { Button } from "@/shared/components/Button";
-import { CARD } from "@/shared/components/PageLayout";
+import { CARD, CardPage } from "@/shared/components/PageLayout";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
@@ -141,159 +141,121 @@ export default async function BookingSuccessPage({
       : null;
 
   return (
-    <main id="main" className="relative min-h-dvh overflow-hidden">
+    <CardPage maxWidth="56rem">
       <BookingConversion bookingRef={cancelToken ?? null} edited={edited} />
-      {/* Backdrop. Fixed, so the image doesn't scale over the full page height. */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <picture>
-          <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
-          <img
-            src="/source/backdrop-blur.webp"
-            alt=""
-            fetchPriority="high"
-            decoding="async"
-            className="absolute inset-0 h-full w-full scale-110 transform-gpu object-cover"
-          />
-        </picture>
-      </div>
+      <div className="flex flex-col gap-6 sm:gap-8">
+        <section className={cn(CARD, "text-center")}>
+          <div className="mb-4 flex justify-center">
+            <FaCircleCheck className="h-16 w-16 text-moonstone-500" aria-hidden />
+          </div>
 
-      {/* Frosted container */}
-      <div className="mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10">
-        <div className="rounded-2xl border border-seasalt-200/40 bg-white/60 p-5 shadow-lg backdrop-blur-xl sm:p-10">
-          <div className="flex flex-col gap-4 sm:gap-5">
-            <section className={cn(CARD, "text-center")}>
-              <div className="mb-4 flex justify-center">
-                <FaCircleCheck className="h-16 w-16 text-moonstone-400" aria-hidden />
-              </div>
+          <h1 className="mb-3 text-2xl font-extrabold text-rich-black sm:text-3xl md:text-4xl">
+            Booking confirmed!
+          </h1>
 
-              <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-                Booking confirmed!
-              </h1>
+          <p className="mb-6 text-base text-rich-black/80 sm:text-lg">
+            Your appointment is confirmed. Check your email for the details and a Google Calendar
+            invite - if you don't see it within a few minutes, check your spam folder.
+          </p>
 
-              <p className="mb-6 text-base text-rich-black/80 sm:text-lg">
-                Your appointment is confirmed. Check your email for the details and a Google
-                Calendar invite - if you don't see it within a few minutes, check your spam folder.
-              </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button href="/" variant="outline">
+              <FaHouse className="h-4 w-4" aria-hidden />
+              Back to home
+            </Button>
+            {cancelToken && (
+              <Button
+                href={`/booking/edit?token=${encodeURIComponent(cancelToken)}`}
+                variant="outline"
+              >
+                <FaPenToSquare className="h-4 w-4" aria-hidden />
+                Edit booking
+              </Button>
+            )}
+            {cancelToken && (
+              <Button
+                href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
+                variant="outline"
+              >
+                Cancel booking
+              </Button>
+            )}
+          </div>
+        </section>
 
-              <div className="flex flex-wrap justify-center gap-3">
-                <Button href="/" variant="secondary" size="sm">
-                  <FaHouse className="h-4 w-4" aria-hidden />
-                  Back to home
+        {appointment && (
+          <section className={cn(CARD)}>
+            <h2 className="mb-3 text-lg font-bold text-rich-black sm:text-xl">Your appointment</h2>
+            <dl className="space-y-2 text-base text-rich-black/80 sm:text-lg">
+              <DetailRow label="When">{formatDateTimeLong(appointment.startAt)}</DetailRow>
+              <DetailRow label="Length">
+                {formatLength(appointment.startAt, appointment.endAt)}
+              </DetailRow>
+              {appointment.meetingType && (
+                <DetailRow label="Type">
+                  {appointment.meetingType === "in_person" ? "In person" : "Remote (online)"}
+                </DetailRow>
+              )}
+              {/* Older rows may have an address without a meetingType. */}
+              {appointment.address && appointment.meetingType !== "remote" && (
+                <DetailRow label="Where">
+                  {combineUnitAndAddress(appointment.unit ?? "", appointment.address ?? "")}
+                </DetailRow>
+              )}
+            </dl>
+
+            <div className="mt-4 flex flex-wrap gap-3 border-t border-seasalt-200 pt-4">
+              {googleUrl && (
+                <Button href={googleUrl} variant="primary" target="_blank" rel="noreferrer">
+                  <FaCalendarPlus className="h-4 w-4" aria-hidden />
+                  Add to Google Calendar
                 </Button>
-                {cancelToken && (
-                  <Button
-                    href={`/booking/edit?token=${encodeURIComponent(cancelToken)}`}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    <FaPenToSquare className="h-4 w-4" aria-hidden />
-                    Edit booking
-                  </Button>
-                )}
-                {cancelToken && (
-                  <Button
-                    href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    Cancel booking
-                  </Button>
-                )}
-              </div>
-            </section>
+              )}
+              {cancelToken && (
+                <Button
+                  href={`/api/booking/ics?token=${encodeURIComponent(cancelToken)}`}
+                  download="appointment.ics"
+                  variant="outline"
+                >
+                  <FaDownload className="h-4 w-4" aria-hidden />
+                  Download calendar file
+                </Button>
+              )}
+            </div>
+          </section>
+        )}
 
-            {appointment && (
-              <section className={cn(CARD)}>
-                <h2 className="mb-3 text-lg font-bold text-russian-violet sm:text-xl">
-                  Your appointment
-                </h2>
-                <dl className="space-y-2 text-base text-rich-black/80 sm:text-lg">
-                  <DetailRow label="When">{formatDateTimeLong(appointment.startAt)}</DetailRow>
-                  <DetailRow label="Length">
-                    {formatLength(appointment.startAt, appointment.endAt)}
-                  </DetailRow>
-                  {appointment.meetingType && (
-                    <DetailRow label="Type">
-                      {appointment.meetingType === "in_person" ? "In person" : "Remote (online)"}
-                    </DetailRow>
-                  )}
-                  {/* Older rows may have an address without a meetingType. */}
-                  {appointment.address && appointment.meetingType !== "remote" && (
-                    <DetailRow label="Where">
-                      {combineUnitAndAddress(appointment.unit ?? "", appointment.address ?? "")}
-                    </DetailRow>
-                  )}
-                </dl>
+        <section className={cn(CARD)}>
+          <h2 className="mb-2 text-lg font-bold text-rich-black sm:text-xl">What happens next?</h2>
+          <ol className="list-inside list-decimal space-y-1 text-base text-rich-black/80 sm:text-lg">
+            <li>A confirmation email has been sent to you with the appointment details</li>
+            <li>A Google Calendar invite has been sent - accept it to add it to your calendar</li>
+            <li>To cancel or reschedule, use the link in the confirmation email or reply to it</li>
+            <li>I'll send you a review link after your appointment</li>
+          </ol>
+        </section>
 
-                <div className="mt-4 flex flex-wrap gap-3 border-t border-seasalt-200/60 pt-4">
-                  {googleUrl && (
-                    <Button
-                      href={googleUrl}
-                      variant="secondary"
-                      size="sm"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <FaCalendarPlus className="h-4 w-4" aria-hidden />
-                      Add to Google Calendar
-                    </Button>
-                  )}
-                  {cancelToken && (
-                    <Button
-                      href={`/api/booking/ics?token=${encodeURIComponent(cancelToken)}`}
-                      download="appointment.ics"
-                      variant="ghost"
-                      size="sm"
-                    >
-                      <FaDownload className="h-4 w-4" aria-hidden />
-                      Download calendar file
-                    </Button>
-                  )}
-                </div>
-              </section>
-            )}
-
-            <section className={cn(CARD)}>
-              <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
-                What happens next?
-              </h2>
-              <ol className="list-inside list-decimal space-y-1 text-base text-rich-black/80 sm:text-lg">
-                <li>A confirmation email has been sent to you with the appointment details</li>
-                <li>
-                  A Google Calendar invite has been sent - accept it to add it to your calendar
-                </li>
-                <li>
-                  To cancel or reschedule, use the link in the confirmation email or reply to it
-                </li>
-                <li>I'll send you a review link after your appointment</li>
-              </ol>
-            </section>
-
-            {promoTitle && (
-              <section className="flex items-start gap-3 rounded-xl border border-mustard-400 bg-mustard-50 p-5 shadow-sm sm:p-6">
-                <FaTag className="mt-1 h-5 w-5 shrink-0 text-russian-violet" aria-hidden />
-                <div>
-                  <h2 className="mb-1 text-base font-bold text-russian-violet sm:text-lg">
-                    Rate locked in: {promoTitle}
-                  </h2>
-                  <p className="text-base text-rich-black/80 sm:text-lg">
-                    This rate applies to your appointment even if the offer ends before your visit.
-                  </p>
-                </div>
-              </section>
-            )}
-
-            <section className={cn(CARD)}>
-              <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
-                Cancellation policy
+        {promoTitle && (
+          <section className="flex items-start gap-3 border border-mustard-400 bg-mustard-50 p-5 sm:p-6">
+            <FaTag className="mt-1 h-5 w-5 shrink-0 text-russian-violet" aria-hidden />
+            <div>
+              <h2 className="mb-1 text-base font-bold text-rich-black sm:text-lg">
+                Rate locked in: {promoTitle}
               </h2>
               <p className="text-base text-rich-black/80 sm:text-lg">
-                {renderEmphasised(cancellationCopy(CANCELLATION))}
+                This rate applies to your appointment even if the offer ends before your visit.
               </p>
-            </section>
-          </div>
-        </div>
+            </div>
+          </section>
+        )}
+
+        <section className={cn(CARD)}>
+          <h2 className="mb-2 text-lg font-bold text-rich-black sm:text-xl">Cancellation policy</h2>
+          <p className="text-base text-rich-black/80 sm:text-lg">
+            {renderEmphasised(cancellationCopy(CANCELLATION))}
+          </p>
+        </section>
       </div>
-    </main>
+    </CardPage>
   );
 }

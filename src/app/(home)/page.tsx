@@ -178,9 +178,9 @@ export default async function Home(): Promise<React.ReactElement> {
               width={2160}
               height={2160}
               sizes="(min-width: 768px) 40vw, 100vw"
-              className="aspect-4/3 w-full rounded-lg object-cover object-[center_25%] shadow-[0_10px_30px_rgba(0,0,0,0.35)] sm:aspect-square"
+              className="aspect-4/3 w-full object-cover object-[center_25%] shadow-[0_10px_30px_rgba(0,0,0,0.35)] sm:aspect-square"
             />
-            <figcaption className="absolute bottom-4 left-4 rounded-md bg-white px-3.5 py-2.5 text-[0.9375rem] text-rich-black shadow-[0_4px_14px_rgba(0,0,0,0.12)]">
+            <figcaption className="absolute bottom-4 left-4 bg-white px-3.5 py-2.5 text-[0.9375rem] text-rich-black shadow-[0_4px_14px_rgba(0,0,0,0.12)]">
               <b className="block text-base">Harrison Raynes</b>
               Owner and Technician
             </figcaption>
@@ -214,7 +214,7 @@ export default async function Home(): Promise<React.ReactElement> {
             </Link>
           </p>
         </div>
-        <div className="rounded-lg bg-seasalt p-7">
+        <div className="bg-seasalt p-7">
           <h3 className="mb-3.5 text-[1.3125rem] font-extrabold">How I work</h3>
           <TickList>
             {APPROACH.map((line) => (
@@ -318,7 +318,7 @@ export default async function Home(): Promise<React.ReactElement> {
 
       {/* With reviews above, the flyer strip shares their white band, so it drops its top padding. */}
       <Section aria-labelledby="flyer-heading" className={hasReviews ? "pt-0 sm:pt-0" : undefined}>
-        <div className="flex flex-wrap items-center justify-between gap-5 rounded-lg border-2 border-dashed border-seasalt-200 px-6 py-5">
+        <div className="flex flex-wrap items-center justify-between gap-5 border-2 border-dashed border-seasalt-200 px-6 py-5">
           <div>
             <h2 id="flyer-heading" className="text-xl font-extrabold">
               Know someone who needs tech help?

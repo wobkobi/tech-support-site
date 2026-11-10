@@ -4,7 +4,12 @@
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";
-import { FIELD_INPUT } from "@/features/booking/lib/form-styles";
+import {
+  CHOICE_BASE,
+  CHOICE_IDLE,
+  CHOICE_ON,
+  FIELD_INPUT,
+} from "@/features/booking/lib/form-styles";
 import { PromoCodeField } from "@/features/business/components/PromoCodeField";
 import {
   meetingModifiers,
@@ -32,7 +37,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 
 // Step headings and their one-line helper text.
-const STEP_TITLE = "mb-1 text-lg font-bold text-russian-violet";
+const STEP_TITLE = "mb-1 text-lg font-bold text-rich-black";
 const STEP_HELP = "mb-4 text-base text-seasalt-700";
 
 type Step = "issue" | "meeting" | "address" | "results";
@@ -673,7 +678,7 @@ export function PricingWizard({
             <div
               key={i}
               className={cn(
-                "h-2 flex-1 rounded-full transition-colors",
+                "h-2 flex-1 transition-colors",
                 i < stepIndex
                   ? "bg-moonstone-400"
                   : i === stepIndex
@@ -742,16 +747,10 @@ export function PricingWizard({
                   type="button"
                   aria-pressed={selected}
                   onClick={() => setMeeting(option.value)}
-                  className={cn(
-                    "rounded-lg border-2 bg-white p-4 text-left transition-colors",
-                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet",
-                    selected
-                      ? "border-russian-violet bg-seasalt"
-                      : "border-seasalt-200 hover:border-seasalt-500",
-                  )}
+                  className={cn(CHOICE_BASE, "p-4 text-left", selected ? CHOICE_ON : CHOICE_IDLE)}
                 >
-                  <p className="text-base font-bold text-russian-violet">{option.title}</p>
-                  <p className="mt-1 text-base text-rich-black">{option.body}</p>
+                  <p className="text-base">{option.title}</p>
+                  <p className="mt-1 text-base font-normal">{option.body}</p>
                 </button>
               );
             })}
@@ -780,7 +779,7 @@ export function PricingWizard({
         <div>
           <div
             role="status"
-            className="mb-4 rounded-lg border-2 border-russian-violet bg-white p-6 text-center"
+            className="mb-4 border-2 border-russian-violet bg-white p-6 text-center"
           >
             {aiFailed ? (
               <p className="mb-3 text-base font-medium text-rich-black">
@@ -815,7 +814,7 @@ export function PricingWizard({
               </>
             )}
             {result.promoLabel && (
-              <p className="mt-3 inline-block rounded bg-mustard-300 px-3 py-1 text-base font-bold text-russian-violet">
+              <p className="mt-3 inline-block bg-mustard-300 px-3 py-1 text-base font-bold text-russian-violet">
                 ⚡ {result.promoLabel}
               </p>
             )}
@@ -845,13 +844,13 @@ export function PricingWizard({
           </div>
 
           {spendNudge && (
-            <p className="mb-4 rounded-lg border-2 border-mustard-300 bg-mustard-50 px-4 py-3 text-base font-medium text-russian-violet-900">
+            <p className="mb-4 border-2 border-mustard-300 bg-mustard-50 px-4 py-3 text-base font-medium text-russian-violet-900">
               {spendNudge}
             </p>
           )}
 
           {restrictedOffer && (
-            <p className="mb-4 rounded-lg border-2 border-mustard-300 bg-mustard-50 px-4 py-3 text-base font-medium text-russian-violet-900">
+            <p className="mb-4 border-2 border-mustard-300 bg-mustard-50 px-4 py-3 text-base font-medium text-russian-violet-900">
               {restrictedOffer}
             </p>
           )}
@@ -923,7 +922,7 @@ export function PricingWizard({
           )}
           <Button
             type="button"
-            variant="secondary"
+            variant="primary"
             onClick={() => void nextStep()}
             disabled={!canAdvance() || isCalculating}
           >

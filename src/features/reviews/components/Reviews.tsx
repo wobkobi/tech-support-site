@@ -37,7 +37,7 @@ export default function Reviews({ items }: { items: ReviewItem[] }): React.React
     <ul className="grid gap-6 md:grid-cols-3">
       {items.map((r) => (
         <li key={r.id}>
-          <figure className="flex h-full flex-col justify-between gap-4 rounded-lg border border-seasalt-100 p-6">
+          <figure className="flex h-full flex-col justify-between gap-4 border border-seasalt-100 p-6">
             <blockquote className="text-[1.0625rem]">&ldquo;{preview(r.text)}&rdquo;</blockquote>
             <figcaption className="flex flex-wrap items-baseline justify-between gap-2">
               <span className="font-bold">{r.name}</span>

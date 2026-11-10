@@ -34,7 +34,7 @@ export default async function ManageBookingPage(): Promise<React.ReactElement> {
     <CardPage maxWidth="min(100vw - 2rem, 44rem)">
       <div className="flex flex-col gap-6 sm:gap-8">
         <section className={cn(CARD)}>
-          <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+          <h1 className="mb-3 text-2xl font-extrabold text-rich-black sm:text-3xl md:text-4xl">
             Manage your booking
           </h1>
           <p className="text-base text-rich-black/80 sm:text-lg">

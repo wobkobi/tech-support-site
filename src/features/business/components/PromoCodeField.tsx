@@ -169,7 +169,7 @@ export function PromoCodeField({
         />
         <Button
           type="button"
-          variant="secondary"
+          variant="outline"
           onClick={() => void apply()}
           disabled={status.kind === "checking" || !value.trim()}
           className="h-auto min-h-11"

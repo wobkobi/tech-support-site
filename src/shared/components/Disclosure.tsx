@@ -28,7 +28,7 @@ export function Disclosure({
 }): React.ReactElement {
   return (
     <details className="group border-b border-seasalt-100 first:border-t">
-      <summary className="flex cursor-pointer list-none items-start justify-between gap-4 rounded py-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-4 py-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet [&::-webkit-details-marker]:hidden">
         <Title className="text-lg font-bold">{title}</Title>
         <FaCaretDown
           aria-hidden

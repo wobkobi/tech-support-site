@@ -341,7 +341,7 @@ export default async function RootLayout({
       <body suppressHydrationWarning>
         <a
           href="#main"
-          className="sr-only rounded-lg bg-russian-violet px-5 py-3 text-base font-bold text-seasalt shadow-lg transition-colors focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-100 focus:ring-2 focus:ring-moonstone-500 focus:ring-offset-2 focus:outline-none"
+          className="sr-only bg-russian-violet px-5 py-3 text-base font-bold text-seasalt shadow-lg transition-colors focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-100 focus:ring-2 focus:ring-moonstone-500 focus:ring-offset-2 focus:outline-none"
         >
           Skip to content
         </a>

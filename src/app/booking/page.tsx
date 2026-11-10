@@ -19,7 +19,8 @@ import {
 } from "@/features/calendar/lib/calendar-cache";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { CARD, CardPage, SOFT_CARD } from "@/shared/components/PageLayout";
+import { Notice } from "@/shared/components/Notice";
+import { CARD, CardPage } from "@/shared/components/PageLayout";
 import { PhoneLink } from "@/shared/components/PhoneLink";
 import { PixelEvent } from "@/shared/components/PixelEvent";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -221,9 +222,9 @@ async function getAvailableDays(): Promise<{
 }
 
 const STEP_ICON =
-  "border-moonstone-500/40 bg-moonstone-400/20 grid size-9 shrink-0 place-items-center rounded-lg border";
+  "border-moonstone-500/40 bg-moonstone-400/20 grid size-9 shrink-0 place-items-center border";
 
-const SKELETON_BLOCK = "bg-white/40 rounded-lg";
+const SKELETON_BLOCK = "bg-seasalt-100";
 
 /**
  * Async island that fetches slot data inside the {@link Suspense} boundary. Renders
@@ -260,7 +261,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     return (
       <div
         role="status"
-        className="flex flex-col gap-2 rounded-lg border-2 border-mustard-300/60 bg-mustard-50/40 p-5 text-rich-black"
+        className="flex flex-col gap-2 border-2 border-mustard-300/60 bg-mustard-50/40 p-5 text-rich-black"
       >
         <p className="text-base font-semibold">Online booking is paused</p>
         <p className="text-base">{closedMessage}</p>
@@ -275,7 +276,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     return (
       <div
         role="alert"
-        className="flex flex-col gap-3 rounded-lg border-2 border-coquelicot-500/60 bg-coquelicot-50 p-5 text-rich-black"
+        className="flex flex-col gap-3 border-2 border-coquelicot-500/60 bg-coquelicot-50 p-5 text-rich-black"
       >
         <p className="text-base font-semibold sm:text-lg">Availability isn't loading right now.</p>
         <p className="text-base sm:text-lg">
@@ -289,7 +290,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
   return (
     <div className="flex flex-col gap-5">
       {sameDayClosed && (
-        <div className="rounded-lg border border-moonstone-500/40 bg-moonstone-400/10 p-4 text-rich-black">
+        <div className="border border-moonstone-500/40 bg-moonstone-400/10 p-4 text-rich-black">
           <p className="text-base">
             Same-day bookings are closed for today{sameDayDetail}. The earliest available time is
             tomorrow.
@@ -410,7 +411,7 @@ export default async function BookingPage(): Promise<React.ReactElement> {
       <div className="flex flex-col gap-6 sm:gap-8">
         {/* Header */}
         <section className={cn(CARD, "animate-fade-in")}>
-          <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+          <h1 className="mb-3 text-2xl font-extrabold text-rich-black sm:text-3xl md:text-4xl">
             Book an appointment
           </h1>
           <p className="text-base text-rich-black">
@@ -460,9 +461,7 @@ export default async function BookingPage(): Promise<React.ReactElement> {
           <aside className="sticky order-1 flex flex-col gap-6 sm:gap-8 lg:top-24 lg:order-2 lg:self-start">
             {/* How it works */}
             <div className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
-              <h2 className="mb-4 text-xl font-bold text-russian-violet sm:text-2xl">
-                How it works
-              </h2>
+              <h2 className="mb-4 text-xl font-bold text-rich-black sm:text-2xl">How it works</h2>
               <ol className="space-y-5">
                 <li className="flex gap-3">
                   <span className={STEP_ICON}>
@@ -504,13 +503,13 @@ export default async function BookingPage(): Promise<React.ReactElement> {
             </div>
 
             {/* Info card */}
-            <div className={cn(SOFT_CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
-              <p className="text-base leading-relaxed text-rich-black/80">
+            <Notice onGrey className="animate-slide-up animate-fill-both animate-delay-300">
+              <p className="leading-relaxed text-rich-black/80">
                 <strong>Timing is flexible.</strong> Most appointments are 1 hour. Choose 2 hours if
                 you have multiple issues or need more time. Actual time may be shorter or longer as
                 needed.
               </p>
-            </div>
+            </Notice>
           </aside>
         </div>
       </div>

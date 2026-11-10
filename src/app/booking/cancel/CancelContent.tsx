@@ -11,7 +11,7 @@ import {
   type CancelMeetingType,
 } from "@/features/business/lib/pricing-policy";
 import { Button } from "@/shared/components/Button";
-import { CARD } from "@/shared/components/PageLayout";
+import { CARD, CardPage } from "@/shared/components/PageLayout";
 import { PhoneLink } from "@/shared/components/PhoneLink";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeLong } from "@/shared/lib/date-format";
@@ -80,7 +80,7 @@ function FeeBanner({
     return (
       <div
         role="alert"
-        className="rounded-lg border-2 border-coquelicot-500/60 bg-coquelicot-50 p-4 text-base text-rich-black sm:text-lg"
+        className="border-2 border-coquelicot-500/60 bg-coquelicot-50 p-4 text-base text-rich-black sm:text-lg"
       >
         <strong>${charge.fee} late-cancellation fee plus round-trip travel</strong> will apply -
         we're inside the {policy.travelChargeHours}-hour window when I would normally be on the way
@@ -95,7 +95,7 @@ function FeeBanner({
     return (
       <div
         role="alert"
-        className="rounded-lg border-2 border-mustard-300/60 bg-mustard-50/40 p-4 text-base text-rich-black sm:text-lg"
+        className="border-2 border-mustard-300/60 bg-mustard-50/40 p-4 text-base text-rich-black sm:text-lg"
       >
         <strong>${charge.fee} cancellation fee</strong> will apply - you're inside the {windowHours}
         -hour cancellation window.
@@ -103,7 +103,7 @@ function FeeBanner({
     );
   }
   return (
-    <div className="rounded-lg border-2 border-moonstone-500/50 bg-moonstone-400/10 p-4 text-base text-rich-black sm:text-lg">
+    <div className="border-2 border-moonstone-500/50 bg-moonstone-400/10 p-4 text-base text-rich-black sm:text-lg">
       <strong>No fee</strong> applies for this cancellation - thanks for the heads up.
     </div>
   );
@@ -115,13 +115,15 @@ function FeeBanner({
  * @param props.message - What went wrong, in plain words.
  * @param props.phone - Display phone number.
  * @param props.phoneTel - tel: URI for the same number.
+ * @param props.variant - Primary when it's the only action; outline beside "Confirm cancellation".
  * @returns The error block.
  */
 function CancelProblem({
   message,
   phone,
   phoneTel,
-}: PhoneProps & { message: string }): React.ReactElement {
+  variant,
+}: PhoneProps & { message: string; variant: "primary" | "outline" }): React.ReactElement {
   return (
     <div role="alert" className="space-y-4">
       <p className="text-base font-medium text-error sm:text-lg">{message}</p>
@@ -129,7 +131,7 @@ function CancelProblem({
         I can email you fresh links to change or cancel, or you can call or text me on{" "}
         <PhoneLink phone={phone} phoneTel={phoneTel} /> and I'll sort it out.
       </p>
-      <Button href="/booking/manage" variant="secondary" size="md">
+      <Button href="/booking/manage" variant={variant}>
         Email me fresh links
       </Button>
     </div>
@@ -249,125 +251,105 @@ export function CancelContent({ phone, phoneTel }: PhoneProps): React.ReactEleme
   }
 
   return (
-    <main id="main" className="relative min-h-dvh overflow-hidden">
-      {/* Backdrop */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <picture>
-          <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
-          <img
-            src="/source/backdrop-blur.webp"
-            alt=""
-            fetchPriority="high"
-            decoding="async"
-            className="absolute inset-0 h-full w-full scale-110 transform-gpu object-cover"
+    <CardPage maxWidth="56rem">
+      <section className={cn(CARD)}>
+        <h1 className="mb-3 text-2xl font-extrabold text-rich-black sm:text-3xl md:text-4xl">
+          Cancel booking
+        </h1>
+
+        {load.kind === "loading" && (
+          <p className="text-base text-rich-black">Loading booking details...</p>
+        )}
+
+        {load.kind === "error" && (
+          <CancelProblem
+            message={load.message}
+            phone={phone}
+            phoneTel={phoneTel}
+            variant="primary"
           />
-        </picture>
-      </div>
+        )}
 
-      {/* Frosted container */}
-      <div className="mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10">
-        <div className="rounded-2xl border border-seasalt-200/40 bg-white/60 p-5 shadow-lg backdrop-blur-xl sm:p-10">
-          <div className="flex flex-col gap-4 sm:gap-5">
-            <section className={cn(CARD)}>
-              <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-                Cancel booking
-              </h1>
+        {load.kind === "alreadyCancelled" && (
+          <p className="text-base text-rich-black">
+            This booking has already been cancelled - no further action needed.
+          </p>
+        )}
 
-              {load.kind === "loading" && (
-                <p className="text-base text-rich-black">Loading booking details...</p>
-              )}
+        {load.kind === "closed" && (
+          <p className="text-base text-rich-black sm:text-lg">
+            This appointment has already started or finished, so there's nothing to cancel online.
+            If something isn't right, call or text me on{" "}
+            <PhoneLink phone={phone} phoneTel={phoneTel} /> and I'll sort it out.
+          </p>
+        )}
 
-              {load.kind === "error" && (
-                <CancelProblem message={load.message} phone={phone} phoneTel={phoneTel} />
-              )}
+        {load.kind === "ready" && submit.kind === "done" && (
+          <p role="status" className="text-base text-rich-black sm:text-lg">
+            Booking cancelled. A confirmation email will follow shortly.
+          </p>
+        )}
 
-              {load.kind === "alreadyCancelled" && (
-                <p className="text-base text-rich-black">
-                  This booking has already been cancelled - no further action needed.
-                </p>
-              )}
-
-              {load.kind === "closed" && (
-                <p className="text-base text-rich-black sm:text-lg">
-                  This appointment has already started or finished, so there's nothing to cancel
-                  online. If something isn't right, call or text me on{" "}
-                  <PhoneLink phone={phone} phoneTel={phoneTel} /> and I'll sort it out.
-                </p>
-              )}
-
-              {load.kind === "ready" && submit.kind === "done" && (
-                <p role="status" className="text-base text-rich-black sm:text-lg">
-                  Booking cancelled. A confirmation email will follow shortly.
-                </p>
-              )}
-
-              {load.kind === "ready" && submit.kind !== "done" && (
-                <div className="space-y-4">
-                  <p className="text-base text-rich-black sm:text-lg">
-                    You're about to cancel your appointment on{" "}
-                    <strong>{formatDateTimeLong(load.startAt)}</strong>.
-                  </p>
-                  <FeeBanner
-                    startAt={load.startAt}
-                    meetingType={load.meetingType}
-                    policy={load.policy}
-                    phone={phone}
-                    phoneTel={phoneTel}
-                  />
-                  {submit.kind === "error" && (
-                    <CancelProblem message={submit.message} phone={phone} phoneTel={phoneTel} />
-                  )}
-                  <div className="flex flex-wrap gap-3">
-                    <Button
-                      variant="primary"
-                      size="md"
-                      onClick={() => void runCancel()}
-                      disabled={submit.kind === "submitting"}
-                      aria-busy={submit.kind === "submitting"}
-                    >
-                      {submit.kind === "submitting" ? "Cancelling..." : "Confirm cancellation"}
-                    </Button>
-                    {/* Moving the appointment is usually what someone actually
+        {load.kind === "ready" && submit.kind !== "done" && (
+          <div className="space-y-4">
+            <p className="text-base text-rich-black sm:text-lg">
+              You're about to cancel your appointment on{" "}
+              <strong>{formatDateTimeLong(load.startAt)}</strong>.
+            </p>
+            <FeeBanner
+              startAt={load.startAt}
+              meetingType={load.meetingType}
+              policy={load.policy}
+              phone={phone}
+              phoneTel={phoneTel}
+            />
+            {submit.kind === "error" && (
+              <CancelProblem
+                message={submit.message}
+                phone={phone}
+                phoneTel={phoneTel}
+                variant="outline"
+              />
+            )}
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="primary"
+                onClick={() => void runCancel()}
+                disabled={submit.kind === "submitting"}
+                aria-busy={submit.kind === "submitting"}
+              >
+                {submit.kind === "submitting" ? "Cancelling..." : "Confirm cancellation"}
+              </Button>
+              {/* Moving the appointment is usually what someone actually
                         wants when they land here - offer it before cancelling. */}
-                    {token && (
-                      <Button
-                        href={`/booking/edit?token=${encodeURIComponent(token)}`}
-                        variant="secondary"
-                        size="md"
-                      >
-                        Reschedule instead
-                      </Button>
-                    )}
-                    <Button href="/" variant="ghost" size="md">
-                      Keep my booking
-                    </Button>
-                  </div>
-                </div>
+              {token && (
+                <Button href={`/booking/edit?token=${encodeURIComponent(token)}`} variant="outline">
+                  Reschedule instead
+                </Button>
               )}
-
-              {(load.kind === "alreadyCancelled" ||
-                load.kind === "closed" ||
-                load.kind === "error" ||
-                submit.kind === "done") && (
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {/* Beside an error, "Email me fresh links" is the filled button;
-                      a second filled one would compete with it. */}
-                  <Button
-                    href="/"
-                    variant={load.kind === "error" ? "ghost" : "secondary"}
-                    size="md"
-                  >
-                    Back to home
-                  </Button>
-                  <Button href="/booking" variant="ghost" size="md">
-                    Book another time
-                  </Button>
-                </div>
-              )}
-            </section>
+              <Button href="/" variant="outline">
+                Keep my booking
+              </Button>
+            </div>
           </div>
-        </div>
-      </div>
-    </main>
+        )}
+
+        {(load.kind === "alreadyCancelled" ||
+          load.kind === "closed" ||
+          load.kind === "error" ||
+          submit.kind === "done") && (
+          <div className="mt-4 flex flex-wrap gap-3">
+            {/* Beside an error, "Email me fresh links" is the filled button;
+                      a second filled one would compete with it. */}
+            <Button href="/" variant={load.kind === "error" ? "outline" : "primary"}>
+              Back to home
+            </Button>
+            <Button href="/booking" variant="outline">
+              Book another time
+            </Button>
+          </div>
+        )}
+      </section>
+    </CardPage>
   );
 }

@@ -54,14 +54,14 @@ export function ReviewAskStopForm({
     <div className="flex flex-col gap-4">
       {stopped ? (
         <>
-          <p className="text-lg font-semibold text-russian-violet" role="status">
+          <p className="text-lg font-semibold text-rich-black" role="status">
             Done. I won&apos;t ask you for a review again.
           </p>
           <p className="text-base text-rich-black/80">
             You&apos;ll still get your invoices and booking emails. Changed your mind?
           </p>
           <div>
-            <Button variant="secondary" disabled={busy} onClick={() => void change("allow")}>
+            <Button variant="outline" disabled={busy} onClick={() => void change("allow")}>
               {busy ? "Saving..." : "Asking is fine"}
             </Button>
           </div>
@@ -80,7 +80,7 @@ export function ReviewAskStopForm({
         </>
       )}
       {error && (
-        <p className="text-base text-red-700" role="alert">
+        <p className="text-base text-error" role="alert">
           {error}
         </p>
       )}

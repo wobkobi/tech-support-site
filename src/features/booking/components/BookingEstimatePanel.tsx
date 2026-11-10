@@ -5,6 +5,8 @@
 import type { JobDuration } from "@/features/booking/lib/booking";
 import { durationRangeText, type InlineQuote } from "@/features/booking/lib/booking-form";
 import { formatMoneyCompact } from "@/features/business/lib/business";
+import { Button } from "@/shared/components/Button";
+import { Notice } from "@/shared/components/Notice";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
@@ -75,12 +77,12 @@ export function BookingEstimatePanel({
           (opens in a new tab, so you won&apos;t lose what you&apos;ve typed).
         </p>
       </div>
-      <button
-        type="button"
+      <Button
+        variant="outline"
+        className="self-start"
         onClick={onEstimate}
         disabled={estimating || !descriptionReady}
         aria-describedby={estimateHelp ? "booking-estimate-help" : undefined}
-        className="min-h-11 self-start rounded-md border border-russian-violet/40 px-4 py-2 text-base font-semibold text-russian-violet transition-colors hover:bg-russian-violet/5 disabled:opacity-50"
       >
         {estimating
           ? "Working it out..."
@@ -89,7 +91,7 @@ export function BookingEstimatePanel({
               ? "Update the estimate"
               : "Estimate again"
             : "Get a price estimate"}
-      </button>
+      </Button>
       {estimateHelp && (
         <p id="booking-estimate-help" className="text-base text-rich-black/70">
           {estimateHelp}
@@ -99,7 +101,7 @@ export function BookingEstimatePanel({
         <div
           role="status"
           className={cn(
-            "rounded-xl border border-russian-violet/20 bg-russian-violet/5 p-4",
+            "border border-russian-violet/20 bg-russian-violet/5 p-4",
             quoteStale && "opacity-60",
           )}
         >
@@ -111,7 +113,7 @@ export function BookingEstimatePanel({
           )}
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <p className="text-base font-medium text-rich-black/70">Rough estimate</p>
-            <span className="rounded-full bg-russian-violet/10 px-2.5 py-0.5 text-sm font-semibold text-russian-violet">
+            <span className="bg-russian-violet/10 px-2.5 py-0.5 text-sm font-semibold text-russian-violet">
               {durationRangeText(quote.minsLow, quote.minsHigh)}
             </span>
           </div>
@@ -135,19 +137,22 @@ export function BookingEstimatePanel({
               and nudging those to a 2-hour visit fires on almost every
               estimate. Only suggest it when the likely time runs over. */}
           {duration === "short" && (quote.minsLow + quote.minsHigh) / 2 > 60 && (
-            <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <Notice
+              onGrey
+              className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+            >
               <p className="text-base text-rich-black/80">
                 This looks like it might take around 2 hours. You can book a 2-hour visit so the
                 time is set aside.
               </p>
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                className="self-start sm:shrink-0 sm:self-auto"
                 onClick={onBookLong}
-                className="min-h-11 self-start rounded-md bg-russian-violet px-4 py-2 text-base font-semibold text-white hover:bg-russian-violet/90 sm:shrink-0 sm:self-auto"
               >
                 Book 2 hours
-              </button>
-            </div>
+              </Button>
+            </Notice>
           )}
         </div>
       )}

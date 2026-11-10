@@ -7,18 +7,16 @@ import type React from "react";
 
 // Phone padding is deliberately tight: the page gutter, CARD and any item card inside it
 // each add their own inset, and at 390px wide a looser stack leaves body text barely half
-// the screen, so every line wraps and long pages run to 5-7 screens.
-export const CARD = "border-seasalt-200/80 bg-white rounded-xl border p-4 shadow-sm sm:p-6";
+// the screen, so every line wraps and long pages run to 5-7 screens. Square and flat (no
+// shadow), like every box, button and field on the public site.
+export const CARD = "border-seasalt-200/80 bg-white border p-4 sm:p-6";
 
 /**
  * Item card nested in a CARD. On phones it swaps border and shadow for a top divider (skipped
  * on the first child) to free width; from sm up it is a card again.
  */
 export const NESTED_CARD =
-  "border-seasalt-200/60 border-t pt-4 first:border-t-0 first:pt-0 sm:rounded-lg sm:border sm:bg-white sm:p-4 sm:shadow-sm sm:first:border-t sm:first:pt-4";
-
-export const SOFT_CARD =
-  "border-seasalt-200/80 bg-white/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg";
+  "border-seasalt-200/60 border-t pt-4 first:border-t-0 first:pt-0 sm:border sm:bg-white sm:p-4 sm:first:border-t sm:first:pt-4";
 
 /** Ground of a {@link CardPage}, shared with its loading state so the swap doesn't flash white. */
 export const CARD_PAGE_GROUND = "bg-seasalt";

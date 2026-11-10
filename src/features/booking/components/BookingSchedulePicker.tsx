@@ -15,12 +15,45 @@ import {
   durationText,
   subSlotLabel,
 } from "@/features/booking/lib/booking-form";
+import {
+  CHOICE_BASE,
+  CHOICE_BOOKED,
+  CHOICE_IDLE,
+  CHOICE_OFF,
+  CHOICE_ON,
+  FIELD_LEGEND,
+} from "@/features/booking/lib/form-styles";
 import { dateSurchargeNote, eveningTickLabel } from "@/features/business/lib/pricing-policy";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
 /** One hourly window of a bookable day. */
 type TimeWindow = BookableDay["timeWindows"][number];
+
+/** How a start time shows in the picker. */
+type SlotLook = "open" | "booked" | "hidden";
+
+/**
+ * Today leaves out every time it can't take, so the grid starts at the next free one. A later
+ * day keeps a booked time in its place, greyed with "Booked", and leaves out times closed for
+ * any other reason (a weekend-morning rule, a 2hr job running into the midday break).
+ * @param available - Whether the time can be booked for the chosen length.
+ * @param booked - Whether a booking or calendar event is in the way.
+ * @param isToday - Whether the day is today.
+ * @returns How the time shows.
+ */
+function slotLook(available: boolean, booked: boolean, isToday: boolean): SlotLook {
+  if (available) return "open";
+  return booked && !isToday ? "booked" : "hidden";
+}
+
+/**
+ * Second line of a booked time's button.
+ * @returns The "Booked" line.
+ */
+function BookedTag(): React.ReactElement {
+  return <span className="block text-sm font-semibold">Booked</span>;
+}
 
 export interface BookingSchedulePickerProps {
   /** Days offered for booking, evening starts included. */
@@ -125,7 +158,7 @@ export function BookingSchedulePicker({
 
   return (
     <fieldset className="flex flex-col gap-6">
-      <legend className="mb-1 text-xl font-bold text-russian-violet sm:text-2xl">Schedule</legend>
+      <legend className="mb-1 text-xl font-bold text-rich-black sm:text-2xl">Schedule</legend>
 
       <p aria-live="polite" className="sr-only">
         {scheduleStatus}
@@ -133,7 +166,7 @@ export function BookingSchedulePicker({
 
       {/* Duration */}
       <fieldset id="booking-duration" className="min-w-0">
-        <legend className="mb-2 text-base font-semibold text-rich-black">
+        <legend className={FIELD_LEGEND}>
           How long do you need? <span className="text-error">*</span>
         </legend>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -144,18 +177,13 @@ export function BookingSchedulePicker({
               aria-pressed={duration === opt.value}
               onClick={() => onDurationChange(opt.value)}
               className={cn(
-                "rounded-lg border p-4 text-left transition-colors",
-                duration === opt.value
-                  ? "border-russian-violet bg-russian-violet/10"
-                  : "border-seasalt-200/60 bg-seasalt hover:border-russian-violet/40",
+                CHOICE_BASE,
+                "p-4 text-left",
+                duration === opt.value ? CHOICE_ON : CHOICE_IDLE,
               )}
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-base font-semibold text-rich-black">{opt.label}</p>
-                  <p className="mt-1 text-base text-rich-black/70">{opt.description}</p>
-                </div>
-              </div>
+              <p className="text-base">{opt.label}</p>
+              <p className="mt-1 text-base font-normal">{opt.description}</p>
             </button>
           ))}
         </div>
@@ -167,7 +195,7 @@ export function BookingSchedulePicker({
 
       {/* Day Selection */}
       <fieldset id={DAY_ANCHOR} className="min-w-0">
-        <legend className="mb-2 text-base font-semibold text-rich-black">Choose a day</legend>
+        <legend className={FIELD_LEGEND}>Choose a day</legend>
 
         {!availableDays.some((d) => d.hasAnySlots) ? (
           <p className="text-base text-rich-black/70">
@@ -191,14 +219,13 @@ export function BookingSchedulePicker({
                   disabled={!day.hasAnySlots}
                   onClick={() => onDaySelect(day)}
                   className={cn(
-                    "w-full rounded-lg border px-3 py-3 text-base font-medium whitespace-nowrap",
-                    !day.hasAnySlots && "cursor-not-allowed line-through",
+                    CHOICE_BASE,
+                    "w-full px-3 py-3 text-base whitespace-nowrap",
                     selectedDay?.dateKey === day.dateKey
-                      ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                      ? CHOICE_ON
                       : day.hasAnySlots
-                        ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                        : "border-dashed border-seasalt-300 bg-seasalt-100 text-rich-black/55",
-                    day.isToday && day.hasAnySlots && "ring-2 ring-coquelicot-500/50 ring-offset-1",
+                        ? CHOICE_IDLE
+                        : CHOICE_OFF,
                   )}
                 >
                   {day.dayLabel}
@@ -219,7 +246,7 @@ export function BookingSchedulePicker({
         >
           {/* The day's surcharge note or the evening tick sits beside the heading, wrapping
               under it on a phone. */}
-          <legend className="mb-3 flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 text-base font-semibold text-rich-black">
+          <legend className="mb-3 flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[1.0625rem] font-bold text-rich-black">
             <span id="booking-time-heading">Start time for {selectedDay.fullLabel}</span>
             {selectedDay.surcharge ? (
               <span className="font-normal text-rich-black/80">
@@ -245,7 +272,7 @@ export function BookingSchedulePicker({
           </legend>
 
           {dayHasNoRoom ? (
-            <div className="rounded-lg border border-seasalt-200/80 bg-white/30 p-4">
+            <div className="border border-seasalt-200 p-4">
               <p className="text-base text-rich-black/70">
                 {onlyEveningsLeft
                   ? "Only evening times are left on this day. Tick Show evening times to see them, or choose another day."
@@ -260,15 +287,20 @@ export function BookingSchedulePicker({
               {/* Hour picker */}
               <div className="grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2">
                 {selectedDay.timeWindows.map((window) => {
-                  const available =
-                    duration === "short" ? window.availableShort : window.availableLong;
-                  const isSelected = selectedTime === window.value;
+                  const look = slotLook(
+                    duration === "short" ? window.availableShort : window.availableLong,
+                    window.subSlots.some((s) =>
+                      duration === "short" ? s.bookedShort : s.bookedLong,
+                    ),
+                    selectedDay.isToday,
+                  );
+                  if (look === "hidden") return null;
                   return (
                     <button
                       key={window.value}
                       type="button"
-                      aria-pressed={isSelected}
-                      disabled={!available}
+                      aria-pressed={selectedTime === window.value}
+                      disabled={look === "booked"}
                       onClick={() => {
                         const firstAvailable = window.subSlots.find((s) =>
                           duration === "short" ? s.availableShort : s.availableLong,
@@ -276,45 +308,51 @@ export function BookingSchedulePicker({
                         onTimeSelect(window.value, firstAvailable?.minute ?? 0);
                       }}
                       className={cn(
-                        "min-h-11 rounded-lg border px-4 py-2.5 text-base font-medium",
-                        !available && "cursor-not-allowed line-through",
-                        isSelected
-                          ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                          : available
-                            ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                            : "border-dashed border-seasalt-300 bg-seasalt-100 text-rich-black/55",
+                        CHOICE_BASE,
+                        "min-h-11 px-4 text-base",
+                        look === "booked"
+                          ? cn(CHOICE_BOOKED, "py-1.5")
+                          : cn("py-2.5", selectedTime === window.value ? CHOICE_ON : CHOICE_IDLE),
                       )}
                     >
-                      {window.label}
+                      <span className="block">{window.label}</span>
+                      {look === "booked" && <BookedTag />}
                     </button>
                   );
                 })}
               </div>
 
-              {/* Sub-slot picker - shown once an hour is selected */}
+              {/* Sub-slot picker - shown once an hour is selected. Even columns, wide enough
+                  for "12:45pm", so a phone shows a tidy 2x2 instead of a ragged wrap. */}
               {activeWindow && (
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2">
                   {activeWindow.subSlots.map((sub) => {
                     const minute = sub.minute;
-                    const available = duration === "short" ? sub.availableShort : sub.availableLong;
+                    const look = slotLook(
+                      duration === "short" ? sub.availableShort : sub.availableLong,
+                      duration === "short" ? sub.bookedShort : sub.bookedLong,
+                      selectedDay.isToday,
+                    );
+                    if (look === "hidden") return null;
                     return (
                       <button
                         key={minute}
                         type="button"
                         aria-pressed={selectedMinute === minute}
-                        disabled={!available}
+                        disabled={look === "booked"}
                         onClick={() => onMinuteSelect(minute)}
                         className={cn(
-                          "min-h-11 rounded-lg border px-4 py-2 text-base font-medium",
-                          !available && "cursor-not-allowed line-through",
-                          selectedMinute === minute
-                            ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                            : available
-                              ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                              : "border-dashed border-seasalt-300 bg-seasalt-100 text-rich-black/55",
+                          CHOICE_BASE,
+                          "min-h-11 px-4 text-base",
+                          look === "booked"
+                            ? cn(CHOICE_BOOKED, "py-1")
+                            : cn("py-2", selectedMinute === minute ? CHOICE_ON : CHOICE_IDLE),
                         )}
                       >
-                        {subSlotLabel(activeWindow.startHour, minute)}
+                        <span className="block">
+                          {subSlotLabel(activeWindow.startHour, minute)}
+                        </span>
+                        {look === "booked" && <BookedTag />}
                       </button>
                     );
                   })}

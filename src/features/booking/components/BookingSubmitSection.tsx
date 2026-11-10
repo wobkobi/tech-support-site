@@ -53,7 +53,7 @@ export function BookingErrorSummary({
         <div
           role="alert"
           className={cn(
-            "rounded-md border border-coquelicot-500/40 bg-coquelicot-50 p-4",
+            "border border-coquelicot-500/40 bg-coquelicot-50 p-4",
             "flex flex-col gap-2",
           )}
         >
@@ -64,7 +64,7 @@ export function BookingErrorSummary({
             Tap below to load the up-to-date availability - your form details will stay where they
             are.
           </p>
-          <Button type="button" variant="secondary" size="sm" onClick={onRefreshSlots}>
+          <Button type="button" variant="outline" className="self-start" onClick={onRefreshSlots}>
             Refresh available times
           </Button>
         </div>
@@ -72,7 +72,7 @@ export function BookingErrorSummary({
       {showFieldErrors && fieldErrorKeys.length > 0 && (
         <div
           role="alert"
-          className="rounded-md border border-coquelicot-500/50 bg-coquelicot-500/10 p-4 text-rich-black"
+          className="border border-coquelicot-500/50 bg-coquelicot-500/10 p-4 text-rich-black"
         >
           <p className="text-base font-semibold">Please fix the following:</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-base">
@@ -147,14 +147,13 @@ export function BookingSubmitBar({
       className={cn(
         // Bleeds to the form card's edges on phones: the negative margin matches CARD's p-4.
         "sticky bottom-0 -mx-4 flex flex-wrap items-center gap-4 border-t",
-        "border-seasalt-200/80 bg-seasalt/90 px-4 py-3 backdrop-blur-md",
-        "sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none",
+        "border-seasalt-200 bg-white px-4 py-3",
+        "sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0",
       )}
     >
       <Button
         type="submit"
-        variant="secondary"
-        size="md"
+        variant="primary"
         aria-busy={submitting}
         disabled={submitting || noSlots}
       >
@@ -182,8 +181,7 @@ export function BookingSubmitBar({
       {isEditMode && cancelToken && (
         <Button
           href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
-          variant="ghost"
-          size="md"
+          variant="outline"
           disabled={submitting}
         >
           Cancel booking instead

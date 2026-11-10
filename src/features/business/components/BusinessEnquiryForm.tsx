@@ -102,7 +102,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
     return (
       <div
         role="status"
-        className="flex flex-col items-center gap-3 rounded-lg border-2 border-moonstone-600 bg-white p-6 text-center"
+        className="flex flex-col items-center gap-3 border-2 border-moonstone-600 bg-white p-6 text-center"
       >
         <FaCircleCheck className="h-10 w-10 text-moonstone-700" aria-hidden />
         <p className="text-lg font-bold text-rich-black sm:text-xl">Enquiry sent - thanks!</p>

@@ -59,10 +59,10 @@ export function BookingSummaryCard({
   return (
     <section
       aria-label="Your appointment so far"
-      className="flex flex-col gap-2 rounded-lg border border-moonstone-500/30 bg-moonstone-400/5 p-4"
+      className="flex flex-col gap-2 border border-seasalt-200 bg-seasalt p-4"
     >
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-base font-bold text-russian-violet sm:text-lg">Your appointment</h3>
+        <h3 className="text-base font-bold text-rich-black sm:text-lg">Your appointment</h3>
         {draftRestored && (
           <button
             type="button"
@@ -70,7 +70,7 @@ export function BookingSummaryCard({
             className={cn(
               // Negative margin: a 44px target without pushing the heading down.
               "-my-2.5 min-h-11 px-1 text-sm text-rich-black/70 underline underline-offset-2",
-              "rounded hover:text-rich-black focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+              "hover:text-rich-black focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
             )}
           >
             Clear form

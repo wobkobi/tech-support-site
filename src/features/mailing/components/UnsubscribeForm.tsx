@@ -53,14 +53,14 @@ export function UnsubscribeForm({
     <div className="flex flex-col gap-4">
       {unsubscribed ? (
         <>
-          <p className="text-lg font-semibold text-russian-violet" role="status">
+          <p className="text-lg font-semibold text-rich-black" role="status">
             You&apos;re unsubscribed. You won&apos;t get any more of these emails.
           </p>
           <p className="text-base text-rich-black/80">
             You&apos;ll still get emails about your own bookings and invoices. Changed your mind?
           </p>
           <div>
-            <Button variant="secondary" disabled={busy} onClick={() => void change("resubscribe")}>
+            <Button variant="outline" disabled={busy} onClick={() => void change("resubscribe")}>
               {busy ? "Saving..." : "Keep getting emails"}
             </Button>
           </div>
@@ -79,7 +79,7 @@ export function UnsubscribeForm({
         </>
       )}
       {error && (
-        <p className="text-base text-red-700" role="alert">
+        <p className="text-base text-error" role="alert">
           {error}
         </p>
       )}
