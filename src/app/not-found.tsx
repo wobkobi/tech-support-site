@@ -51,7 +51,7 @@ export default async function NotFound(): Promise<React.ReactElement> {
               <Button href="/" variant="primary">
                 Back to home
               </Button>
-              <Button href="/contact" variant="ghost">
+              <Button href="/contact" variant="outline">
                 Contact me
               </Button>
             </div>

@@ -331,6 +331,10 @@ interface SubSlot {
   minute: StartMinute;
   availableShort: boolean;
   availableLong: boolean;
+  /** A booking or calendar event overlaps a 1hr job here (the booking page shows "Booked"). */
+  bookedShort: boolean;
+  /** A booking or calendar event overlaps a 2hr job here. */
+  bookedLong: boolean;
 }
 
 interface TimeWindow {
@@ -644,25 +648,23 @@ export function buildAvailableDays(
             Date.UTC(year, month - 1, day, slotHour - utcOffset, minute, 0),
           );
 
-          let subAvailableShort =
-            fits(slotTotalMinutes, slotTotalMinutes + shortMins) &&
-            isSlotFree(
-              subStart,
-              new Date(subStart.getTime() + shortMins * 60 * 1000),
-              existingBookings,
-              calendarEvents,
-              config.bufferMin,
-            );
-
-          let subAvailableLong =
-            fits(slotTotalMinutes, slotTotalMinutes + longMins) &&
-            isSlotFree(
-              subStart,
-              new Date(subStart.getTime() + longMins * 60 * 1000),
-              existingBookings,
-              calendarEvents,
-              config.bufferMin,
-            );
+          // Free and fits are kept apart so the page can tell "Booked" from the other reasons.
+          const freeShort = isSlotFree(
+            subStart,
+            new Date(subStart.getTime() + shortMins * 60 * 1000),
+            existingBookings,
+            calendarEvents,
+            config.bufferMin,
+          );
+          const freeLong = isSlotFree(
+            subStart,
+            new Date(subStart.getTime() + longMins * 60 * 1000),
+            existingBookings,
+            calendarEvents,
+            config.bufferMin,
+          );
+          let subAvailableShort = fits(slotTotalMinutes, slotTotalMinutes + shortMins) && freeShort;
+          let subAvailableLong = fits(slotTotalMinutes, slotTotalMinutes + longMins) && freeLong;
 
           // Apply time-based rules for today.
           if (isToday) {
@@ -689,6 +691,8 @@ export function buildAvailableDays(
             minute,
             availableShort: subAvailableShort,
             availableLong: subAvailableLong,
+            bookedShort: !freeShort,
+            bookedLong: !freeLong,
           });
         }
 

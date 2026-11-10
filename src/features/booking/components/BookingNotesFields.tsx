@@ -8,6 +8,7 @@ import {
   DESCRIPTION_NO_WORDS_MESSAGE,
 } from "@/features/booking/lib/booking";
 import { NOTES_WARN_GAP } from "@/features/booking/lib/booking-form";
+import { FIELD_INPUT, FIELD_LABEL } from "@/features/booking/lib/form-styles";
 import { TextArea } from "@/shared/components/TextArea";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -56,7 +57,7 @@ export function BookingNotesField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor="booking-notes" className="text-base font-semibold text-rich-black">
+      <label htmlFor="booking-notes" className={FIELD_LABEL}>
         What do you need help with? <span className="text-error">*</span>
       </label>
       <TextArea
@@ -94,11 +95,7 @@ export function BookingNotesField({
         }}
         aria-invalid={!!error || undefined}
         aria-describedby={error ? "booking-notes-error" : "booking-notes-counter"}
-        className={cn(
-          "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-          error && "border-coquelicot-500/60",
-        )}
+        className={cn(FIELD_INPUT, error && "border-coquelicot-500/60")}
         placeholder="e.g., Wi-Fi not working, need help with email setup, laptop running slow..."
       />
       <div id="booking-notes-counter" className="flex items-center justify-between gap-3 text-sm">
@@ -122,7 +119,7 @@ export function BookingNotesField({
               className={cn(
                 // Negative margin: a 44px target without growing the counter row.
                 "-my-3 min-h-11 px-1 text-sm text-rich-black/70 underline underline-offset-2",
-                "rounded hover:text-rich-black focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+                "hover:text-rich-black focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             >
               Clear
@@ -169,7 +166,7 @@ export function BookingAccessNotesField({
 }: BookingAccessNotesFieldProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor="booking-access-notes" className="text-base font-semibold text-rich-black">
+      <label htmlFor="booking-access-notes" className={FIELD_LABEL}>
         Anything else I should know for the visit?{" "}
         <span className="font-normal text-rich-black/70">(optional)</span>
       </label>
@@ -185,10 +182,7 @@ export function BookingAccessNotesField({
         value={accessNotes}
         onChange={(e) => onChange(e.target.value)}
         aria-describedby="booking-access-notes-hint booking-access-notes-counter"
-        className={cn(
-          "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-        )}
+        className={FIELD_INPUT}
         placeholder="e.g., Park on the street, the driveway is steep. Side gate is unlocked. Friendly dog."
       />
       <p

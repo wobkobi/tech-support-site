@@ -65,7 +65,7 @@ export function ErrorPageShell({
         <section className={cn(CARD, "text-center")}>
           <div className="mb-4 text-7xl font-extrabold text-coquelicot-500 sm:text-8xl">Oops!</div>
 
-          <h1 className="mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl">
+          <h1 className="mb-4 text-3xl font-extrabold text-rich-black sm:text-4xl md:text-5xl">
             {title}
           </h1>
 
@@ -86,7 +86,7 @@ export function ErrorPageShell({
               <FaArrowRotateRight className="h-5 w-5" aria-hidden />
               Try again
             </Button>
-            <Button href={secondary.href} variant="ghost">
+            <Button href={secondary.href} variant="outline">
               {secondary.icon}
               {secondary.label}
             </Button>
@@ -97,7 +97,7 @@ export function ErrorPageShell({
               <summary className="cursor-pointer font-semibold hover:text-russian-violet">
                 {detailsSummary}
               </summary>
-              <pre className="mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-200/60 bg-white/60 p-4 text-left text-base">
+              <pre className="mt-3 max-w-full overflow-auto border border-seasalt-200 bg-seasalt p-4 text-left text-base">
                 {String(error?.stack || error)}
               </pre>
             </details>

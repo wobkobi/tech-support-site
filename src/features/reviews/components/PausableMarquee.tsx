@@ -32,7 +32,7 @@ export function PausableMarquee({
           type="button"
           // Flip the label, not aria-pressed, to avoid announcing both state and name.
           onClick={() => setPaused((p) => !p)}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-base font-semibold text-russian-violet transition-colors hover:bg-russian-violet/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet"
+          className="inline-flex min-h-11 items-center gap-2 px-3 text-base font-semibold text-russian-violet transition-colors hover:bg-russian-violet/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet"
         >
           {paused ? (
             <FaPlay className="size-3.5" aria-hidden="true" />

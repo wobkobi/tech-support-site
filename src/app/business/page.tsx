@@ -330,7 +330,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
           title="Tell me what you need"
           lead="A couple of sentences is plenty - I'll come back to you within one business day."
         />
-        <div className="max-w-180 rounded-lg bg-seasalt p-7">
+        <div className="max-w-180 bg-seasalt p-7">
           <BusinessEnquiryForm />
         </div>
         <p className="mt-6">

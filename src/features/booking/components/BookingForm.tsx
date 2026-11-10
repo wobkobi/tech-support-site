@@ -677,9 +677,7 @@ export default function BookingForm({
 
       {/* ── Section 2: Your details ── */}
       <fieldset className="flex flex-col gap-6">
-        <legend className="mb-1 text-xl font-bold text-russian-violet sm:text-2xl">
-          Your details
-        </legend>
+        <legend className="mb-1 text-xl font-bold text-rich-black sm:text-2xl">Your details</legend>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <BookingNameField
@@ -759,7 +757,7 @@ export default function BookingForm({
 
       {/* ── Section 3: Describe the issue ── */}
       <fieldset className="flex flex-col gap-6">
-        <legend className="mb-1 text-xl font-bold text-russian-violet sm:text-2xl">
+        <legend className="mb-1 text-xl font-bold text-rich-black sm:text-2xl">
           Describe the issue
         </legend>
 

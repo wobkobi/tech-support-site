@@ -219,7 +219,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
                 key={group.region ?? "other"}
                 className="group border-t border-seasalt-200 py-2.5 last:border-b lg:border-t-[3px] lg:border-moonstone-500 lg:last:border-b-0"
               >
-                <summary className="flex cursor-pointer list-none items-start justify-between gap-2 rounded py-1 font-extrabold text-russian-violet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet [&::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-2 py-1 font-extrabold text-russian-violet focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet [&::-webkit-details-marker]:hidden">
                   <span>
                     {group.region ?? "Other areas"}
                     <small className="block text-sm font-semibold text-seasalt-700">

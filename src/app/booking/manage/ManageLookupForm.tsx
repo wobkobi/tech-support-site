@@ -3,6 +3,7 @@
 // Find-my-booking email form. The API replies the same whether or not the address
 // matched, so never imply a match.
 
+import { FIELD_INPUT, FIELD_LABEL } from "@/features/booking/lib/form-styles";
 import { Button } from "@/shared/components/Button";
 import { PhoneLink } from "@/shared/components/PhoneLink";
 import type React from "react";
@@ -77,10 +78,7 @@ export function ManageLookupForm({ phone, phoneTel }: ManageLookupFormProps): Re
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4">
       <div>
-        <label
-          htmlFor="manage-email"
-          className="mb-1 block text-base font-semibold text-russian-violet sm:text-lg"
-        >
+        <label htmlFor="manage-email" className={`mb-1 block ${FIELD_LABEL}`}>
           Your email address
         </label>
         <input
@@ -91,7 +89,7 @@ export function ManageLookupForm({ phone, phoneTel }: ManageLookupFormProps): Re
           value={email}
           onChange={(ev) => setEmail(ev.target.value)}
           placeholder="you@example.com"
-          className="w-full rounded-lg border border-seasalt-200 bg-white px-4 py-3 text-base focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:text-lg"
+          className={FIELD_INPUT}
         />
         <p className="mt-1 text-base text-rich-black/70">Use the same address you booked with.</p>
       </div>

@@ -211,7 +211,7 @@ export function NavBar({ phone, phoneTel }: NavBarProps): React.ReactElement | n
             onClick={toggleMenu}
             aria-expanded={menuOpen}
             aria-controls="site-menu"
-            className="min-h-11 rounded-md border-2 border-russian-violet px-3 font-bold text-russian-violet xl:hidden"
+            className="min-h-11 border-2 border-russian-violet px-3 font-bold text-russian-violet xl:hidden"
           >
             {menuOpen ? "Close" : "Menu"}
           </button>

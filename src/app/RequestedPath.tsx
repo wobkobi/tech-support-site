@@ -26,7 +26,7 @@ export function RequestedPath(): React.ReactElement {
   );
   if (!pathname) return <>this address</>;
   return (
-    <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[0.9em] break-all text-rich-black">
+    <code className="bg-white px-1.5 py-0.5 font-mono text-[0.9em] break-all text-rich-black">
       {pathname}
     </code>
   );

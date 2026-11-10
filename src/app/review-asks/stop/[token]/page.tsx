@@ -37,7 +37,7 @@ export default async function ReviewAskStopPage({
   return (
     <CardPage maxWidth="40rem">
       <section className={CARD}>
-        <h1 className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl">
+        <h1 className="mb-4 text-2xl font-extrabold text-rich-black sm:text-3xl">
           Review requests
         </h1>
         {isPreview && (

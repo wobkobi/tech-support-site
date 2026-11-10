@@ -118,7 +118,7 @@ function LinkProblem({
   return (
     <CardPage>
       <section className={cn(CARD, "animate-fade-in")}>
-        <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+        <h1 className="mb-3 text-2xl font-extrabold text-rich-black sm:text-3xl md:text-4xl">
           {cancelled ? "This booking was cancelled" : "I couldn't find that booking"}
         </h1>
         <p className="mb-4 text-base text-rich-black sm:text-lg">
@@ -134,15 +134,15 @@ function LinkProblem({
         </p>
         <div className="flex flex-wrap gap-3">
           {cancelled ? (
-            <Button href="/booking" variant="secondary" size="md">
+            <Button href="/booking" variant="primary">
               Book a new time
             </Button>
           ) : (
-            <Button href="/booking/manage" variant="secondary" size="md">
+            <Button href="/booking/manage" variant="primary">
               Email me fresh links
             </Button>
           )}
-          <Button href="/" variant="ghost" size="md">
+          <Button href="/" variant="outline">
             Back to home
           </Button>
         </div>
@@ -290,6 +290,8 @@ export default async function EditBookingPage({
             minute: m,
             availableShort: m === startMinute,
             availableLong: m === startMinute && isLong,
+            bookedShort: false,
+            bookedLong: false,
           })),
         },
       ],
@@ -302,7 +304,7 @@ export default async function EditBookingPage({
     <CardPage>
       <div className="flex flex-col gap-6 sm:gap-8">
         <section className={cn(CARD, "animate-fade-in")}>
-          <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+          <h1 className="mb-3 text-2xl font-extrabold text-rich-black sm:text-3xl md:text-4xl">
             Edit booking
           </h1>
           <p className="text-base text-rich-black">
@@ -316,7 +318,7 @@ export default async function EditBookingPage({
           /* The server would reject a save anyway, so don't show a form that
                can only fail - explain why and offer the paths that still work. */
           <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
-            <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
+            <h2 className="mb-2 text-lg font-bold text-rich-black sm:text-xl">
               {closed
                 ? "This appointment has passed"
                 : cutoffBlocked
@@ -333,7 +335,7 @@ export default async function EditBookingPage({
             </p>
             <div className="flex flex-wrap gap-3">
               {identity.phoneTel && (
-                <Button href={identity.phoneTel} variant="secondary" size="md">
+                <Button href={identity.phoneTel} variant="primary">
                   Call {identity.phone}
                 </Button>
               )}
@@ -341,8 +343,7 @@ export default async function EditBookingPage({
               {!closed && (
                 <Button
                   href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
-                  variant="ghost"
-                  size="md"
+                  variant="outline"
                 >
                   Cancel instead
                 </Button>
@@ -353,7 +354,7 @@ export default async function EditBookingPage({
           <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
             {/* Only worth saying when a limit is actually configured. */}
             {(changesLeft !== null || reschedule.cutoffHours > 0) && (
-              <p className="mb-4 rounded-lg border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black/80">
+              <p className="mb-4 border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black/80">
                 {changesLeft !== null && (
                   <>
                     You can move this booking to a new time{" "}

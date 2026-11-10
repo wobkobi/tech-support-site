@@ -14,7 +14,7 @@ export function GetEstimateButton(): React.ReactElement {
   return (
     <Button
       type="button"
-      variant="secondary"
+      variant="primary"
       onClick={() =>
         document.getElementById("estimate")?.scrollIntoView({ behavior: "smooth", block: "start" })
       }

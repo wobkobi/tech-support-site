@@ -125,7 +125,7 @@ export function TravelCheck({
 
       <div aria-live="polite" className="mt-4 text-lg">
         {state.kind === "found" && (
-          <p className="rounded-md border-l-4 border-moonstone-500 bg-white p-4">
+          <p className="border-l-4 border-moonstone-500 bg-white p-4">
             {state.place} is about <strong>{state.figure.eachWayMins} minutes</strong> each way from
             me, so travel is about{" "}
             <PromoPrice discounted={state.figure.charged < state.figure.full}>

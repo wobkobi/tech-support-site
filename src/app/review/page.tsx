@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 function GoogleReviewButton({ url, label }: { url: string; label: string }): React.ReactElement {
   return (
     <div className="space-y-2">
-      <Button href={url} target="_blank" variant="primary" size="md">
+      <Button href={url} target="_blank" variant="primary">
         {label}
       </Button>
       <p className="text-base text-rich-black/70">
@@ -147,7 +147,7 @@ export default async function ReviewPage({
         {/* Token invalid warning */}
         {token && !tokenValid && (
           <section className={cn(CARD)}>
-            <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+            <h1 className="mb-2 text-2xl font-extrabold text-rich-black sm:text-3xl md:text-4xl">
               Invalid review link
             </h1>
             <p className="mb-4 text-base text-rich-black/80">
@@ -164,7 +164,7 @@ export default async function ReviewPage({
                 <GoogleReviewButton url={googleUrl} label="Leave a review on Google" />
               </div>
             )}
-            <Button href="/" variant="secondary" size="md">
+            <Button href="/" variant="outline">
               Back to home
             </Button>
           </section>
@@ -174,7 +174,7 @@ export default async function ReviewPage({
         {tokenValid && !alreadyReviewed && googleUrl && (
           <>
             <section className={cn(CARD)}>
-              <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+              <h1 className="mb-2 text-2xl font-extrabold text-rich-black sm:text-3xl md:text-4xl">
                 How was your appointment?
               </h1>
               <p className="mb-4 text-base text-rich-black/80">
@@ -210,7 +210,7 @@ export default async function ReviewPage({
         {tokenValid && (alreadyReviewed || !googleUrl) && (
           <>
             <section className={cn(CARD)}>
-              <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+              <h1 className="mb-2 text-2xl font-extrabold text-rich-black sm:text-3xl md:text-4xl">
                 {alreadyReviewed ? "Edit your review" : "How was your appointment?"}
               </h1>
               <p className="text-base text-rich-black/80">
@@ -223,7 +223,7 @@ export default async function ReviewPage({
             {/* Every past reviewer: Google bans asking only happy customers. */}
             {alreadyReviewed && googleUrl && (
               <section className={cn(CARD, "space-y-3")}>
-                <h2 className="text-xl font-bold text-russian-violet sm:text-2xl">
+                <h2 className="text-xl font-bold text-rich-black sm:text-2xl">
                   Could you post it on Google too?
                 </h2>
                 <p className="text-base text-rich-black/80">
@@ -254,7 +254,7 @@ export default async function ReviewPage({
         {/* No token - show message */}
         {!token && (
           <section className={cn(CARD)}>
-            <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
+            <h1 className="mb-2 text-2xl font-extrabold text-rich-black sm:text-3xl md:text-4xl">
               {googleUrl ? "Leave a review" : "Review link required"}
             </h1>
             {googleUrl && (
@@ -283,7 +283,7 @@ export default async function ReviewPage({
               </Link>
               , and I'll send you a fresh one.
             </p>
-            <Button href="/" variant="secondary" size="md">
+            <Button href="/" variant="outline">
               Back to home
             </Button>
           </section>

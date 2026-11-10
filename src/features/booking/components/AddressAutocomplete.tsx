@@ -4,6 +4,7 @@
 
 "use client";
 
+import { FIELD_INPUT } from "@/features/booking/lib/form-styles";
 import { cn } from "@/shared/lib/cn";
 import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import useOnVisible from "@/shared/lib/useOnVisible";
@@ -441,12 +442,8 @@ export default function AddressAutocomplete({
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
         className={cn(
-          inputClassName ??
-            cn(
-              "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-              "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-            ),
-          showWarning && "border-yellow-500/60",
+          inputClassName ?? FIELD_INPUT,
+          showWarning && "border-coquelicot-600/60",
           ariaInvalid && "border-coquelicot-500/60",
         )}
       />
@@ -457,7 +454,7 @@ export default function AddressAutocomplete({
           id={listboxId}
           role="listbox"
           aria-label="Address suggestions"
-          className="absolute top-full right-0 left-0 z-50 mt-1.5 rounded-lg border-2 border-russian-violet bg-white p-1.5"
+          className="absolute top-full right-0 left-0 z-50 mt-1.5 border-2 border-russian-violet bg-white p-1.5"
         >
           {suggestions.map((s, i) => (
             <li
@@ -470,7 +467,7 @@ export default function AddressAutocomplete({
               onClick={() => void selectSuggestion(s)}
               onMouseEnter={() => setActiveIndex(i)}
               className={cn(
-                "flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2.5 text-base text-rich-black",
+                "flex cursor-pointer items-center gap-2.5 px-3 py-2.5 text-base text-rich-black",
                 i === activeIndex && "bg-seasalt",
               )}
             >
@@ -491,7 +488,7 @@ export default function AddressAutocomplete({
       )}
 
       {apiKeyMissing && (
-        <p className="flex items-start gap-1 text-sm text-yellow-800">
+        <p className="flex items-start gap-1.5 text-base text-coquelicot-700">
           <FaTriangleExclamation className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
             Address autocomplete unavailable. Please type your full address manually. (API key not
@@ -501,7 +498,7 @@ export default function AddressAutocomplete({
       )}
 
       {scriptError && (
-        <p className="flex items-start gap-1 text-sm text-yellow-800">
+        <p className="flex items-start gap-1.5 text-base text-coquelicot-700">
           <FaTriangleExclamation className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
             Address autocomplete unavailable. Please type your full address manually. (Google Maps

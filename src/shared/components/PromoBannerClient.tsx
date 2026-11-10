@@ -79,7 +79,7 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
       <Link
         href="/pricing"
         className={cn(
-          "block rounded hover:underline",
+          "block hover:underline",
           "focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet-900",
         )}
       >

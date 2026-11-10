@@ -3,6 +3,14 @@
 
 "use client";
 
+import {
+  CHOICE_BASE,
+  CHOICE_IDLE,
+  CHOICE_ON,
+  FIELD_INPUT,
+  FIELD_LABEL,
+  FIELD_LEGEND,
+} from "@/features/booking/lib/form-styles";
 import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
@@ -13,12 +21,6 @@ import { focusAndReveal } from "@/shared/lib/focus-and-reveal";
 import { formatNZPhone, normalisePhone, validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useEffect, useId, useRef, useState } from "react";
-
-/** Input styling shared by the name and review fields and the phone/email overrides. */
-const FIELD_CLASSES = cn(
-  "border-seasalt-200 bg-white text-rich-black",
-  "focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-);
 
 type NameDisplay = "name" | "anonymous";
 
@@ -260,7 +262,7 @@ export default function ReviewFormProtected({
   if (sent) {
     return (
       <div role="status" className="space-y-4 text-center">
-        <p className="text-2xl font-extrabold text-russian-violet sm:text-3xl">
+        <p className="text-2xl font-extrabold text-rich-black sm:text-3xl">
           {isEditing ? "Review updated!" : "Thanks for your review!"}
         </p>
         <p className="text-base text-rich-black/80 sm:text-lg">
@@ -273,7 +275,7 @@ export default function ReviewFormProtected({
         {/* Offered to every reviewer, never filtered by what they wrote: Google
             bans asking only happy customers for reviews. */}
         {googleReviewUrl && (
-          <div className="mx-auto max-w-lg space-y-3 rounded-lg border border-moonstone-500/50 bg-moonstone-400/10 p-4 sm:p-5">
+          <div className="mx-auto max-w-lg space-y-3 border border-moonstone-500/50 bg-moonstone-400/10 p-4 sm:p-5">
             <p className="text-base text-rich-black sm:text-lg">
               Could you post it on Google too? That's where most people look for local tech help, so
               it makes a big difference.
@@ -287,11 +289,11 @@ export default function ReviewFormProtected({
           </div>
         )}
         <div className="flex flex-wrap justify-center gap-3 pt-2">
-          <Button href="/" variant="secondary">
+          <Button href="/" variant="outline">
             Back to home
           </Button>
           {liveNow && (
-            <Button href="/reviews" variant="ghost">
+            <Button href="/reviews" variant="outline">
               See all reviews
             </Button>
           )}
@@ -304,7 +306,7 @@ export default function ReviewFormProtected({
     <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-4">
       {/* Personal-link banner: reassures without the "Verified" jargon. */}
       {isVerified && (
-        <div className="flex items-center gap-2 rounded-lg border border-moonstone-500/50 bg-moonstone-400/10 p-3 text-base text-moonstone-800">
+        <div className="flex items-center gap-2 border border-moonstone-500/50 bg-moonstone-400/10 p-3 text-base text-moonstone-800">
           <svg
             className="h-5 w-5 shrink-0"
             fill="currentColor"
@@ -330,7 +332,7 @@ export default function ReviewFormProtected({
         {hasFieldErrors && (
           <div
             role="alert"
-            className="rounded-lg border border-coquelicot-500/50 bg-coquelicot-500/10 p-3 text-base text-rich-black"
+            className="border border-coquelicot-500/50 bg-coquelicot-500/10 p-3 text-base text-rich-black"
           >
             <p className="font-semibold">Please fix the following:</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5">
@@ -372,7 +374,7 @@ export default function ReviewFormProtected({
         {!hasFieldErrors && submitError && (
           <div
             role="alert"
-            className="rounded-lg border border-coquelicot-500/50 bg-coquelicot-500/10 p-3 text-base text-rich-black"
+            className="border border-coquelicot-500/50 bg-coquelicot-500/10 p-3 text-base text-rich-black"
           >
             <p className="font-medium text-error">{submitError}</p>
             {phone && phoneTel && (
@@ -386,10 +388,10 @@ export default function ReviewFormProtected({
       </div>
 
       {/* Identity */}
-      <div className="space-y-4 rounded-xl border border-seasalt-200/80 bg-seasalt p-4">
+      <div className="space-y-4">
         {/* Name display options */}
         <div>
-          <p className="mb-2 text-base font-semibold text-rich-black">How do you want to appear?</p>
+          <p className={FIELD_LEGEND}>How do you want to appear?</p>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
             {NAME_OPTIONS.map((opt) => (
               <button
@@ -402,10 +404,9 @@ export default function ReviewFormProtected({
                   if (opt.value === "anonymous") clearError("firstName");
                 }}
                 className={cn(
-                  "min-h-11 rounded-lg border px-4 py-1.5 text-base font-medium whitespace-nowrap transition-colors",
-                  nameDisplay === opt.value
-                    ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                    : "border-seasalt-200 bg-white text-rich-black hover:border-russian-violet/40",
+                  CHOICE_BASE,
+                  "min-h-11 px-4 py-1.5 text-base whitespace-nowrap",
+                  nameDisplay === opt.value ? CHOICE_ON : CHOICE_IDLE,
                 )}
               >
                 {opt.label}
@@ -433,21 +434,14 @@ export default function ReviewFormProtected({
         {!isAnonymous && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label
-                htmlFor={firstId}
-                className="mb-1 block text-base font-semibold text-rich-black"
-              >
+              <label htmlFor={firstId} className={`mb-1 block ${FIELD_LABEL}`}>
                 First name <span className="text-error">*</span>
               </label>
               <input
                 id={firstId}
                 type="text"
                 autoComplete="given-name"
-                className={cn(
-                  FIELD_CLASSES,
-                  "w-full rounded-md border px-3 py-2",
-                  errors.firstName && "border-coquelicot-500/60",
-                )}
+                className={cn(FIELD_INPUT, errors.firstName && "border-coquelicot-500/60")}
                 value={firstName}
                 onChange={(e) => {
                   setFirstName(e.target.value);
@@ -467,17 +461,14 @@ export default function ReviewFormProtected({
             </div>
 
             <div>
-              <label
-                htmlFor={lastId}
-                className="mb-1 block text-base font-semibold text-rich-black"
-              >
+              <label htmlFor={lastId} className={`mb-1 block ${FIELD_LABEL}`}>
                 Last name <span className="font-normal text-rich-black/70">(optional)</span>
               </label>
               <input
                 id={lastId}
                 type="text"
                 autoComplete="family-name"
-                className={cn(FIELD_CLASSES, "w-full rounded-md border px-3 py-2")}
+                className={FIELD_INPUT}
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 maxLength={60}
@@ -489,9 +480,9 @@ export default function ReviewFormProtected({
       </div>
 
       {/* Optional contact details */}
-      <div className="space-y-3 rounded-xl border border-seasalt-200/80 bg-seasalt p-4">
+      <div className="space-y-3 border-t border-seasalt-200 pt-5">
         <div>
-          <p className="text-base font-semibold text-rich-black">
+          <p className={FIELD_LABEL}>
             Stay in touch <span className="font-normal text-rich-black/70">(optional)</span>
           </p>
           <p className="mt-0.5 text-base text-rich-black/80">
@@ -501,7 +492,7 @@ export default function ReviewFormProtected({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor={phoneId} className="mb-1 block text-base font-semibold text-rich-black">
+            <label htmlFor={phoneId} className={`mb-1 block ${FIELD_LABEL}`}>
               Phone
             </label>
             <PhoneInput
@@ -514,12 +505,12 @@ export default function ReviewFormProtected({
               disabled={loading}
               errorMessages={{ invalid: "Doesn't look right - check the number." }}
               nzOnly
-              className={cn(FIELD_CLASSES, "w-full rounded-md border px-3 py-2 text-base")}
+              className={FIELD_INPUT}
             />
           </div>
 
           <div>
-            <label htmlFor={emailId} className="mb-1 block text-base font-semibold text-rich-black">
+            <label htmlFor={emailId} className={`mb-1 block ${FIELD_LABEL}`}>
               Email
             </label>
             <EmailInput
@@ -528,16 +519,16 @@ export default function ReviewFormProtected({
               onChange={setContactEmail}
               placeholder="you@example.com"
               disabled={loading}
-              className={cn(FIELD_CLASSES, "w-full rounded-md border px-3 py-2 text-base")}
+              className={FIELD_INPUT}
             />
           </div>
         </div>
       </div>
 
       {/* Review */}
-      <div className="rounded-xl border border-seasalt-200/80 bg-seasalt p-4">
+      <div className="border-t border-seasalt-200 pt-5">
         <div className="flex items-baseline justify-between gap-3">
-          <label htmlFor={textId} className="block text-base font-semibold text-rich-black">
+          <label htmlFor={textId} className={`block ${FIELD_LABEL}`}>
             Review <span className="text-error">*</span>
           </label>
           <span
@@ -562,11 +553,7 @@ export default function ReviewFormProtected({
           id={textId}
           autoComplete="off"
           placeholder={`Share your experience (at least ${textMin} characters)...`}
-          className={cn(
-            FIELD_CLASSES,
-            "mt-1 min-h-35 w-full rounded-md border px-3 py-2",
-            errors.text && "border-coquelicot-500/60",
-          )}
+          className={cn(FIELD_INPUT, "mt-1 min-h-35", errors.text && "border-coquelicot-500/60")}
           value={text}
           onChange={(e) => {
             setText(e.target.value);
@@ -585,13 +572,7 @@ export default function ReviewFormProtected({
         )}
 
         <div className="mt-3 flex items-center justify-between">
-          <Button
-            type="submit"
-            variant="secondary"
-            size="md"
-            aria-busy={loading}
-            disabled={loading}
-          >
+          <Button type="submit" variant="primary" aria-busy={loading} disabled={loading}>
             {loading ? "Sending..." : isEditing ? "Update review" : "Send review"}
           </Button>
         </div>

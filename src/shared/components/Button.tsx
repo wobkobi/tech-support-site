@@ -52,6 +52,7 @@ interface ButtonAsButton {
   "aria-label"?: string;
   "aria-disabled"?: boolean;
   "aria-busy"?: boolean;
+  "aria-describedby"?: string;
 }
 
 export type ButtonProps = ButtonAsLink | ButtonAsButton;
@@ -143,7 +144,7 @@ export function Button(props: ButtonProps): React.ReactElement {
 
   const baseClasses = cn(
     "inline-flex items-center justify-center gap-2",
-    "rounded-lg font-bold",
+    "font-bold",
     // Links render selectable text by default; match the native-button behaviour.
     "whitespace-nowrap select-none",
     // Explicit keyboard focus ring: browser defaults vary and can sit
@@ -221,6 +222,7 @@ export function Button(props: ButtonProps): React.ReactElement {
     "aria-label": ariaLabel,
     "aria-disabled": ariaDisabled,
     "aria-busy": ariaBusy,
+    "aria-describedby": ariaDescribedBy,
   } = rest as ButtonAsButton;
 
   return (
@@ -232,6 +234,7 @@ export function Button(props: ButtonProps): React.ReactElement {
       aria-label={ariaLabel}
       aria-disabled={ariaDisabled ?? disabled}
       aria-busy={ariaBusy}
+      aria-describedby={ariaDescribedBy}
     >
       {children}
     </button>

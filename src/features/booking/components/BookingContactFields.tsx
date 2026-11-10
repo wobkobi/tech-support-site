@@ -4,6 +4,14 @@
 // prompt), the mailing-list tickbox, phone and meeting type.
 
 import { BOOKING_FIELD_LIMITS, PHONE_INVALID_MESSAGE } from "@/features/booking/lib/booking";
+import {
+  CHOICE_BASE,
+  CHOICE_IDLE,
+  CHOICE_ON,
+  FIELD_INPUT,
+  FIELD_LABEL,
+  FIELD_LEGEND,
+} from "@/features/booking/lib/form-styles";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
@@ -42,7 +50,7 @@ export function BookingNameField({
 }: BookingNameFieldProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor="booking-name" className="text-base font-semibold text-rich-black">
+      <label htmlFor="booking-name" className={FIELD_LABEL}>
         Name <span className="text-error">*</span>
       </label>
       <input
@@ -65,11 +73,7 @@ export function BookingNameField({
         }}
         aria-invalid={!!error || undefined}
         aria-describedby={error ? "booking-name-error" : undefined}
-        className={cn(
-          "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-          error && "border-coquelicot-500/60",
-        )}
+        className={cn(FIELD_INPUT, error && "border-coquelicot-500/60")}
       />
       {error && (
         <p id="booking-name-error" className="text-sm text-error">
@@ -133,7 +137,7 @@ export function BookingEmailField({
 }: BookingEmailFieldProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor="booking-email" className="text-base font-semibold text-rich-black">
+      <label htmlFor="booking-email" className={FIELD_LABEL}>
         Email <span className="text-error">*</span>
       </label>
       <EmailInput
@@ -147,11 +151,7 @@ export function BookingEmailField({
         disabled={locked}
         maxLength={BOOKING_FIELD_LIMITS.email}
         errorMessages={{ invalid: "Please enter a valid email address." }}
-        className={cn(
-          "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-          "disabled:cursor-not-allowed disabled:text-rich-black/70",
-        )}
+        className={cn(FIELD_INPUT, "disabled:cursor-not-allowed disabled:text-rich-black/70")}
       />
       {locked && (
         <p className="text-base text-rich-black/70">
@@ -166,7 +166,7 @@ export function BookingEmailField({
           tabIndex={-1}
           role="group"
           aria-labelledby="booking-email-suggestion"
-          className="flex flex-col gap-1 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-base"
+          className="flex flex-col gap-1 border-l-4 border-coquelicot-600 bg-seasalt px-4 py-3 text-base"
         >
           <span id="booking-email-suggestion" className="text-rich-black">
             Did you mean <strong>{emailSuggestion}</strong>?
@@ -267,7 +267,7 @@ export function BookingPhoneField({
 }: BookingPhoneFieldProps): React.ReactElement {
   return (
     <div id="booking-phone-wrap" className="flex flex-col gap-1.5">
-      <label htmlFor="booking-phone" className="text-base font-semibold text-rich-black">
+      <label htmlFor="booking-phone" className={FIELD_LABEL}>
         Phone{" "}
         {required ? (
           <span className="text-error">*</span>
@@ -287,11 +287,7 @@ export function BookingPhoneField({
         // The event's own value: the formatted onChange above hasn't re-rendered yet
         onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined}
         nzOnly
-        className={cn(
-          "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-          "sm:max-w-sm",
-        )}
+        className={cn(FIELD_INPUT, "sm:max-w-sm")}
       />
       {required && (
         <p className="text-base text-rich-black/70">
@@ -322,7 +318,7 @@ export function BookingMeetingTypeField({
 }: BookingMeetingTypeFieldProps): React.ReactElement {
   return (
     <fieldset id="booking-meeting-type" className="min-w-0">
-      <legend className="mb-2 text-base font-semibold text-rich-black">
+      <legend className={FIELD_LEGEND}>
         Meeting type <span className="text-error">*</span>
       </legend>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
@@ -338,10 +334,9 @@ export function BookingMeetingTypeField({
             aria-pressed={meetingType === opt.value}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "min-h-11 rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
-              meetingType === opt.value
-                ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+              CHOICE_BASE,
+              "min-h-11 px-5 py-2.5 text-base whitespace-nowrap",
+              meetingType === opt.value ? CHOICE_ON : CHOICE_IDLE,
             )}
           >
             {opt.label}

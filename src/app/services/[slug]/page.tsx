@@ -242,12 +242,10 @@ export default async function ServiceDetailPage({
             {reviews.map((r) => (
               <li
                 key={r.id}
-                className="flex flex-col rounded-lg border-2 border-seasalt-200/60 bg-white/80 p-4 sm:p-5"
+                className="flex flex-col border border-seasalt-200 bg-white p-4 sm:p-5"
               >
                 <blockquote>{r.text}</blockquote>
-                <p className="pt-3 text-base font-semibold text-russian-violet sm:text-lg">
-                  - {r.name}
-                </p>
+                <p className="pt-3 text-base font-bold sm:text-lg">- {r.name}</p>
               </li>
             ))}
           </ul>
@@ -274,7 +272,7 @@ export default async function ServiceDetailPage({
         <dl className="grid max-w-180 gap-6">
           {page.faqs.map(({ q, a }) => (
             <div key={q}>
-              <dt className="text-lg font-extrabold text-russian-violet">{q}</dt>
+              <dt className="text-lg font-extrabold">{q}</dt>
               <dd className="mt-1">{a}</dd>
             </div>
           ))}

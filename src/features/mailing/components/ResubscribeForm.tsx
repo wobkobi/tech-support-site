@@ -51,7 +51,7 @@ export function ResubscribeForm({
     <div className="flex flex-col gap-4">
       {onList ? (
         <>
-          <p className="text-lg font-semibold text-russian-violet" role="status">
+          <p className="text-lg font-semibold text-rich-black" role="status">
             You&apos;re on my list. Thanks!
           </p>
           <p className="text-base text-rich-black/80">
@@ -73,7 +73,7 @@ export function ResubscribeForm({
         </>
       )}
       {error && (
-        <p className="text-base text-red-700" role="alert">
+        <p className="text-base text-error" role="alert">
           {error}
         </p>
       )}

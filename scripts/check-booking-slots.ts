@@ -113,6 +113,37 @@ function main(): void {
   );
   expectEqual("a 2hr job's last start is 6pm", Math.max(...startsOf(wednesday, true)), 18 * 60);
 
+  // A 2-3pm booking on Wednesday: the page shows "Booked" only where a booking is in the way,
+  // and leaves out a start that's closed for another reason (too late to finish by close).
+  const { days: bookedDays } = buildAvailableDays(
+    [booking("2026-10-28T01:00:00Z", "2026-10-28T02:00:00Z")],
+    [],
+    now,
+    CONFIG,
+  );
+  const bookedWed = bookedDays.find((d) => d.dateKey === "2026-10-28");
+  /**
+   * One of Wednesday's starts.
+   * @param hour - NZ start hour.
+   * @param minute - Minutes past the hour.
+   * @returns The sub-slot, or undefined when the grid has no such start.
+   */
+  const startAt = (
+    hour: number,
+    minute: number,
+  ): BookableDay["timeWindows"][number]["subSlots"][number] | undefined =>
+    bookedWed?.timeWindows
+      .find((w) => w.startHour === hour)
+      ?.subSlots.find((s) => s.minute === minute);
+  expectEqual("2pm reads booked", startAt(14, 0)?.bookedShort, true);
+  expectEqual("1pm is free for a 1hr job", startAt(13, 0)?.bookedShort, false);
+  expectEqual("1pm reads booked for a 2hr job", startAt(13, 0)?.bookedLong, true);
+  expectEqual(
+    "6:15pm is closed for a 2hr job without reading booked",
+    [startAt(18, 15)?.availableLong, startAt(18, 15)?.bookedLong],
+    [false, false],
+  );
+
   // Show evening times unticked: starts from 6pm on are left out, not crossed out.
   const after6 = {
     fromHour: 18,
