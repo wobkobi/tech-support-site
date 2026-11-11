@@ -246,7 +246,7 @@ export function NotificationsView(): React.ReactElement {
   if (state === "unsupported") {
     return (
       <Card className="space-y-3">
-        <CardHeader title="Not supported here" className="mb-0" />
+        <CardHeader title="Not supported here" className="mb-3" />
         <p className="text-admin-muted">
           This browser can&apos;t receive push notifications. Booking and review emails still arrive
           as normal.
@@ -258,7 +258,7 @@ export function NotificationsView(): React.ReactElement {
   if (state === "needs-install") {
     return (
       <Card className="space-y-3">
-        <CardHeader title="Add this to your Home Screen first" className="mb-0" />
+        <CardHeader title="Add this to your Home Screen first" className="mb-3" />
         <p className="text-admin-muted">
           On iPhone, notifications only work once the admin is installed to the Home Screen. Safari
           tabs can&apos;t receive them.
@@ -280,7 +280,7 @@ export function NotificationsView(): React.ReactElement {
   if (state === "blocked") {
     return (
       <Card className="space-y-3">
-        <CardHeader title="Notifications are blocked" className="mb-0" />
+        <CardHeader title="Notifications are blocked" className="mb-3" />
         <p className="text-admin-muted">
           This device declined the prompt, and it can&apos;t be asked again from the page. On
           iPhone, turn it back on in Settings &gt; Notifications &gt; TTP Admin (or whatever you
@@ -293,7 +293,7 @@ export function NotificationsView(): React.ReactElement {
   return (
     <div className="space-y-6">
       <Card className="space-y-3">
-        <CardHeader title="This device" className="mb-0" />
+        <CardHeader title="This device" className="mb-3" />
         {state === "on" ? (
           <>
             <p className="text-admin-muted">Notifications are on for this device.</p>
@@ -320,7 +320,7 @@ export function NotificationsView(): React.ReactElement {
 
       {devices.length > 0 && (
         <Card className="space-y-3">
-          <CardHeader title="Registered devices" className="mb-0" />
+          <CardHeader title="Registered devices" className="mb-3" />
           <ul className="divide-y divide-admin-border">
             {devices.map((d) => (
               <li key={d.id} className="flex items-center justify-between gap-3 py-3">

@@ -138,7 +138,7 @@ export function TravelSection({
     <Card className="space-y-3">
       <CardHeader
         title="Travel"
-        className="mb-0 items-center"
+        className="mb-3 items-center"
         actions={
           (travelEntries.length > 0 || jobAddress.trim().length > 0) && (
             <SectionClearButton

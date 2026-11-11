@@ -118,7 +118,7 @@ export function TasksSection({
     <Card className="space-y-3">
       <CardHeader
         title="Tasks"
-        className="mb-0 items-center"
+        className="mb-3 items-center"
         actions={
           <div className="flex items-center gap-3">
             <button type="button" onClick={onManageTags} className={TEXT_ACTION_CLS}>

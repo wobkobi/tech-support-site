@@ -107,7 +107,7 @@ export function JobDetailsSection({
     <Card className="space-y-4">
       <CardHeader
         title="Time"
-        className="mb-0 items-center"
+        className="items-center"
         actions={
           hasEntry && (
             <SectionClearButton
