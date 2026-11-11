@@ -322,6 +322,21 @@ export function clampBillableMins(
   return ceilingMins != null ? Math.min(ceilingMins, floored) : floored;
 }
 
+/**
+ * A parsed task's decimal-hours qty as billed grid minutes, at least one increment. Stated
+ * durations round UP ("took 12 mins" never bills 10). The qty goes to whole minutes first:
+ * the model writes hours to 2 dp, so a stated 10 min arrives as 0.17h = 10.2 min, and
+ * rounding that up would bill 15. A 2 dp qty is never more than 0.3 min off.
+ * @param qty - Task quantity in decimal hours, as the model emitted it.
+ * @param explicit - Whether the operator stated this task's duration.
+ * @param incrementMins - Live billing increment.
+ * @returns Billed minutes, a multiple of the increment.
+ */
+export function snapTaskQtyMins(qty: number, explicit: boolean, incrementMins: number): number {
+  const steps = Math.round((qty || 0) * 60) / incrementMins;
+  return Math.max(incrementMins, (explicit ? Math.ceil(steps) : Math.round(steps)) * incrementMins);
+}
+
 // > Copy generators
 // Figures are passed in so text matches live values; `**…**` marks bold for the pricing page.
 

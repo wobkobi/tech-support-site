@@ -89,11 +89,14 @@ export function minsToHoursLabel(mins: number): string {
 
 /**
  * Composes the line-item description from device + action + optional details, shared by
- * AI-generated and operator-entered tasks.
+ * AI-generated and operator-entered tasks. The catch-all "Other" device never prints: the
+ * customer reads "Session preparation", not "Other session preparation". The tag itself
+ * stays on the task, so template matching and price history are unchanged.
  * @param device - Device tag (e.g. "Phone").
  * @param action - Action tag (e.g. "Setup").
  * @param details - Optional free-text qualifier appended after " - ".
- * @returns Composed string "Device action" / "Device action - details", or empty when device or action is missing.
+ * @returns Composed string "Device action" / "Device action - details" ("Action" alone for
+ * the "Other" device), or empty when device or action is missing.
  */
 export function composeDescription(
   device: string | null | undefined,
@@ -101,7 +104,11 @@ export function composeDescription(
   details?: string | null,
 ): string {
   if (!device || !action) return "";
-  const base = `${device} ${action.toLowerCase()}`;
+  const lowerAction = action.toLowerCase();
+  const base =
+    device.trim().toLowerCase() === "other"
+      ? lowerAction.charAt(0).toUpperCase() + lowerAction.slice(1)
+      : `${device} ${lowerAction}`;
   const trimmed = details?.trim();
   return trimmed ? `${base} - ${trimmed}` : base;
 }

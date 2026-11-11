@@ -10,7 +10,7 @@ import {
 } from "@/features/business/lib/business";
 import { estimateQuoteLines } from "@/features/business/lib/estimate-duration.server";
 import { isBusinessModifier, withJobModifiers } from "@/features/business/lib/job-modifiers";
-import { clampBillableMins } from "@/features/business/lib/pricing-policy";
+import { clampBillableMins, snapTaskQtyMins } from "@/features/business/lib/pricing-policy";
 import {
   buildParseJobContext,
   buildParseJobPrompt,
@@ -693,24 +693,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const incMins = settings.pricing.billingIncrementMins;
-    /**
-     * Model qty as grid minutes, at least one increment. Stated durations round UP
-     * ("took 12 mins" never bills 10); the epsilon stops 0.25h * 60 = 15.000000000000002
-     * ceiling to the next step.
-     * @param qty - Task quantity in decimal hours, as the model emitted it.
-     * @param explicit - Whether the operator stated this task's duration.
-     * @returns Billed minutes, a multiple of the billing increment.
-     */
-    const snapTaskMins = (qty: number, explicit: boolean): number => {
-      const steps = ((qty || 0) * 60) / incMins;
-      return Math.max(incMins, (explicit ? Math.ceil(steps - 1e-9) : Math.round(steps)) * incMins);
-    };
 
     // A quote states a total only through times or a whole-job figure ("about 2 hours"); a
     // durationMins no bigger than the lines' own stated times is just their sum.
     const explicitMins = (parsed.tasks ?? [])
       .filter((t) => t.isExplicit)
-      .reduce((s, t) => s + snapTaskMins(t.qty, true), 0);
+      .reduce((s, t) => s + snapTaskQtyMins(t.qty, true, incMins), 0);
     const statedTotal =
       hasSession || (typeof parsed.durationMins === "number" && parsed.durationMins > explicitMins);
 
@@ -727,7 +715,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
       parsed.tasks = parsed.tasks.map((t, i) => {
         const mins = t.isExplicit
-          ? snapTaskMins(t.qty, true)
+          ? snapTaskQtyMins(t.qty, true, incMins)
           : (estimate?.mins[i] ?? settings.pricing.shortTaskMins);
         return { ...t, minutes: mins, qty: mins / 60, isShort: false };
       });
@@ -756,7 +744,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const targetHours = Math.round((targetMins / 60) * 100) / 100;
       // Snap to whole minutes up front: a 2 dp qty can't hold a 5-min step (0.17h = 10.2 min).
       parsed.tasks = parsed.tasks.map((t) => {
-        const mins = snapTaskMins(t.qty, !!(t as { isExplicit?: boolean }).isExplicit);
+        const mins = snapTaskQtyMins(t.qty, !!(t as { isExplicit?: boolean }).isExplicit, incMins);
         return { ...t, minutes: mins, qty: mins / 60 };
       });
       const sumQty = parsed.tasks.reduce((s, t) => s + (t.qty || 0), 0);
