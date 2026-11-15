@@ -15,15 +15,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type React from "react";
+import { FaLock } from "react-icons/fa6";
 
 /** Path prefixes that hide the footer (admin has its own chrome). */
 const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 
-const SERVICE_LINKS: ReadonlyArray<{ label: string; href: string }> = [
+/** `soon` marks a page that isn't open yet: a small lock follows the label. */
+const SERVICE_LINKS: ReadonlyArray<{ label: string; href: string; soon?: boolean }> = [
   { label: "Computers & laptops", href: "/services#computers-laptops" },
   { label: "Wi-Fi & internet", href: "/services/wifi-internet" },
   { label: "Phones & tablets", href: "/services#phones-tablets" },
   { label: "Business IT support", href: "/business" },
+  { label: "Software", href: "/services/software", soon: true },
   { label: "All services", href: "/services" },
 ];
 
@@ -95,6 +98,12 @@ export function SiteFooter({ phone, phoneTel, email }: SiteFooterProps): React.R
                 <li key={l.href}>
                   <Link href={l.href} className={LINK}>
                     {l.label}
+                    {l.soon && (
+                      <>
+                        <FaLock aria-hidden className="ml-1.5 inline size-2.5 opacity-70" />
+                        <span className="sr-only"> (coming soon)</span>
+                      </>
+                    )}
                   </Link>
                 </li>
               ))}

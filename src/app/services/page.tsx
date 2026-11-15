@@ -23,6 +23,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
 import { Fragment } from "react";
+import { FaLock } from "react-icons/fa6";
 
 // Rate edits purge via the rate-config tag; the daily timer is a fallback (~100 ISR write units each).
 export const revalidate = 86400;
@@ -138,6 +139,21 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
             </RuledBlock>
           ))}
         </RuledGrid>
+        <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-1 border border-seasalt-200/80 bg-seasalt px-5 py-3">
+          <FaLock aria-hidden className="size-4 shrink-0 text-seasalt-700" />
+          <p className="min-w-0 flex-1">
+            <strong>Software</strong>{" "}
+            <span className="text-seasalt-700">
+              - coming soon. Apps I&apos;m building to make everyday tech easier.
+            </span>
+          </p>
+          <Link
+            href="/services/software"
+            className={cn(TEXT_LINK, "inline-flex min-h-11 items-center")}
+          >
+            Take a look<span className="sr-only"> at the software coming soon</span>
+          </Link>
+        </div>
         <Notice className="mt-8">
           Not sure which category your problem fits? That&apos;s fine. Just describe what&apos;s
           happening and I&apos;ll figure out the best approach.
