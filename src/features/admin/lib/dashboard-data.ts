@@ -1,10 +1,15 @@
 // src/features/admin/lib/dashboard-data.ts
-// Admin dashboard data: one batch of parallel Prisma queries plus the derived values.
+// Admin dashboard data: one batch of parallel Prisma and calendar reads plus the derived values.
 
 import "server-only";
 
 import type { BarGroup } from "@/features/admin/components/charts/BarChart";
-import { meetingTypeFromNotes } from "@/features/booking/lib/booking";
+import {
+  bookingJob,
+  calendarOnlyJobs,
+  mergeJobs,
+  type DashboardJob,
+} from "@/features/admin/lib/dashboard-jobs";
 import { balanceDue, formatNZD } from "@/features/business/lib/business";
 import { isInvoiceOverdue, NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import {
@@ -14,6 +19,11 @@ import {
 } from "@/features/business/lib/ledger-chart";
 import { bucketByNzMonth, nzMonthOf, nzMonthsEnding } from "@/features/business/lib/monthly";
 import { loadGstStatus } from "@/features/business/lib/tax/load";
+import {
+  getBookingCalendarId,
+  getCachedScheduleEvents,
+  type CalendarEvent,
+} from "@/features/calendar/lib/google-calendar";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -31,12 +41,6 @@ export interface ActivityEvent {
   detail: string;
   href: string;
 }
-
-/** A confirmed booking from now on, as the upcoming-bookings panel reads it. */
-export type UpcomingBooking = Pick<
-  Booking,
-  "id" | "name" | "email" | "phone" | "startAt" | "endAt" | "address" | "meetingType" | "notes"
->;
 
 /** A pending review, as the pending-reviews panel reads it. */
 export type PendingReviewRow = Pick<
@@ -68,23 +72,56 @@ export type RecentInvoice = Pick<
 /** A contact never sent a review link, offered as a suggestion in the review-link form. */
 export type ReviewLinkCandidate = Pick<Contact, "id" | "name" | "email" | "phone" | "address">;
 
+/** How far ahead the calendar is read for calendar-only jobs. */
+const JOB_LOOKAHEAD_DAYS = 90;
+
+/** Jobs shown across the Next job and Upcoming panels. */
+const UPCOMING_JOB_LIMIT = 6;
+
+/** Booking fields a dashboard job needs. */
+const JOB_BOOKING_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  startAt: true,
+  endAt: true,
+  address: true,
+  meetingType: true,
+  notes: true,
+} as const;
+
+/**
+ * Calendar events for the job lists, through the schedule page's 30s cache. Pass NZ-midnight
+ * bounds so the cache key holds all day. A calendar outage falls back to bookings alone.
+ * @param from - Start of the window.
+ * @param to - End of the window.
+ * @returns The events, or none when the calendar couldn't be read.
+ */
+async function loadJobEvents(from: Date, to: Date): Promise<CalendarEvent[]> {
+  try {
+    return await getCachedScheduleEvents(from.toISOString(), to.toISOString());
+  } catch (err) {
+    console.error("[dashboard] Couldn't read the calendar for upcoming jobs:", err);
+    return [];
+  }
+}
+
 /** Everything the dashboard page and its sections render. */
 export interface DashboardData {
-  /** NZ "YYYY-MM-DD" key for today, used by the today-filtered bookings link. */
+  /** NZ "YYYY-MM-DD" key for today, used by the Jobs today card's schedule link. */
   todayKey: string;
   pendingCount: number;
   approvedCount: number;
   confirmedCount: number;
   contactCount: number;
   unsyncedCount: number;
-  /** Today's confirmed bookings (NZ day). */
-  todaysBookings: Pick<Booking, "id" | "name" | "startAt" | "endAt">[];
-  /** The soonest upcoming booking, if any. */
-  nextJob: UpcomingBooking | undefined;
-  /** The upcoming bookings after {@link DashboardData.nextJob}. */
-  laterBookings: UpcomingBooking[];
-  /** Address for the next job's Maps button; null for remote jobs or no address. */
-  nextJobAddress: string | null;
+  /** Today's jobs (NZ day): confirmed bookings plus calendar-only jobs. */
+  todaysJobs: DashboardJob[];
+  /** The soonest job still to start, if any. */
+  nextJob: DashboardJob | undefined;
+  /** The upcoming jobs after {@link DashboardData.nextJob}. */
+  laterJobs: DashboardJob[];
 
   pendingReviews: PendingReviewRow[];
   pastConfirmedBookings: PastConfirmedBooking[];
@@ -158,6 +195,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     chartIncome,
     chartExpenses,
     gst,
+    jobEvents,
   ] = await Promise.all([
     prisma.review.count({ where: { status: "pending" } }),
     prisma.review.count({ where: { status: "approved" } }),
@@ -173,18 +211,8 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     prisma.booking.findMany({
       where: { status: "confirmed", startAt: { gte: now } },
       orderBy: { startAt: "asc" },
-      take: 6,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        startAt: true,
-        endAt: true,
-        address: true,
-        meetingType: true,
-        notes: true,
-      },
+      take: UPCOMING_JOB_LIMIT,
+      select: JOB_BOOKING_SELECT,
     }),
     prisma.review.findMany({
       where: { status: "pending" },
@@ -228,11 +256,11 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
       where: { reviewSentAt: { not: null } },
       select: { email: true, phone: true },
     }),
-    // Today's confirmed bookings - drives the "Bookings today" card.
+    // Today's confirmed bookings; calendar-only jobs join them for the "Jobs today" card.
     prisma.booking.findMany({
       where: { status: "confirmed", startAt: { gte: todayStart, lt: todayEnd } },
       orderBy: { startAt: "asc" },
-      select: { id: true, name: true, startAt: true, endAt: true },
+      select: JOB_BOOKING_SELECT,
     }),
     // This-month income, bounded at month end so a future-dated entry can't lift the card.
     prisma.incomeEntry.aggregate({
@@ -306,6 +334,8 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     }),
     // GST basis for the chart's income and expense series.
     loadGstStatus(),
+    // Jobs entered straight into the calendar have no Booking row, so read the calendar too.
+    loadJobEvents(todayStart, nzMidnightUtc(nzYear, nzMonth, nzDay + JOB_LOOKAHEAD_DAYS)),
   ]);
 
   // --- Retainers due this month ---
@@ -365,13 +395,33 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
   const overdueInvoices = outstandingInvoices.filter((inv) => isInvoiceOverdue(inv, now));
   const todayKey = nzDateKey(now);
 
-  // --- Next job ---
-  // Remote jobs get no Maps button; an unknown meeting type with an address still does.
-  const [nextJob, ...laterBookings] = upcomingBookings;
-  const nextJobAddress =
-    nextJob && (nextJob.meetingType ?? meetingTypeFromNotes(nextJob.notes)) !== "remote"
-      ? nextJob.address || null
-      : null;
+  // --- Jobs: confirmed bookings plus calendar-only jobs ---
+  // An event any Booking row holds (cancelled ones too) is that booking's, never a second job.
+  const bookingCalendarId = getBookingCalendarId();
+  const candidateEventIds = jobEvents
+    .filter((e) => e.calendarEmail === bookingCalendarId)
+    .map((e) => e.id);
+  const bookedEventIds = new Set(
+    candidateEventIds.length > 0
+      ? (
+          await prisma.booking.findMany({
+            where: { calendarEventId: { in: candidateEventIds } },
+            select: { calendarEventId: true },
+          })
+        ).flatMap((b) => (b.calendarEventId ? [b.calendarEventId] : []))
+      : [],
+  );
+  const calendarJobs = calendarOnlyJobs(jobEvents, bookingCalendarId, bookedEventIds);
+  const todaysJobs = mergeJobs(
+    [todaysBookings.map(bookingJob), calendarJobs],
+    todayStart,
+    todayEnd,
+  );
+  const [nextJob, ...laterJobs] = mergeJobs(
+    [upcomingBookings.map(bookingJob), calendarJobs],
+    now,
+    null,
+  ).slice(0, UPCOMING_JOB_LIMIT);
 
   // --- Unified activity feed: merge recent events across tables and sort by time ---
   const activity: ActivityEvent[] = [
@@ -429,10 +479,9 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     confirmedCount,
     contactCount,
     unsyncedCount,
-    todaysBookings,
+    todaysJobs,
     nextJob,
-    laterBookings,
-    nextJobAddress,
+    laterJobs,
 
     pendingReviews,
     pastConfirmedBookings,

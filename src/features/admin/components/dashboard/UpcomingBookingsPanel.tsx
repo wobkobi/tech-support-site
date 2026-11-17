@@ -1,47 +1,54 @@
 // src/features/admin/components/dashboard/UpcomingBookingsPanel.tsx
-// Dashboard panel for the confirmed bookings after the next job (NextJobPanel shows that
-// one), each a link to its record.
+// Dashboard panel for the jobs after the next one (NextJobPanel shows that one): bookings link
+// to their record, calendar-only jobs to their day on the schedule.
 
 import { DashboardPanel } from "@/features/admin/components/dashboard/DashboardPanel";
-import type { UpcomingBooking } from "@/features/admin/lib/dashboard-data";
+import type { DashboardJob } from "@/features/admin/lib/dashboard-jobs";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import Link from "next/link";
 import type React from "react";
 
 /**
- * Upcoming bookings panel: the bookings after the next job as links to their records.
+ * Second line of a row: a booking's contact details, or a calendar-only job's location.
+ * @param job - The job.
+ * @returns The line's text.
+ */
+function detailLine(job: DashboardJob): string {
+  if (job.source === "calendar") return job.address ?? "Added in Google Calendar";
+  return [job.email, job.phone].filter(Boolean).join(" · ");
+}
+
+/**
+ * Upcoming jobs panel: the jobs after the next one, each a link.
  * @param props - Component props.
- * @param props.laterBookings - The confirmed bookings after the next job.
+ * @param props.laterJobs - The jobs after the next job.
  * @returns The panel element.
  */
 export function UpcomingBookingsPanel({
-  laterBookings,
+  laterJobs,
 }: {
-  laterBookings: UpcomingBooking[];
+  laterJobs: DashboardJob[];
 }): React.ReactElement {
   return (
     <DashboardPanel
-      title="Upcoming bookings"
-      action={{ label: "View all", href: "/admin/bookings" }}
+      title="Upcoming jobs"
+      action={{ label: "View schedule", href: "/admin/schedule" }}
       empty="Nothing else booked yet."
     >
-      {laterBookings.length === 0 ? null : (
+      {laterJobs.length === 0 ? null : (
         <ul className="divide-y divide-admin-border">
-          {laterBookings.map((b) => (
-            <li key={b.id}>
+          {laterJobs.map((job) => (
+            <li key={`${job.source}:${job.key}`}>
               <Link
-                href={`/admin/bookings/${b.id}`}
+                href={job.href}
                 className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-admin-bg sm:px-5"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-admin-text">{b.name}</p>
-                  <p className="truncate text-sm text-admin-muted">
-                    {b.email}
-                    {b.phone ? ` · ${b.phone}` : ""}
-                  </p>
+                  <p className="truncate font-semibold text-admin-text">{job.name}</p>
+                  <p className="truncate text-sm text-admin-muted">{detailLine(job)}</p>
                 </div>
                 <p className="shrink-0 text-right text-sm font-medium text-admin-text-secondary">
-                  {formatDateTimeShort(b.startAt.toISOString())}
+                  {formatDateTimeShort(job.startAt.toISOString())}
                 </p>
               </Link>
             </li>

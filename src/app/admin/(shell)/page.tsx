@@ -106,9 +106,10 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       urgent: overdueInvoices.length > 0,
     },
     {
-      label: "Bookings today",
-      value: data.todaysBookings.length,
-      href: `/admin/bookings?from=${todayKey}&to=${todayKey}`,
+      // Calendar-only jobs count too, and only the schedule lists them.
+      label: "Jobs today",
+      value: data.todaysJobs.length,
+      href: `/admin/schedule?day=${todayKey}`,
       urgent: false,
     },
     {
@@ -147,25 +148,21 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     },
   ];
 
-  const todayCount = data.todaysBookings.length;
+  const todayCount = data.todaysJobs.length;
   /**
    * The next job panel, rendered once for phones and once for desktop.
    * @param className - Classes that hide the copy at the other size.
    * @returns The panel element.
    */
   const nextJobPanel = (className: string): React.ReactElement => (
-    <NextJobPanel
-      nextJob={data.nextJob}
-      nextJobAddress={data.nextJobAddress}
-      className={className}
-    />
+    <NextJobPanel nextJob={data.nextJob} className={className} />
   );
 
   return (
     <>
       <PageHeader
         title="Dashboard"
-        description={`${TODAY_FORMAT.format(new Date())} · ${todayCount} booking${todayCount === 1 ? "" : "s"} today`}
+        description={`${TODAY_FORMAT.format(new Date())} · ${todayCount} job${todayCount === 1 ? "" : "s"} today`}
         actions={
           // Phones reach these through the bottom bar's + and the tiles below.
           <div className="flex gap-2 max-lg:hidden">
@@ -205,14 +202,15 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       {/* What needs doing first; history below. */}
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-8">
-          <UpcomingBookingsPanel laterBookings={data.laterBookings} />
+          <UpcomingBookingsPanel laterJobs={data.laterJobs} />
           <BarChart
             title="Income vs expenses"
             description="Last 12 months"
             series={incomeExpenseSeries(data.gstRegistered)}
             groups={data.incomeExpenseGroups}
             groupHeading="Month"
-            differenceLabel="Profit"
+            // Not "Profit": the Tax page's profit depreciates assets and claims km, not fuel.
+            differenceLabel="Income less expenses"
             emptyText="No income or expenses recorded in the last 12 months."
           />
           <CompleteEventsPanel
