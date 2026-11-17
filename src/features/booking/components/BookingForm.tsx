@@ -42,9 +42,11 @@ import {
   buildDurationOptions,
   isSlotAvailable,
   removeBookingDraft,
+  shortNoticeCancelNote,
   subSlotLabel,
   validateBookingFields,
   verifyBookingAddress,
+  type BookingCancelTerms,
   type RestoredBookingDraft,
 } from "@/features/booking/lib/booking-form";
 import { PromoCodeField } from "@/features/business/components/PromoCodeField";
@@ -95,6 +97,10 @@ export interface BookingFormProps {
   phoneTel?: string;
   /** Whether a code promo is active right now; false hides the code box. Defaults to true. */
   showPromoCode?: boolean;
+  /** Live cancellation figures; when given, a time inside the free-cancel window gets a note. */
+  cancelTerms?: BookingCancelTerms;
+  /** Edit mode with the online move limit reached: the time shows but can't change. */
+  timeLocked?: boolean;
 }
 
 /**
@@ -112,6 +118,8 @@ export interface BookingFormProps {
  * @param props.phone - Display phone number for the call-or-text fallbacks.
  * @param props.phoneTel - tel: URI for the call-or-text fallbacks.
  * @param props.showPromoCode - Whether to offer the promo code box.
+ * @param props.cancelTerms - Live cancellation figures for the short-notice note.
+ * @param props.timeLocked - Shows the booked time read-only (move limit reached).
  * @returns Booking form element
  */
 export default function BookingForm({
@@ -127,6 +135,8 @@ export default function BookingForm({
   phone: ownerPhone,
   phoneTel: ownerPhoneTel,
   showPromoCode = true,
+  cancelTerms,
+  timeLocked = false,
 }: BookingFormProps): React.ReactElement {
   const router = useRouter();
   const isEditMode = Boolean(cancelToken);
@@ -221,6 +231,8 @@ export default function BookingForm({
   // Honeypot value - see the hidden input in the form markup below.
   const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Fixed at mount: the short-notice note only needs hour-level accuracy.
+  const [openedAt] = useState(() => new Date());
 
   /**
    * The chosen slot's start, using the NZ offset for that date (DST-correct).
@@ -622,6 +634,10 @@ export default function BookingForm({
   const timeLabel = activeWindow ? subSlotLabel(activeWindow.startHour, selectedMinute) : null;
   const phoneLink =
     ownerPhone && ownerPhoneTel ? <PhoneLink phone={ownerPhone} phoneTel={ownerPhoneTel} /> : null;
+  const cancelNote =
+    cancelTerms && !timeLocked
+      ? shortNoticeCancelNote(slotStartInstant(), openedAt, meetingType, cancelTerms, !isEditMode)
+      : null;
 
   return (
     <form
@@ -654,23 +670,45 @@ export default function BookingForm({
         />
       </div>
       {/* ── Section 1: Scheduling ── */}
-      <BookingSchedulePicker
-        availableDays={availableDays}
-        durations={durations}
-        duration={duration}
-        onDurationChange={handleDurationChange}
-        selectedDay={selectedDay}
-        showEvenings={showEvenings}
-        onShowEveningsChange={setShowEvenings}
-        selectedTime={selectedTime}
-        selectedMinute={selectedMinute}
-        activeWindow={activeWindow}
-        timeLabel={timeLabel}
-        phoneLink={phoneLink}
-        onDaySelect={handleDaySelect}
-        onTimeSelect={handleTimeSelect}
-        onMinuteSelect={setSelectedMinute}
-      />
+      {timeLocked ? (
+        // Only the time is locked: details, address and notes below still save.
+        <section className="flex flex-col gap-2">
+          <h2 className="text-xl font-bold text-rich-black sm:text-2xl">Your appointment</h2>
+          <p className="text-base font-semibold text-rich-black sm:text-lg">
+            {selectedDay?.fullLabel}
+            {timeLabel ? `, ${timeLabel}` : ""}
+          </p>
+          <p className="border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black/80">
+            This booking has already been moved the most times allowed online, so the time
+            can&apos;t be changed here. You can still update your details below. To move it, call or
+            text me{phoneLink ? <> on {phoneLink}</> : ""}.
+          </p>
+        </section>
+      ) : (
+        <BookingSchedulePicker
+          availableDays={availableDays}
+          durations={durations}
+          duration={duration}
+          onDurationChange={handleDurationChange}
+          selectedDay={selectedDay}
+          showEvenings={showEvenings}
+          onShowEveningsChange={setShowEvenings}
+          selectedTime={selectedTime}
+          selectedMinute={selectedMinute}
+          activeWindow={activeWindow}
+          timeLabel={timeLabel}
+          phoneLink={phoneLink}
+          onDaySelect={handleDaySelect}
+          onTimeSelect={handleTimeSelect}
+          onMinuteSelect={setSelectedMinute}
+        />
+      )}
+
+      {cancelNote && (
+        <p className="border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black">
+          {cancelNote}
+        </p>
+      )}
 
       {/* Divider */}
       <hr className="border-seasalt-200/80" />

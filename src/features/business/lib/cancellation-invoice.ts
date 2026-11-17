@@ -56,6 +56,7 @@ export async function createDraftCancellationInvoice(
       reason,
       meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
       policy: CANCELLATION,
+      bookedAt: booking.createdAt,
     },
   );
 

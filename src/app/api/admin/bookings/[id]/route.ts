@@ -12,6 +12,7 @@ import {
   bookingEventDetails,
   bookingEventSummary,
 } from "@/features/booking/lib/booking-event.server";
+import { confirmationCoversReminder } from "@/features/booking/lib/booking-reminder";
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { loadOwnerBookingSummary } from "@/features/booking/lib/owner-booking-summary.server";
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
@@ -36,7 +37,7 @@ import {
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email-booking";
-import { cancelHeldBookingEmails } from "@/features/reviews/lib/email-core";
+import { cancelHeldBookingEmails, outreachHoldUntil } from "@/features/reviews/lib/email-core";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -162,7 +163,7 @@ export async function PATCH(
   const isMoneyStateChange =
     (body.status !== undefined && body.status !== "completed") || body.markNoShow === true;
   const isTimeChange = body.startAt !== undefined || body.endAt !== undefined;
-  const { scheduling } = await getSettings();
+  const { scheduling, comms, pricing } = await getSettings();
   if (
     (isMoneyStateChange || isTimeChange) &&
     isPastEditWindow(booking.endAt.getTime(), now.getTime(), scheduling.pastEditLockHours)
@@ -255,9 +256,19 @@ export async function PATCH(
     if (!booking.activeSlotKey?.startsWith("released:")) {
       data.activeSlotKey = startAt.toISOString();
     }
-    // A moved start needs its 24h reminder again; a finish-only change doesn't.
+    // A moved start needs its 24h reminder again; a finish-only change doesn't. A notified
+    // move whose notice lands too close to the start for a reminder to add anything (judged at
+    // the quiet-hours release, as the notice is held) counts as the reminder.
     if (startAt.getTime() !== booking.startAt.getTime()) {
-      data.emailReminderSentAt = null;
+      const noticeLands = notify ? ((await outreachHoldUntil(now)) ?? now) : null;
+      data.emailReminderSentAt =
+        noticeLands &&
+        confirmationCoversReminder(startAt, noticeLands, {
+          leadHours: comms.reminderLeadHours,
+          freeNoticeHours: pricing.cancellation.freeNoticeHours,
+        })
+          ? now
+          : null;
     }
 
     // The invoice re-checks a weekday/time promo at the job's start, so the booking (and its
@@ -350,11 +361,12 @@ export async function PATCH(
     // Operator cancels never charge; on-behalf follows customer fee rules.
     data.cancelledBy = onBehalf ? "customer" : "operator";
     const { CANCELLATION } = await getPolicy();
-    // In-person and remote have their own windows and fees.
+    // In-person and remote have their own windows and fees, and on-behalf gets the grace period.
     const charge = assessCancellation(booking.startAt, now, {
       reason: "late-cancellation",
       meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
       policy: CANCELLATION,
+      bookedAt: booking.createdAt,
     });
     data.lateCancellation = onBehalf ? charge.fee > 0 : false;
     data.travelChargeApplies = onBehalf ? charge.travelApplies : false;

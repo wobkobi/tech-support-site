@@ -308,6 +308,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
         phone={settings.identity.phone}
         phoneTel={settings.identity.phoneTel}
         showPromoCode={showPromoCode}
+        cancelTerms={settings.pricing.cancellation}
       />
     </div>
   );

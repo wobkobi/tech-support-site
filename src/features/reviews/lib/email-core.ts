@@ -287,31 +287,47 @@ export async function sendBatch(
 }
 
 /**
+ * When {@link sendOutreach} would hold an email triggered now until, so copy that names the
+ * day ("today", "tomorrow") can be judged at the moment it lands.
+ * @param now - When the send is triggered (defaults to the current instant).
+ * @returns The quiet-hours release time, or null when it would go straight away.
+ */
+export async function outreachHoldUntil(now: Date = new Date()): Promise<Date | null> {
+  try {
+    const { comms } = await getSettings();
+    return nextSendTime(
+      {
+        enabled: comms.quietHoursEnabled,
+        startHour: comms.quietHoursStart,
+        endHour: comms.quietHoursEnd,
+      },
+      now,
+    );
+  } catch (err) {
+    // Settings unreadable - send now; early beats missing.
+    console.warn("[email] Couldn't read quiet hours, sending immediately:", err);
+    return null;
+  }
+}
+
+/**
  * Sends outreach. Inside quiet hours Resend holds it via `scheduledAt`; the call still
  * resolves now, so the caller's "sent" stamp stops crons sending twice.
  * @param payload - The Resend send payload.
  * @param bookingId - Booking a later cancel/reschedule would invalidate; recorded so
  *   {@link cancelHeldBookingEmails} can recall it.
  * @param options - Optional request options (idempotency key).
+ * @param knownHold - A hold already worked out by {@link outreachHoldUntil}, so the copy and the
+ *   send agree; omit to work it out here.
  * @returns Resend's send response.
  */
 export async function sendOutreach(
   payload: MailPayload,
   bookingId?: string,
   options?: MailOptions,
+  knownHold?: Date | null,
 ): Promise<MailResult> {
-  let holdUntil: Date | null = null;
-  try {
-    const { comms } = await getSettings();
-    holdUntil = nextSendTime({
-      enabled: comms.quietHoursEnabled,
-      startHour: comms.quietHoursStart,
-      endHour: comms.quietHoursEnd,
-    });
-  } catch (err) {
-    // Settings unreadable - send now; early beats missing.
-    console.warn("[email] Couldn't read quiet hours, sending immediately:", err);
-  }
+  const holdUntil = knownHold === undefined ? await outreachHoldUntil() : knownHold;
   if (!holdUntil) return sendNow(payload, options);
   console.log(`[email] Quiet hours - holding until ${holdUntil.toISOString()}`);
   const result = await getResend().emails.send(

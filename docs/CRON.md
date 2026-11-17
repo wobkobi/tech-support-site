@@ -51,8 +51,8 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Calendar cache refresh  | `/api/cron/refresh-calendar-cache`  | GET    | every 30 minutes | Fetch Google Calendar events into the DB cache                                                                                                                                                                                           |
 | Reconcile booking times | `/api/cron/reconcile-booking-times` | GET    | every 30 minutes | Pull corrected times back from Calendar, flag deleted events, retry booking-event deletes Google refused                                                                                                                                 |
 | Booking reminders       | `/api/cron/send-booking-reminders`  | GET    | every 30 minutes | Email a 24h-out reminder for confirmed bookings                                                                                                                                                                                          |
-| Invoice reminders       | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each)                                                                                                                                                                                          |
-| Review asks             | `/api/cron/send-review-asks`        | GET    | daily 10:00 NZ   | Email the Google review ask N days after an invoice is sent                                                                                                                                                                              |
+| Invoice reminders       | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each); a Cashbook payment (exact, or same amount and a shared name) holds the nudge and pushes you to mark it paid                                                                             |
+| Review asks             | `/api/cron/send-review-asks`        | GET    | daily 10:00 NZ   | Email the one Google review ask per person N days after the invoice is paid; skips jobs where nothing could be fixed                                                                                                                     |
 | Sheets sync             | `/api/cron/sync-sheets`             | GET    | hourly           | Reconcile Cashbook/Expenses sheets with MongoDB                                                                                                                                                                                          |
 | Contacts sync           | `/api/cron/sync-contacts`           | GET    | every 3 hours    | Two-way incremental Google Contacts sync                                                                                                                                                                                                 |
 | Subscription reminders  | `/api/cron/record-subscriptions`    | GET    | daily 08:00 NZ   | Push reminder for due subscriptions; records nothing (Record button on Expenses does)                                                                                                                                                    |
@@ -89,7 +89,9 @@ across DST changes.
   and the holidays refresh upserts, then prunes only once every year has fetched.
 - Booking reminders send inside a window from `CANCELLATION.freeNoticeHours + 1` up to
   `comms.reminderLeadHours` before the start, so the reminder always lands while the customer can
-  still cancel free.
+  still cancel free. A booking only gets one once half the lead time has passed since it was made,
+  so a booking made close to the start relies on its confirmation instead. The email's "today" or
+  "tomorrow" is judged on the NZ date it lands, after any quiet-hours hold.
 - Tunable values (retention days, reminder lead hours, notification toggles) are read live from
   settings on every run; the reminder job no-ops cleanly when its toggle is off.
 - Review asks go out `reviewAskDelayDays` after the invoice is emailed (or after it is marked paid,

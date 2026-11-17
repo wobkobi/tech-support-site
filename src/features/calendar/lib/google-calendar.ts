@@ -149,15 +149,19 @@ export async function createBookingEvent(params: {
 }
 
 /**
- * Moves a booking event to a new time window. Patches start/end only so a
- * nudged finish time does not cancel and re-issue the invite.
+ * Moves a booking event to a new time window in place, so Google sends the attendee an
+ * "updated" notice instead of a cancellation plus a new invite. Details ride along when given.
  * @param params - Patch parameters.
  * @param params.eventId - Calendar event ID to move (Booking.calendarEventId).
  * @param params.startAt - New start time (UTC).
  * @param params.endAt - New end time (UTC).
  * @param params.timeZone - Display timezone for the invite.
  * @param params.notifyAttendees - Whether Google emails the attendee about the move.
- * @returns Promise that resolves when patched.
+ * @param params.summary - New title; omit to leave it.
+ * @param params.description - New customer-facing invite text; omit to leave it.
+ * @param params.location - New location; null clears it (remote session), omit to leave it.
+ * @returns Whether the event turned out to be cancelled in Calendar (a patch can still succeed
+ *   on a deleted event that Google keeps as a cancelled stub).
  */
 export async function patchBookingEvent(params: {
   eventId: string;
@@ -165,18 +169,26 @@ export async function patchBookingEvent(params: {
   endAt: Date;
   timeZone: string;
   notifyAttendees: boolean;
-}): Promise<void> {
+  summary?: string;
+  description?: string;
+  location?: string | null;
+}): Promise<{ cancelled: boolean }> {
   const calendar = getCalendarClient();
 
-  await calendar.events.patch({
+  const response = await calendar.events.patch({
     calendarId: getBookingCalendarId(),
     eventId: params.eventId,
     requestBody: {
       start: { dateTime: params.startAt.toISOString(), timeZone: params.timeZone },
       end: { dateTime: params.endAt.toISOString(), timeZone: params.timeZone },
+      ...(params.summary !== undefined ? { summary: params.summary } : {}),
+      ...(params.description !== undefined ? { description: params.description } : {}),
+      // A patch skips a missing field, so an empty string is what clears it.
+      ...(params.location !== undefined ? { location: params.location ?? "" } : {}),
     },
     sendUpdates: params.notifyAttendees ? "all" : "none",
   });
+  return { cancelled: response.data.status === "cancelled" };
 }
 
 /**
