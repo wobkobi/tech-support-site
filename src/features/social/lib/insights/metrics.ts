@@ -37,7 +37,7 @@ export const FIGURE_LABEL: Record<FigureKey, string> = {
   comments: "Comments",
   shares: "Shares",
   saves: "Saves",
-  clicks: "Link clicks",
+  clicks: "Clicks",
   engagements: "Engagements",
 };
 
@@ -791,6 +791,37 @@ export function dayLabel(key: string): string {
   const [y, m, d] = dateKeyParts(key);
   const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   return `${WEEKDAY_SHORT[weekday]} ${d} ${MONTHS[m - 1]}`;
+}
+
+/**
+ * The last day every app has reported a figure for, so a chart can end there instead of showing
+ * days not reported yet as 0. The apps run behind (Meta about a day, Google about 3), and the
+ * chart can't draw a gap. Apps with no figure in the range at all don't hold it back.
+ * @param days - Account days.
+ * @param days.platform - Its app.
+ * @param days.day - Its key.
+ * @param days.value - The figure, or null when the app didn't give it.
+ * @param from - First day.
+ * @param to - Last day.
+ * @param platforms - The apps on show.
+ * @returns A day key from `from` to `to`, or null when no app has a figure in the range.
+ */
+export function reportedThrough(
+  days: readonly { platform: SocialPlatformKey; day: string; value: number | null }[],
+  from: string,
+  to: string,
+  platforms: readonly SocialPlatformKey[],
+): string | null {
+  let through: string | null = null;
+  for (const p of platforms) {
+    let last: string | null = null;
+    for (const d of days) {
+      if (d.platform !== p || d.value === null || d.day < from || d.day > to) continue;
+      if (last === null || d.day > last) last = d.day;
+    }
+    if (last !== null && (through === null || last < through)) through = last;
+  }
+  return through;
 }
 
 /**

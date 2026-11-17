@@ -15,6 +15,7 @@ import {
   clampCaption,
   postingFields,
 } from "@/features/social/lib/postings-core";
+import { loadPromoStandings } from "@/features/social/lib/promo-retire.server";
 import { scheduleProblems } from "@/features/social/lib/publish";
 import {
   FILL_LEAD_MS,
@@ -179,7 +180,20 @@ async function fillQueue(
     where: { id: { in: queue.itemIds }, ...IS_CONTENT },
   });
   const byId = new Map(items.map((i) => [i.id, i]));
-  const candidates = await loadCandidates(items);
+  // An item tied to a promo only fills slots inside the promo's dates, and none while it's off
+  // or over; the cron's promo sweep retires items whose promo has ended.
+  const promos = await loadPromoStandings(
+    items.flatMap((i) => (i.promoId ? [i.promoId] : [])),
+    now,
+  );
+  const candidates = (await loadCandidates(items)).flatMap((c): QueueCandidate[] => {
+    const promoId = byId.get(c.id)?.promoId;
+    if (!promoId) return [c];
+    const standing = promos.get(promoId)?.standing;
+    return standing?.state === "live"
+      ? [{ ...c, promoWindow: { from: standing.from, to: standing.to } }]
+      : [];
+  });
 
   for (const at of free) {
     if (Date.now() > deadline) {

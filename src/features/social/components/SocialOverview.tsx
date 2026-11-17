@@ -24,7 +24,7 @@ import { shortDay, timeOfDay, type ColourContext } from "@/features/social/lib/c
 import { checklistOf, type ChecklistKey } from "@/features/social/lib/checklist";
 import type { InboxSummary } from "@/features/social/lib/inbox/inbox-data.server";
 import { inboxHref, readInboxQuery } from "@/features/social/lib/inbox/map";
-import { dayLabel } from "@/features/social/lib/insights/metrics";
+import { dayLabel, GOOGLE_LAG_DAYS } from "@/features/social/lib/insights/metrics";
 import {
   calendarHref,
   postHref,
@@ -230,6 +230,8 @@ export function SocialOverview({
         description={
           <>
             {dayLabel(data.views.from)} to {dayLabel(data.views.to)}.{" "}
+            {data.views.series.includes("google") &&
+              `Google figures run about ${GOOGLE_LAG_DAYS} days behind, so the week ends when every app's figures are in. `}
             <Link href={SOCIAL_ANALYTICS_PATH} className="font-semibold text-russian-violet">
               See Analytics
             </Link>

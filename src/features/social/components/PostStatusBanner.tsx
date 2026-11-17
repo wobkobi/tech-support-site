@@ -19,7 +19,8 @@ import type React from "react";
  * @param props - Component props.
  * @param props.post - The post.
  * @param props.busy - Which action is running.
- * @param props.onCancelSchedule - Cancels a schedule.
+ * @param props.onCancelSchedule - Cancels a schedule, or turns a failed post no app has back
+ *   into a draft.
  * @param props.onRetry - Re-posts to the failed platforms.
  * @param props.canRetry - Whether a partly posted or failed post has a platform to retry.
  * @param props.onTakeDown - Asks to take the post down.
@@ -70,6 +71,11 @@ export function PostStatusBanner({
   }
 
   const pill = POST_STATUS_PILL[post.status];
+  // A failed post no app has (missed, or blocked at its time) can go back to a draft; the
+  // server checks the same before it does.
+  const canReopen =
+    post.status === "failed" &&
+    post.targets.every((t) => t.status !== "posted" && t.status !== "removed");
   const live = post.targets.filter((t) => t.enabled && t.status !== "skipped");
   const waiting = live
     .filter((t) => t.status === "pending")
@@ -122,6 +128,18 @@ export function PostStatusBanner({
               onClick={onRetry}
             >
               Retry failed
+            </AdminButton>
+          )}
+          {canReopen && (
+            <AdminButton
+              size="sm"
+              variant="secondary"
+              busy={busy === "unschedule"}
+              disabled={busy !== null}
+              onClick={onCancelSchedule}
+              title="Make it an editable draft again, to change it or pick a new time."
+            >
+              Back to draft
             </AdminButton>
           )}
           {canTakeDown && post.status !== "posting" && (

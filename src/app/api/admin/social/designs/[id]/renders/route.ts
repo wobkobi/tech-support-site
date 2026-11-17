@@ -2,9 +2,11 @@
 // Stores one size's exported picture, sent one size at a time and kept exactly as drawn.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { placeholderProblem } from "@/features/social-design/lib/bound";
 import { parseDesignDoc } from "@/features/social-design/lib/doc";
 import { FORMATS, isFormatKey } from "@/features/social-design/lib/formats";
 import { designGoneOut, GONE_OUT_ERROR } from "@/features/social-design/lib/gone-out.server";
+import { loadBoundValues } from "@/features/social-design/lib/load-bound";
 import {
   deleteUnusedMedia,
   writeKeepingUpdatedAt,
@@ -32,7 +34,8 @@ interface Ctx {
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the design id.
- * @returns JSON `{ render }`, 503 when uploads are off.
+ * @returns JSON `{ render }`, 503 when uploads are off, 409 when the size would show a bracketed
+ *   reminder like "[No promo running]".
  */
 export async function POST(request: NextRequest, { params }: Ctx): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
@@ -74,6 +77,8 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   if ("error" in parsed || !parsed.doc.formats.includes(format)) {
     return errorResponse("This design doesn't have that size any more.", 409);
   }
+  const placeholder = placeholderProblem(parsed.doc, await loadBoundValues(), [format]);
+  if (placeholder) return errorResponse(placeholder, 409);
   // A size that went out keeps the picture it went out with; a new size can still be drawn.
   if (design.renders.some((r) => r.format === format) && (await designGoneOut(design))) {
     return errorResponse(GONE_OUT_ERROR, 409);

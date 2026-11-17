@@ -15,7 +15,7 @@ import {
   type DesignDraft,
 } from "@/features/social-design/lib/ai-draft";
 import { appCrops } from "@/features/social-design/lib/app-crops";
-import { boundText } from "@/features/social-design/lib/bound";
+import { boundText, placeholderProblem, usesPromo } from "@/features/social-design/lib/bound";
 import { blankDoc } from "@/features/social-design/lib/design-row";
 import {
   docHash,
@@ -1150,6 +1150,47 @@ function checkPictures(): void {
   expect("paid ads leave contact details off", !!contact && leftOffPaidAd(contact, true));
   expect("ordinary posts keep contact details", !!contact && !leftOffPaidAd(contact, false));
   expect("paid ads keep the headline", !!headline && !leftOffPaidAd(headline, true));
+
+  // Bracketed reminders block storing and downloading.
+  const noPromo = { ...NO_BOUND, promoOffer: null, promoEnds: null, promoSummary: null };
+  expect("the promo template draws promo words", usesPromo(doc));
+  expect("a blank design doesn't", !usesPromo(blankDoc()));
+  expect("live values: nothing blocks", placeholderProblem(doc, NO_BOUND) === null);
+  expect(
+    "no promo running: blocked, naming the reminder",
+    placeholderProblem(doc, noPromo)?.includes("[No promo running]") === true,
+    placeholderProblem(doc, noPromo) ?? undefined,
+  );
+  const promoLayer = doc.layers.find((l) => l.type === "promo")!;
+  const hidden: DesignDoc = {
+    ...doc,
+    layouts: Object.fromEntries(
+      Object.entries(doc.layouts).map(([f, layout]) => [
+        f,
+        { ...layout, [promoLayer.id]: { ...layout![promoLayer.id]!, hidden: true } },
+      ]),
+    ),
+  };
+  expect(
+    "no promo running, promo words hidden on every size: not blocked",
+    placeholderProblem(hidden, noPromo) === null,
+    placeholderProblem(hidden, noPromo) ?? undefined,
+  );
+  expect(
+    "no phone set: blocked, naming the reminder",
+    placeholderProblem(doc, { ...NO_BOUND, phone: null })?.includes(
+      "[Add your phone in Settings]",
+    ) === true,
+    placeholderProblem(doc, { ...NO_BOUND, phone: null }) ?? undefined,
+  );
+  expect(
+    "no phone set on a paid ad: contact details are left off, so not blocked",
+    placeholderProblem({ ...doc, paidAd: true }, { ...NO_BOUND, phone: null }) === null,
+  );
+  expect(
+    "only the sizes asked about are checked",
+    placeholderProblem(blankDoc(), noPromo, ["feed-4x5"]) === null,
+  );
 
   expect(
     "promo description is its headline as a sentence",

@@ -5,6 +5,12 @@
 // Run with: npm test -- social-queue
 
 import {
+  promoCovers,
+  promoStanding,
+  retiredLastDay,
+  type PromoForStanding,
+} from "@/features/social/lib/promo-standing";
+import {
   canFill,
   describeSlots,
   isQueueSlot,
@@ -199,6 +205,18 @@ function checkPicking(): void {
   const noGap = { ...rules, minGapDays: 0 };
   expect("gap 0: posted yesterday is fine", canFill(cand("a", { times: [ms - DAY] }), noGap, at));
   expect("gap 0: never two at once", !canFill(cand("a", { times: [ms] }), noGap, at));
+  expect(
+    "promo item: a slot inside the promo's dates is fine",
+    canFill(cand("a", { promoWindow: { from: ms - DAY, to: ms + DAY } }), rules, at),
+  );
+  expect(
+    "promo item: a slot at or after the promo's end is skipped",
+    !canFill(cand("a", { promoWindow: { from: ms - DAY, to: ms } }), rules, at),
+  );
+  expect(
+    "promo item: a slot before the promo starts is skipped",
+    !canFill(cand("a", { promoWindow: { from: ms + 1, to: ms + DAY } }), rules, at),
+  );
   expect(
     "recycling off and posted: no more",
     !canFill(cand("a", { recycle: false, times: [ms - 60 * DAY] }), rules, at),
@@ -420,6 +438,57 @@ function checkWords(): void {
   );
 }
 
+/** Where a promo stands for the posts tied to it, and the last day a retired item gets. */
+function checkPromoStanding(): void {
+  console.log("\nPromo standing");
+  const now = new Date("2026-11-17T00:00:00Z");
+  const promo: PromoForStanding = {
+    startAt: new Date("2026-11-01T11:00:00Z"),
+    // Midnight NZ (UTC+13) at the start of 1 Dec, so its last day is 30 Nov.
+    endAt: new Date("2026-11-30T11:00:00Z"),
+    isActive: true,
+    kind: "automatic",
+  };
+  const live = promoStanding(promo, false, now);
+  expectEqual("running: live with its dates", live, {
+    state: "live",
+    from: promo.startAt.getTime(),
+    to: promo.endAt.getTime(),
+  });
+  expect("covers a time inside", promoCovers(live, new Date("2026-11-20T00:00:00Z")));
+  expect("not its end instant", !promoCovers(live, promo.endAt));
+  expect("not before it starts", !promoCovers(live, new Date("2026-10-31T00:00:00Z")));
+  expectEqual("switched off: off", promoStanding({ ...promo, isActive: false }, false, now), {
+    state: "off",
+  });
+  expectEqual("used up: off", promoStanding(promo, true, now), { state: "off" });
+  expectEqual("a code promo: off", promoStanding({ ...promo, kind: "code" }, false, now), {
+    state: "off",
+  });
+  const after = new Date("2026-12-02T00:00:00Z");
+  expectEqual("past its end: ended", promoStanding(promo, false, after), {
+    state: "ended",
+    endAt: promo.endAt,
+  });
+  expectEqual(
+    "switched off and past its end: still ended",
+    promoStanding({ ...promo, isActive: false }, false, after).state,
+    "ended",
+  );
+  expectEqual("deleted: ended", promoStanding(null, false, now), { state: "ended", endAt: null });
+  expect("off covers nothing", !promoCovers({ state: "off" }, now));
+  expectEqual(
+    "retired: last day is the promo's last NZ day",
+    retiredLastDay(promo.endAt, after).toISOString(),
+    "2026-11-30T00:00:00.000Z",
+  );
+  expectEqual(
+    "retired after a delete: the day before now",
+    retiredLastDay(null, new Date("2026-11-17T03:00:00Z")).toISOString(),
+    "2026-11-16T00:00:00.000Z",
+  );
+}
+
 /** Runs every check. */
 function main(): void {
   checkLabels();
@@ -428,6 +497,7 @@ function main(): void {
   checkUpcoming();
   checkParse();
   checkWords();
+  checkPromoStanding();
   finish();
 }
 

@@ -6,6 +6,7 @@
 import { callApi } from "@/features/mailing/lib/api-client";
 import { usePictureExporter } from "@/features/social-design/components/canvas/export";
 import { exoFamily, loadExo } from "@/features/social-design/components/canvas/fonts";
+import { placeholderProblem } from "@/features/social-design/lib/bound";
 import type { RenderRow } from "@/features/social-design/lib/design-row";
 import { docHash, type BoundValues, type DesignDoc } from "@/features/social-design/lib/doc";
 import type { FormatKey } from "@/features/social-design/lib/formats";
@@ -41,6 +42,8 @@ export function useFormatRender(bound: BoundValues): {
 
   const render = useCallback(
     async (designId: string, doc: DesignDoc, format: FormatKey): Promise<RenderRow> => {
+      const placeholder = placeholderProblem(doc, bound, [format]);
+      if (placeholder) throw new Error(placeholder);
       const blob = await exportPicture({ doc, format, scale: 1, type: "image/jpeg" });
       const form = new FormData();
       form.append("format", format);

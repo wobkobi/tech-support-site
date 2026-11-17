@@ -408,6 +408,10 @@ export function DesignEditor({
    * opens it in the composer.
    */
   async function putInPost(): Promise<void> {
+    if (pictures.blocked) {
+      toast(pictures.blocked, { tone: "error" });
+      return;
+    }
     setUsing(true);
     try {
       if (!(await pictures.update())) {
@@ -803,8 +807,10 @@ export function DesignEditor({
         >
           {pictures.progress
             ? `Drawing ${FORMATS[pictures.progress.format].label} (${pictures.progress.step} of ${pictures.progress.total})...`
-            : "Pictures are out of date."}
-          {canUpload && (
+            : pictures.blocked
+              ? `Pictures are out of date, and can't be updated yet. ${pictures.blocked}`
+              : "Pictures are out of date."}
+          {canUpload && !pictures.blocked && (
             <AdminButton
               size="xs"
               variant="outline"

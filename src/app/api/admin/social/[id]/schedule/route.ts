@@ -1,13 +1,14 @@
 // src/app/api/admin/social/[id]/schedule/route.ts
 // Schedules a draft for the publish-scheduled cron, moves a scheduled post to another time (or
-// swaps two), or cancels back to a draft. Quiet hours don't apply. Cancelling or moving a
-// schedule's posting leaves its slot empty.
+// swaps two), or cancels back to a draft (a failed post that never went up, too). Quiet hours
+// don't apply. Cancelling or moving a schedule's posting leaves its slot empty.
 
 import { parseObjectId } from "@/features/business/lib/validation";
 import { movePost, swapPosts, type MoveResult } from "@/features/social/lib/calendar-moves.server";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
 import { scheduleProblems } from "@/features/social/lib/publish";
 import { skipQueueSlot } from "@/features/social/lib/queue-fill.server";
+import { freshRun, neverWentUp } from "@/features/social/lib/targets";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -88,7 +89,8 @@ export async function PUT(request: NextRequest, { params }: Ctx): Promise<NextRe
 }
 
 /**
- * DELETE /api/admin/social/[id]/schedule - cancels a schedule.
+ * DELETE /api/admin/social/[id]/schedule - cancels a schedule, or turns a failed post that never
+ * went up anywhere (one missed or blocked at its time) back into a draft to fix or reschedule.
  * @param request - Incoming request.
  * @param ctx - Route context.
  * @param ctx.params - Route params with the post id.
@@ -100,8 +102,31 @@ export async function DELETE(request: NextRequest, { params }: Ctx): Promise<Nex
   if (!id) return errorResponse("Post not found.", 404);
   const post = await prisma.socialPost.findUnique({
     where: { id },
-    select: { queueId: true, scheduledAt: true },
+    select: { queueId: true, scheduledAt: true, status: true, targets: true },
   });
+  if (post?.status === "failed") {
+    if (!neverWentUp(post.targets)) {
+      return errorResponse(
+        "Part of it went out, so it can't go back to a draft. Press Duplicate to post it again.",
+        409,
+      );
+    }
+    // The status guard loses to a Retry that has just claimed it.
+    const reopened = await prisma.socialPost.updateMany({
+      where: { id, status: "failed" },
+      data: {
+        status: "draft",
+        scheduledAt: null,
+        queueId: null,
+        postingStartedAt: null,
+        targets: freshRun(post.targets),
+      },
+    });
+    if (reopened.count === 0) {
+      return errorResponse("It changed while you were doing that - it may be posting now.", 409);
+    }
+    return okResponse();
+  }
   const updated = await prisma.socialPost.updateMany({
     where: { id, status: "scheduled" },
     data: { status: "draft", scheduledAt: null, queueId: null },

@@ -116,6 +116,20 @@ export function resetFailed(targets: TargetState[]): TargetState[] {
 }
 
 /**
+ * Whether a post never reached any app: nothing posted or taken down, and nothing an app is
+ * still processing. Only then can a failed post go back to being a draft.
+ * @param targets - Current targets.
+ * @returns True when no app has any part of it.
+ */
+export function neverWentUp(
+  targets: readonly Pick<TargetState, "status" | "externalId" | "containerId">[],
+): boolean {
+  return targets.every(
+    (t) => t.status !== "posted" && t.status !== "removed" && !t.externalId && !t.containerId,
+  );
+}
+
+/**
  * Resets enabled targets to pending and disabled to skipped, for a fresh publish.
  * @param targets - Current targets.
  * @returns New targets array.

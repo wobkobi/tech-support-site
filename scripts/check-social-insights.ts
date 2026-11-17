@@ -33,6 +33,7 @@ import {
   readAppFilter,
   readRange,
   readState,
+  reportedThrough,
   scopeIn,
   skipKey,
   STORY_AGES,
@@ -463,6 +464,37 @@ function checkSums(): void {
       .map((g) => g.shortLabel)
       .slice(0, 3),
     ["25", "26", "27"],
+  );
+  const lagging = [
+    { platform: "facebook" as const, day: "2026-10-21", value: 7 },
+    { platform: "facebook" as const, day: "2026-10-18", value: 4 },
+    { platform: "google" as const, day: "2026-10-19", value: 3 },
+    { platform: "google" as const, day: "2026-10-20", value: null },
+  ];
+  expectEqual(
+    "chart ends on the last day every app has given",
+    reportedThrough(lagging, "2026-10-15", "2026-10-22", ["facebook", "google"]),
+    "2026-10-19",
+  );
+  expectEqual(
+    "one app on show: its own last day",
+    reportedThrough(lagging, "2026-10-15", "2026-10-22", ["facebook"]),
+    "2026-10-21",
+  );
+  expectEqual(
+    "an app with nothing in the range doesn't hold it back",
+    reportedThrough(lagging, "2026-10-15", "2026-10-22", ["facebook", "instagram"]),
+    "2026-10-21",
+  );
+  expectEqual(
+    "nothing given: null",
+    reportedThrough([], "2026-10-15", "2026-10-22", ["facebook"]),
+    null,
+  );
+  expectEqual(
+    "days past the range don't count",
+    reportedThrough(lagging, "2026-10-15", "2026-10-20", ["facebook"]),
+    "2026-10-18",
   );
   const quarter = dayGroups([], "2026-07-25", "2026-10-22", ["facebook"]);
   expectEqual("90 days in weeks", quarter.length, 13);

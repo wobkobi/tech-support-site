@@ -26,10 +26,17 @@ const TYPES: Record<"jpg" | "png", PictureType> = { jpg: "image/jpeg", png: "ima
  * @param doc - Design.
  * @param canUpload - Whether Blob uploads are set up.
  * @param isTemplate - Whether the design is a template.
+ * @param placeholder - Why no picture can be made yet, or null.
  * @returns Reason, or null.
  */
-function useBlocker(doc: DesignDoc, canUpload: boolean, isTemplate: boolean): string | null {
+function useBlocker(
+  doc: DesignDoc,
+  canUpload: boolean,
+  isTemplate: boolean,
+  placeholder: string | null,
+): string | null {
   if (isTemplate) return "Templates don't go into posts. Start a design from this one first.";
+  if (placeholder) return placeholder;
   if (!canUpload) {
     return "Pictures can't be stored until Blob uploads are set up (BLOB_READ_WRITE_TOKEN). Downloads still work.";
   }
@@ -85,8 +92,8 @@ export function PicturesPanel({
   const [ext, setExt] = useState<"jpg" | "png">("jpg");
   const [scale, setScale] = useState<"1" | "2">(doc.paidAd ? "2" : "1");
   const [downloading, setDownloading] = useState<FormatKey | "all" | null>(null);
-  const { state, renders, progress, failed } = pictures;
-  const blocker = useBlocker(doc, canUpload, isTemplate);
+  const { state, renders, progress, failed, blocked } = pictures;
+  const blocker = useBlocker(doc, canUpload, isTemplate, blocked);
   const busy = progress !== null;
 
   /**
@@ -142,7 +149,10 @@ export function PicturesPanel({
       size="lg"
       footer={
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {blocker && <p className="mr-auto text-sm text-admin-text-secondary">{blocker}</p>}
+          {/* A placeholder reason already shows at the top of the dialog. */}
+          {blocker && blocker !== blocked && (
+            <p className="mr-auto text-sm text-admin-text-secondary">{blocker}</p>
+          )}
           <AdminButton variant="outline" onClick={onClose}>
             Close
           </AdminButton>
@@ -178,13 +188,18 @@ export function PicturesPanel({
                 size="xs"
                 className="ml-auto"
                 busy={busy}
-                disabled={!canUpload || isTemplate}
+                disabled={!canUpload || isTemplate || blocked !== null}
                 onClick={() => void update()}
               >
                 <FaRotate aria-hidden className="size-3" /> Update pictures
               </AdminButton>
             )}
           </div>
+          {blocked && (
+            <p role="alert" className="text-sm font-semibold text-coquelicot-700">
+              {blocked}
+            </p>
+          )}
           {failed.map((f) => (
             <div
               key={f.format}
@@ -229,7 +244,7 @@ export function PicturesPanel({
             <AdminButton
               variant="outline"
               busy={downloading === "all"}
-              disabled={downloading !== null}
+              disabled={downloading !== null || blocked !== null}
               onClick={() => void download(doc.formats, "all")}
             >
               <FaDownload aria-hidden className="size-3" /> Download all
@@ -266,7 +281,7 @@ export function PicturesPanel({
                     size="xs"
                     variant="outline"
                     busy={downloading === f}
-                    disabled={downloading !== null}
+                    disabled={downloading !== null || blocked !== null}
                     onClick={() => void download([f], f)}
                   >
                     <FaDownload aria-hidden className="size-3" /> Download

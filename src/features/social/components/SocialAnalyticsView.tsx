@@ -42,6 +42,7 @@ import {
   ANALYTICS_RANGES,
   dayLabel,
   engagementRate,
+  GOOGLE_LAG_DAYS,
   MIN_POSTS_FOR_TIMES,
   TIME_BANDS,
   type AnalyticsRange,
@@ -176,7 +177,12 @@ export function SocialAnalyticsView({
   }
 
   const updated = data.ranAt ? timeAgo(Date.parse(data.ranAt), Date.parse(now)) : null;
-  const weekly = data.chart.groups.length < data.range;
+  const { weekly, through } = data.chart;
+  // Shown when the chart stops short of the range's last day because figures aren't in yet.
+  const lagLine =
+    through < data.to
+      ? ` Ends ${dayLabel(through)}, the last day every app has given figures for${data.chart.series.includes("google") ? ` (Google figures run about ${GOOGLE_LAG_DAYS} days behind)` : ""}.`
+      : "";
   const hasAny = data.days.length > 0 || data.posts.length > 0;
 
   return (
@@ -271,9 +277,10 @@ export function SocialAnalyticsView({
       <BarChart
         title="Views by app"
         description={
-          weekly
+          (weekly
             ? "Each column is a week. Google's are profile views; Facebook's and Instagram's are views of your posts and Page."
-            : "Google's are profile views; Facebook's and Instagram's are views of your posts and Page."
+            : "Google's are profile views; Facebook's and Instagram's are views of your posts and Page.") +
+          lagLine
         }
         series={appSeries(data.chart.series)}
         groups={data.chart.groups}
@@ -381,7 +388,7 @@ function TopPosts({ posts }: { posts: readonly AnalyticsPost[] }): React.ReactEl
     ["reach", "Reach"],
     ["engagements", "Engagements"],
     ["rate", "Engagement rate"],
-    ["clicks", "Link clicks"],
+    ["clicks", "Clicks"],
   ];
 
   return (
