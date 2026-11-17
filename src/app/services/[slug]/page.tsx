@@ -3,8 +3,8 @@
 // content are generated; any other slug 404s and stays a /services#<slug> anchor.
 
 import { formatMoneyCompact } from "@/features/business/lib/business";
-import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
-import { getActivePromo, promoDisplayRate, promoForRateCard } from "@/features/business/lib/promos";
+import { getPublicPricing, publicRateCard } from "@/features/business/lib/pricing-policy.server";
+import { getActivePromo, promoForRateCard } from "@/features/business/lib/promos";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { ClosingCta } from "@/shared/components/ClosingCta";
 import { Notice } from "@/shared/components/Notice";
@@ -27,6 +27,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type React from "react";
+import { Fragment } from "react";
 
 // ISR like /services, so rate edits reach the page without a redeploy. Review
 // moderation purges it sooner through revalidateReviewPaths(). The daily timer is
@@ -126,8 +127,8 @@ export default async function ServiceDetailPage({
     pinnedReviews(page.reviewIds),
   ]);
   // Quote the promo rate the same way the FAQ does, or the page contradicts the banner.
-  const displayRate = promoDisplayRate(pricing.baseRate, promoForRateCard(promo));
-  const rateDiscounted = displayRate !== pricing.baseRate;
+  const rateCard = publicRateCard(pricing, promoForRateCard(promo));
+  const rateDiscounted = rateCard.some((line) => line.price !== line.full);
   const path = `/services/${slug}`;
 
   const serviceJsonLd = {
@@ -216,13 +217,18 @@ export default async function ServiceDetailPage({
         <div className="max-w-180">
           <p>{page.typicalTime}</p>
           <p className="mt-3">
-            I charge{" "}
-            <PromoPrice discounted={rateDiscounted} className="font-bold">
-              {formatMoneyCompact(displayRate)}/hr
-            </PromoPrice>
-            {rateDiscounted && " with the current offer"} for the time I spend working, and
-            I&apos;ll tell you the expected cost before I start. Home visits also include travel
-            time; the{" "}
+            I charge for the time I spend working:{" "}
+            {rateCard.map((line, i) => (
+              <Fragment key={line.key}>
+                {i > 0 && (i === rateCard.length - 1 ? " and " : ", ")}
+                <PromoPrice discounted={line.price !== line.full} className="font-bold">
+                  {formatMoneyCompact(line.price)}/hr
+                </PromoPrice>{" "}
+                {line.shortPhrase}
+              </Fragment>
+            ))}
+            {rateDiscounted && " with the current offer"}. I&apos;ll tell you the expected cost
+            before I start. Home visits also include travel time; the{" "}
             <Link href="/pricing" className={TEXT_LINK}>
               pricing page
             </Link>{" "}

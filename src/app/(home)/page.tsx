@@ -31,25 +31,24 @@ export const metadata: Metadata = {
 // Long fallback avoids waking a cold DB on a fixed timer.
 export const revalidate = 86400;
 
+/** The home page shows at most this many quotes; the full list lives on /reviews. */
+const HOME_REVIEW_LIMIT = 3;
+
 /**
  * Cached review query, tagged so revalidateReviewPaths() can invalidate it; ISR
  * regenerations within the TTL skip the DB.
  */
-// Cache a generous pool; the page slices it to the featured count, so changing that needs no bust.
 const getApprovedReviews = unstable_cache(
   async () =>
     prisma.review.findMany({
       orderBy: { createdAt: "desc" },
       select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
       where: { status: "approved" },
-      take: 50,
+      take: HOME_REVIEW_LIMIT,
     }),
   ["home-approved-reviews"],
   { tags: ["reviews"], revalidate: 86400 },
 );
-
-/** The home page shows at most this many quotes; the full list lives on /reviews. */
-const HOME_REVIEW_LIMIT = 3;
 
 // A 44px tap row for a text link on its own line (TEXT_LINK also sits inside paragraphs).
 const TAP_LINK = "inline-flex min-h-11 items-center";
@@ -94,11 +93,8 @@ export default async function Home(): Promise<React.ReactElement> {
     getApprovedReviews().catch(() => []),
     getSettings(),
   ]);
-  // The featured-count setting still gates the section (0 hides it); the grid caps at three.
-  const rows = allRows.slice(
-    0,
-    Math.min(settings.reviews.homepageFeaturedCount, HOME_REVIEW_LIMIT),
-  );
+  // Sliced as well as taken, so a pool cached before the limit changed still shows three.
+  const rows = allRows.slice(0, HOME_REVIEW_LIMIT);
   const { phone, phoneTel } = settings.identity;
 
   const items: ReviewItem[] = rows.map((r) => ({
@@ -149,8 +145,8 @@ export default async function Home(): Promise<React.ReactElement> {
               Computer Repairs &amp; IT Support in Auckland
             </h1>
             <p className="mb-6 max-w-170 text-lg sm:text-[1.1875rem]">
-              I come to your home or business anywhere in Auckland, fix the problem, explain what
-              went wrong in plain English, and don&apos;t leave until it actually works.
+              I come to your home or business anywhere in Auckland, work through the problem with
+              you and explain what went wrong in plain English.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button href="/booking" variant="primary" className="w-full sm:w-auto">

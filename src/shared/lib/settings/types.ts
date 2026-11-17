@@ -308,8 +308,6 @@ export interface SchedulingSettings {
 }
 
 export interface ReviewsSettings {
-  /** How many approved reviews feature on the home page. */
-  homepageFeaturedCount: number;
   /** When true, reviews verified via a booking/contact token auto-approve. */
   autoApproveVerified: boolean;
   /**

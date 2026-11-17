@@ -201,6 +201,7 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     confidence,
     estimatorRange,
     lowEndFloorFactor,
+    minBillableMins,
   );
   // Date surcharge: a flat $/hr on the band's hours (its dollars over the full rate), which no
   // promo discounts, counted towards the spend threshold (calcJobTotal's order). Low rounds
@@ -222,6 +223,7 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     confidence,
     estimatorRange,
     lowEndFloorFactor,
+    minBillableMins,
   );
   // Quote-level promo types apply here; rate-based ones already applied above.
   const discounted = applyPromoToQuote(

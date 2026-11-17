@@ -211,11 +211,6 @@ export const COMMS_FIELD_META = {
 
 /** Field metadata for the reviews group, keyed by field name. */
 export const REVIEWS_FIELD_META = {
-  homepageFeaturedCount: {
-    title: "Featured reviews on homepage",
-    description: "How many approved reviews show on the home page.",
-    unit: "reviews",
-  },
   autoApproveVerified: {
     title: "Auto-approve verified reviews",
     description:

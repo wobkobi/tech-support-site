@@ -142,6 +142,7 @@ function buildPriceRange(
       inputs.confidence,
       settings.estimatorRange,
       settings.lowEndFloorFactor,
+      settings.minBillableMins,
     );
 
   // Travel rate (never discounted) via calcTravelCharge, matching the calculator and invoice.

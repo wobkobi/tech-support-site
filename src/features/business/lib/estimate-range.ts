@@ -2,6 +2,7 @@
 // Client-safe price-band maths and formatting shared by the pricing wizard, booking-form
 // estimate and admin booking views: a point estimate becomes a confidence-scaled low/high band.
 
+import { roundCents } from "@/shared/lib/money";
 import type { EstimateConfidence, EstimatorRange } from "@/shared/lib/settings/types";
 
 /** Minimal rate shape the remote-discount lookup needs (subset of PublicRate). */
@@ -41,11 +42,14 @@ const LOW_END_FLOOR_FACTOR = 0.75;
 /**
  * Builds a $5-step low/high band that widens as confidence falls, floored at
  * {@link LOW_END_FLOOR_FACTOR} of straight-time cost and at least the minimum spread wide.
+ * The low end never drops under the minimum charge an invoice bills at this rate (the minimum
+ * billable minutes, rounded up to the next $5), so a quote can't promise less.
  * @param mins - Billable minutes for this slice (already floored).
  * @param rate - Effective $/hr for labour.
  * @param confidence - How confident the estimate is; selects the band width.
  * @param range - The live, settings-driven confidence band config.
  * @param lowEndFloorFactor - Live low-end floor fraction (defaults to the constant).
+ * @param minBillableMins - Live minimum billable minutes; 0 skips the minimum-charge floor.
  * @returns Whole-dollar `{ low, high }`.
  */
 export function priceRangeFor(
@@ -54,13 +58,17 @@ export function priceRangeFor(
   confidence: EstimateConfidence,
   range: EstimatorRange,
   lowEndFloorFactor: number = LOW_END_FLOOR_FACTOR,
+  minBillableMins = 0,
 ): { low: number; high: number } {
   const band = range[confidence] ?? range.medium;
   const cost = (mins / 60) * rate;
   // Band low rounds DOWN to $5; the floor rounds to NEAREST so it can't dip under itself.
   const bandLow = Math.floor((cost * band.lowFactor) / 5) * 5;
   const flooredLow = Math.round((cost * lowEndFloorFactor) / 5) * 5;
-  const low = Math.max(bandLow, flooredLow);
+  // Up to the next $5 like the rest of the band ($37.50 shows as $40). roundCents first so
+  // float noise (50.0000001) can't ceil an exact $50 up to $55.
+  const minCharge = Math.ceil(roundCents((Math.max(0, minBillableMins) / 60) * rate) / 5) * 5;
+  const low = Math.max(bandLow, flooredLow, minCharge);
   const high = Math.max(Math.ceil((cost * band.highFactor) / 5) * 5, low + range.minSpread);
   return { low, high };
 }
