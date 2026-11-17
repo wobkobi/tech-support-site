@@ -17,7 +17,7 @@ export interface UpcomingReviewAsk {
   invoiceId: string;
   number: string;
   name: string;
-  /** "Due 8 Oct 2026", or "Goes out at the next run". */
+  /** "Due 8 Oct 2026", "Waits until it's paid, then 2 days", or "Goes out at the next run". */
   when: string;
   /** Why it will be skipped if nothing changes, or null. */
   warning: string | null;

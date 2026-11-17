@@ -8,9 +8,12 @@ import { contactReviewAskState } from "@/features/reviews/lib/review-ask-opt-out
 import {
   contactAddresses,
   decideReviewAsk,
+  hadGoogleAsk,
+  jobWhollyFailed,
   pickReviewAskAddress,
   reviewAskClockStart,
   reviewAskDueAt,
+  type FailedJobFields,
   type InvoiceReviewAskInfo,
   type ReviewAskDecision,
   type ReviewAskTiming,
@@ -18,6 +21,7 @@ import {
 import { formatDateShort } from "@/shared/lib/date-format";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { ReviewAskOutcome } from "@prisma/client";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -43,7 +47,8 @@ export interface ReviewAskCandidate {
     clientName: string;
     clientEmail: string;
     status: string;
-    clockStart: Date;
+    /** Null while the invoice is unpaid. */
+    clockStart: Date | null;
     outcome: ReviewAskOutcome | null;
     attempts: number;
   };
@@ -125,6 +130,11 @@ export async function loadReviewAskCandidates(
       status: true,
       sentAt: true,
       paidAt: true,
+      unsuccessful: true,
+      unsuccessfulDiscount: true,
+      promoDiscount: true,
+      goldCardDiscount: true,
+      lineItems: true,
       reviewAskOutcome: true,
       reviewAskAttempts: true,
     },
@@ -236,14 +246,17 @@ export async function loadReviewAskCandidates(
     return stamps.length ? new Date(Math.max(...stamps.map((d) => d.getTime()))) : null;
   };
 
+  const failFactor = (await getSettings()).pricing.unsuccessfulWorkFactor;
   const candidates: ReviewAskCandidate[] = [];
   for (const { inv, contact, address, addresses } of resolved) {
+    // Unpaid SENT rows wait with no clock; a PAID row with neither stamp is legacy.
     const clockStart = reviewAskClockStart(inv);
-    if (!clockStart) continue;
+    if (!clockStart && inv.status === "PAID") continue;
     const decision = decideReviewAsk(
       {
         status: inv.status,
         clockStart,
+        unsuccessful: jobWhollyFailed(inv, failFactor),
         hasContact: !!contact,
         address,
         reviewOptOut: contact ? optedOut(reviewOptOuts, contact.id, addresses) : false,
@@ -283,30 +296,55 @@ export async function loadReviewAskCandidates(
 
 /**
  * Send-modal forecast of an invoice's review ask, with the job's rules plus asks queued
- * on the person's other invoices (only the first of a close group goes out).
+ * on the person's other invoices (only the first one due goes out).
  * @param invoice - The invoice being sent.
  * @param invoice.id - Invoice id, left out of the queued asks.
  * @param invoice.contactId - Optional Contact id.
  * @param invoice.clientEmail - Invoice's client email.
+ * @param invoice.status - Invoice status; only a PAID invoice has a due date yet.
  * @param invoice.sentAt - Set when the invoice went out before (a re-send).
+ * @param invoice.paidAt - Payment date, when paid.
+ * @param invoice.unsuccessful - A task on the job was marked as not fixed.
+ * @param invoice.unsuccessfulDiscount - The not-fixed discount, if any.
+ * @param invoice.promoDiscount - Promo discount, if any.
+ * @param invoice.goldCardDiscount - Gold Card discount, if any.
+ * @param invoice.lineItems - The invoice lines, to weigh the discount against the labour.
  * @param timing - Delay and gap from settings.
  * @param now - Current instant.
- * @returns Modal info: due date, and the skip that will apply with the ask behind it.
+ * @returns Modal info: due date (null while unpaid), and the skip that will apply with
+ *   the ask behind it.
  */
 export async function forecastInvoiceReviewAsk(
-  invoice: { id: string; contactId: string | null; clientEmail: string; sentAt: Date | null },
+  invoice: {
+    id: string;
+    contactId: string | null;
+    clientEmail: string;
+    status: string;
+    sentAt: Date | null;
+    paidAt: Date | null;
+    unsuccessful: boolean;
+    unsuccessfulDiscount: number | null;
+    promoDiscount: number | null;
+    goldCardDiscount: number | null;
+    lineItems: FailedJobFields["lineItems"];
+  },
   timing: ReviewAskTiming,
   now: Date,
 ): Promise<InvoiceReviewAskInfo> {
-  // Sending stamps sentAt when it's empty, so an unsent invoice's clock starts now.
-  const dueAt = reviewAskDueAt(invoice.sentAt ?? now, timing.delayDays);
+  // Sending stamps sentAt when it's empty, so an unsent invoice's email goes out now.
+  const clockStart = reviewAskClockStart({ ...invoice, sentAt: invoice.sentAt ?? now });
+  const dueAt = clockStart ? reviewAskDueAt(clockStart, timing.delayDays) : null;
   const info: InvoiceReviewAskInfo = {
     delayDays: timing.delayDays,
-    dueLabel: formatDateShort(dueAt),
+    dueLabel: dueAt ? formatDateShort(dueAt) : null,
     gapDays: timing.gapDays,
     skip: null,
     blockingAsk: null,
   };
+  const { pricing } = await getSettings();
+  if (jobWhollyFailed(invoice, pricing.unsuccessfulWorkFactor)) {
+    return { ...info, skip: "unsuccessful" };
+  }
 
   const contact = await findInvoiceContact(invoice);
   if (!contact) return { ...info, skip: "no_contact" };
@@ -343,30 +381,31 @@ export async function forecastInvoiceReviewAsk(
   ]);
   const [reviewOptOutRows, mailingOptOutRows] = addressOptOuts;
 
-  // Play queued asks forward in due order; each that clears the gap becomes the latest.
-  // An overdue one counts from now (it goes out next run).
+  // Play paid queued asks forward in due order; the first that clears the gap and the
+  // one-Google-ask rule becomes the latest. An overdue one counts from now (next run).
+  // Unpaid ones have no due date yet, so they can't be placed.
   let lastAsk = state.lastAskedAt;
   let lastAskQueued = false;
-  if (timing.gapDays > 0) {
-    const queuedDues = queuedInvoices
-      .map((q) => reviewAskClockStart(q))
-      .filter((d): d is Date => !!d)
-      .map((start) => reviewAskDueAt(start, timing.delayDays))
-      .sort((a, b) => a.getTime() - b.getTime());
-    for (const due of queuedDues) {
-      if (due > dueAt) break;
-      const at = due < now ? now : due;
-      if (!lastAsk || at.getTime() - lastAsk.getTime() >= timing.gapDays * DAY_MS) {
-        lastAsk = at;
-        lastAskQueued = true;
-      }
+  const queuedDues = queuedInvoices
+    .map((q) => reviewAskClockStart(q))
+    .filter((d): d is Date => !!d)
+    .map((start) => reviewAskDueAt(start, timing.delayDays))
+    .sort((a, b) => a.getTime() - b.getTime());
+  for (const due of queuedDues) {
+    if (dueAt && due > dueAt) break;
+    const at = due < now ? now : due;
+    if (hadGoogleAsk(lastAsk)) break;
+    if (!lastAsk || at.getTime() - lastAsk.getTime() >= timing.gapDays * DAY_MS) {
+      lastAsk = at;
+      lastAskQueued = true;
     }
   }
 
   const decision = decideReviewAsk(
     {
-      status: "SENT",
-      clockStart: invoice.sentAt ?? now,
+      status: invoice.status,
+      clockStart,
+      unsuccessful: false,
       hasContact: true,
       address,
       reviewOptOut: state.blockedBy === "review_opt_out" || reviewOptOutRows > 0,
@@ -386,7 +425,7 @@ export async function forecastInvoiceReviewAsk(
     ...info,
     skip,
     blockingAsk:
-      skip === "asked_recently" && lastAsk
+      (skip === "asked_recently" || skip === "google_asked") && lastAsk
         ? { label: formatDateShort(lastAsk), queued: lastAskQueued }
         : null,
   };

@@ -39,6 +39,8 @@ export interface LikelyIncome {
   /** ISO date of the row. */
   date: string;
   method: string;
+  /** The Cashbook's customer name; can be just a first name. */
+  customer?: string;
 }
 
 /** Props for {@link PaymentDialog}. */
@@ -209,9 +211,10 @@ export function PaymentDialog({
                 Use the income entry already there
               </span>
               <span className="mt-0.5 block text-sm text-admin-muted">
-                {formatNZD(likelyIncome.amount)} by {likelyIncome.method} on{" "}
-                {formatDateShort(likelyIncome.date)}. Links it to this invoice instead of adding a
-                second one. Untick if that was a different job.
+                {formatNZD(likelyIncome.amount)}
+                {likelyIncome.customer ? ` from "${likelyIncome.customer}"` : ""} by{" "}
+                {likelyIncome.method} on {formatDateShort(likelyIncome.date)}. Links it to this
+                invoice instead of adding a second one. Untick if that was a different job.
               </span>
             </span>
           </label>
