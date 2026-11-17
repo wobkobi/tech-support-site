@@ -7,6 +7,7 @@ import { isBookingClosed } from "@/features/booking/lib/booking";
 import {
   assessCancellation,
   CANCELLATION,
+  FREE_CANCEL_GRACE_HOURS,
   type CancellationPolicy,
   type CancelMeetingType,
 } from "@/features/business/lib/pricing-policy";
@@ -32,7 +33,13 @@ type CancellationInfo = Pick<
 
 type LoadState =
   | { kind: "loading" }
-  | { kind: "ready"; startAt: Date; meetingType: CancelMeetingType; policy: CancellationInfo }
+  | {
+      kind: "ready";
+      startAt: Date;
+      bookedAt: Date | null;
+      meetingType: CancelMeetingType;
+      policy: CancellationInfo;
+    }
   | { kind: "alreadyCancelled" }
   | { kind: "closed" }
   | { kind: "error"; message: string };
@@ -54,6 +61,7 @@ interface PhoneProps {
  * so the figure shown is the one charged, remote bookings included.
  * @param props - Component props.
  * @param props.startAt - Booking start time.
+ * @param props.bookedAt - When the booking was made, for the free grace period; null skips it.
  * @param props.meetingType - Whether the booking is on site or remote.
  * @param props.policy - Live cancellation figures from the cancel-info API.
  * @param props.phone - Display phone number.
@@ -62,20 +70,26 @@ interface PhoneProps {
  */
 function FeeBanner({
   startAt,
+  bookedAt,
   meetingType,
   policy,
   phone,
   phoneTel,
 }: PhoneProps & {
   startAt: Date;
+  bookedAt: Date | null;
   meetingType: CancelMeetingType;
   policy: CancellationInfo;
 }): React.ReactElement {
-  const charge = assessCancellation(startAt, new Date(), {
+  const now = new Date();
+  const terms = {
     reason: "late-cancellation",
     meetingType,
     policy: { ...CANCELLATION, ...policy },
-  });
+  } as const;
+  const charge = assessCancellation(startAt, now, { ...terms, bookedAt: bookedAt ?? undefined });
+  // Free only because it was booked moments ago: say so, so the customer knows why.
+  const graceWaived = charge.fee === 0 && assessCancellation(startAt, now, terms).fee > 0;
   if (charge.travelApplies) {
     return (
       <div
@@ -104,7 +118,16 @@ function FeeBanner({
   }
   return (
     <div className="border-2 border-moonstone-500/50 bg-moonstone-400/10 p-4 text-base text-rich-black sm:text-lg">
-      <strong>No fee</strong> applies for this cancellation - thanks for the heads up.
+      {graceWaived ? (
+        <>
+          <strong>No fee</strong> applies - you're cancelling within {FREE_CANCEL_GRACE_HOURS} hour
+          {FREE_CANCEL_GRACE_HOURS === 1 ? "" : "s"} of making the booking.
+        </>
+      ) : (
+        <>
+          <strong>No fee</strong> applies for this cancellation - thanks for the heads up.
+        </>
+      )}
     </div>
   );
 }
@@ -171,6 +194,7 @@ export function CancelContent({ phone, phoneTel }: PhoneProps): React.ReactEleme
         const data = (await res.json()) as {
           ok?: boolean;
           startAt?: string;
+          bookedAt?: string;
           status?: string;
           meetingType?: CancelMeetingType;
           cancellation?: CancellationInfo;
@@ -199,6 +223,7 @@ export function CancelContent({ phone, phoneTel }: PhoneProps): React.ReactEleme
         setLoad({
           kind: "ready",
           startAt,
+          bookedAt: data.bookedAt ? new Date(data.bookedAt) : null,
           meetingType: data.meetingType === "remote" ? "remote" : "in-person",
           policy: data.cancellation ?? CANCELLATION,
         });
@@ -298,6 +323,7 @@ export function CancelContent({ phone, phoneTel }: PhoneProps): React.ReactEleme
             </p>
             <FeeBanner
               startAt={load.startAt}
+              bookedAt={load.bookedAt}
               meetingType={load.meetingType}
               policy={load.policy}
               phone={phone}

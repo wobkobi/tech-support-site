@@ -1,6 +1,7 @@
 // scripts/check-review-asks.ts
-// When an invoice's automatic review ask goes out or is skipped: clock start, DST-safe
-// due dates, the gap, the address used, and stop vs unsubscribe tokens.
+// When an invoice's automatic review ask goes out or is skipped: clock start (payment),
+// DST-safe due dates, the gap, one Google ask per person, unsuccessful jobs, the address
+// used, and stop vs unsubscribe tokens.
 // Run with: npm test -- review-asks
 
 import {
@@ -12,6 +13,8 @@ import {
 import {
   askPersonStatus,
   decideReviewAsk,
+  GOOGLE_ASKS_FROM,
+  jobWhollyFailed,
   pickReviewAskAddress,
   reviewAskClockStart,
   reviewAskDueAt,
@@ -26,14 +29,15 @@ const DAY = 24 * 60 * 60 * 1000;
 const TIMING = { delayDays: 2, gapDays: 30 };
 
 /**
- * A ready-to-send input, sent 2026-06-10 10:00 NZST, that each case then bends.
+ * A ready-to-send input, paid 2026-06-10 10:00 NZST, that each case then bends.
  * @param patch - Fields to override.
  * @returns Rule input.
  */
 function input(patch: Partial<ReviewAskInput> = {}): ReviewAskInput {
   return {
-    status: "SENT",
+    status: "PAID",
     clockStart: new Date("2026-06-09T22:00:00Z"),
+    unsuccessful: false,
     hasContact: true,
     address: "sam@example.com",
     reviewOptOut: false,
@@ -48,12 +52,13 @@ function input(patch: Partial<ReviewAskInput> = {}): ReviewAskInput {
  * @param i - Rule input.
  * @param now - Instant to decide at.
  * @param gapDays - Optional gap override.
- * @returns Summary string.
+ * @param manual - Send now.
+ * @returns Summary string; an unpaid wait reads `unpaid:<forecast>`.
  */
-function decide(i: ReviewAskInput, now: Date, gapDays = TIMING.gapDays): string {
-  const d = decideReviewAsk(i, { ...TIMING, gapDays }, now);
+function decide(i: ReviewAskInput, now: Date, gapDays = TIMING.gapDays, manual = false): string {
+  const d = decideReviewAsk(i, { ...TIMING, gapDays, manual }, now);
   if (d.action === "skip") return `skip:${d.reason}`;
-  if (d.action === "wait") return `wait:${d.forecast ?? "-"}`;
+  if (d.action === "wait") return `${d.dueAt ? "wait" : "unpaid"}:${d.forecast ?? "-"}`;
   return "send";
 }
 
@@ -139,18 +144,110 @@ function main(): void {
     "wait:asked_recently",
   );
 
+  console.log("Waiting for payment");
+  expectEqual(
+    "unpaid invoice waits with no due date",
+    decide(input({ status: "SENT", clockStart: null }), after),
+    "unpaid:-",
+  );
+  expectEqual(
+    "unpaid wait still forecasts an opt-out",
+    decide(input({ status: "SENT", clockStart: null, reviewOptOut: true }), after),
+    "unpaid:review_opt_out",
+  );
+  expectEqual(
+    "voided unpaid invoice skips",
+    decide(input({ status: "VOIDED", clockStart: null }), after),
+    "skip:voided",
+  );
+  expectEqual(
+    "Send now on an unpaid invoice sends",
+    decide(input({ status: "SENT", clockStart: null }), after, 0, true),
+    "send",
+  );
+
+  console.log("One Google ask per person");
+  const googleAsk = new Date(GOOGLE_ASKS_FROM.getTime() + 60_000);
+  const lateNow = new Date("2027-03-01T00:00:00Z");
+  const lateInput = { clockStart: new Date("2027-02-20T00:00:00Z") };
+  expectEqual(
+    "a Google ask months ago still skips",
+    decide(input({ ...lateInput, lastAskedAt: googleAsk }), lateNow),
+    "skip:google_asked",
+  );
+  expectEqual(
+    "an ask at the switch instant counts",
+    decide(input({ ...lateInput, lastAskedAt: GOOGLE_ASKS_FROM }), lateNow),
+    "skip:google_asked",
+  );
+  expectEqual(
+    "a site-form ask before the switch doesn't count",
+    decide(input({ ...lateInput, lastAskedAt: new Date(GOOGLE_ASKS_FROM.getTime() - 1) }), lateNow),
+    "send",
+  );
+  expectEqual(
+    "the Google-ask skip holds with the gap off",
+    decide(input({ ...lateInput, lastAskedAt: googleAsk }), lateNow, 0),
+    "skip:google_asked",
+  );
+  expectEqual(
+    "Google ask forecast while waiting",
+    decide(
+      input({ clockStart: new Date("2027-02-28T22:00:00Z"), lastAskedAt: googleAsk }),
+      lateNow,
+    ),
+    "wait:google_asked",
+  );
+  expectEqual(
+    "Send now ignores the one-ask limit",
+    decide(input({ ...lateInput, lastAskedAt: googleAsk }), lateNow, 0, true),
+    "send",
+  );
+  expectEqual(
+    "Send now still respects an opt-out",
+    decide(input({ ...lateInput, lastAskedAt: googleAsk, reviewOptOut: true }), lateNow, 0, true),
+    "skip:review_opt_out",
+  );
+
+  console.log("Unsuccessful jobs");
+  expectEqual(
+    "unsuccessful job skips even before due",
+    decide(input({ unsuccessful: true }), before),
+    "skip:unsuccessful",
+  );
+  expectEqual(
+    "unsuccessful unpaid job skips straight away",
+    decide(input({ unsuccessful: true, status: "SENT", clockStart: null }), before),
+    "skip:unsuccessful",
+  );
+  expectEqual(
+    "Send now on an unsuccessful job sends",
+    decide(input({ unsuccessful: true }), after, 0, true),
+    "send",
+  );
+
   console.log("Clock start");
   const sent = new Date("2026-06-01T00:00:00Z");
   const paid = new Date("2026-06-05T00:00:00Z");
   expectEqual(
-    "emailed invoice starts at sentAt",
+    "paid after the email starts at payment",
     reviewAskClockStart({ status: "PAID", sentAt: sent, paidAt: paid }),
-    sent,
+    paid,
+  );
+  expectEqual(
+    "paid on the day, emailed later, starts at the email",
+    reviewAskClockStart({ status: "PAID", sentAt: paid, paidAt: sent }),
+    paid,
   );
   expectEqual(
     "paid without emailing starts at paidAt",
     reviewAskClockStart({ status: "PAID", sentAt: null, paidAt: paid }),
     paid,
+  );
+  expectEqual(
+    "emailed but unpaid has no clock",
+    reviewAskClockStart({ status: "SENT", sentAt: sent, paidAt: null }),
+    null,
   );
   expectEqual(
     "sent without a stamp has no clock",
@@ -294,6 +391,121 @@ function main(): void {
     "no email or phone",
     askPersonStatus(person({ hasEmail: false }), 30, listNow),
     "no_details",
+  );
+  const pastSwitch = new Date("2027-01-10T00:00:00Z");
+  expectEqual(
+    "had their Google ask, long ago",
+    askPersonStatus(person({ lastAskedAt: GOOGLE_ASKS_FROM }), 30, pastSwitch),
+    "google_asked",
+  );
+  expectEqual(
+    "Google ask outranks reviewed",
+    askPersonStatus(person({ reviewed: true, lastAskedAt: GOOGLE_ASKS_FROM }), 30, pastSwitch),
+    "google_asked",
+  );
+  expectEqual(
+    "site-form ask before the switch is ready once past the gap",
+    askPersonStatus(person({ lastAskedAt: new Date("2026-09-01T00:00:00Z") }), 30, pastSwitch),
+    "ready",
+  );
+  expectEqual(
+    "Google ask with no email still offers a text",
+    askPersonStatus(
+      person({ hasEmail: false, hasPhone: true, lastAskedAt: GOOGLE_ASKS_FROM }),
+      30,
+      pastSwitch,
+    ),
+    "text_only",
+  );
+
+  // Whole-job failure, weighed from the real invoices that carry the flag
+  interface Line {
+    description: string;
+    lineTotal: number;
+    minutes?: number;
+  }
+  /**
+   * An hourly labour line.
+   * @param description - Task description.
+   * @param lineTotal - Line total in dollars.
+   * @returns The line, with minutes set as hourly rows have.
+   */
+  const timed = (description: string, lineTotal: number): Line => ({
+    description,
+    lineTotal,
+    minutes: 15,
+  });
+  /**
+   * A flat travel line.
+   * @param lineTotal - Line total in dollars.
+   * @returns The line, with no minutes.
+   */
+  const travel = (lineTotal: number): Line => ({ description: "Round-trip travel", lineTotal });
+  expectEqual(
+    "every task failed after a 35% promo (0083)",
+    jobWhollyFailed(
+      {
+        unsuccessful: true,
+        unsuccessfulDiscount: 48.75,
+        promoDiscount: 52.5,
+        goldCardDiscount: null,
+        lineItems: [timed("Other setup - landline phone", 150), travel(25)],
+      },
+      0.5,
+    ),
+    true,
+  );
+  expectEqual(
+    "one $25 task of five failed (0102)",
+    jobWhollyFailed(
+      {
+        unsuccessful: true,
+        unsuccessfulDiscount: 12.5,
+        promoDiscount: null,
+        goldCardDiscount: null,
+        lineItems: [
+          timed("Software setup", 33.33),
+          timed("Printer configuration", 41.67),
+          timed("Cloud data transfer", 25),
+          timed("Software troubleshooting", 8.33),
+          timed("Phone troubleshooting", 25),
+          travel(10),
+        ],
+      },
+      0.5,
+    ),
+    false,
+  );
+  expectEqual(
+    "no discount means not failed",
+    jobWhollyFailed(
+      {
+        unsuccessful: false,
+        unsuccessfulDiscount: null,
+        promoDiscount: null,
+        goldCardDiscount: null,
+        lineItems: [timed("Laptop repair", 100)],
+      },
+      0.5,
+    ),
+    false,
+  );
+  expectEqual(
+    "lines without minutes fall back to the non-travel rows",
+    jobWhollyFailed(
+      {
+        unsuccessful: true,
+        unsuccessfulDiscount: 50,
+        promoDiscount: null,
+        goldCardDiscount: null,
+        lineItems: [
+          { description: "Laptop repair", lineTotal: 100 },
+          { description: "Round-trip travel (8 min drive)", lineTotal: 10 },
+        ],
+      },
+      0.5,
+    ),
+    true,
   );
 
   // Stop tokens: same secret as unsubscribe links, different purpose prefix

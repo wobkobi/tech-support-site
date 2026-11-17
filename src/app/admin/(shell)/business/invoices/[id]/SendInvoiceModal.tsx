@@ -67,6 +67,11 @@ function reviewAskSkipText(info: InvoiceReviewAskInfo): string | null {
       ? `No review ask with this invoice. Their review ask from another invoice goes out on ${info.blockingAsk.label}, and ${gap}.`
       : `No review ask with this invoice. You asked them for a review on ${info.blockingAsk.label}, and ${gap}.`;
   }
+  if (info.skip === "google_asked" && info.blockingAsk) {
+    return info.blockingAsk.queued
+      ? `No review ask with this invoice. Their Google review ask from another invoice goes out on ${info.blockingAsk.label}, and each person gets one.`
+      : `No review ask with this invoice. They had their Google review ask on ${info.blockingAsk.label}, and each person gets one.`;
+  }
   return `No review ask with this invoice - ${reviewAskNoteLabel(info.skip)}.`;
 }
 
@@ -379,10 +384,12 @@ export function SendInvoiceModal({
                     className={ADMIN_CHECKBOX_CLS}
                   />
                   <span>
-                    Ask for a Google review in {reviewAskInfo.delayDays}{" "}
-                    {reviewAskInfo.delayDays === 1 ? "day" : "days"}
+                    Ask for a Google review {reviewAskInfo.delayDays}{" "}
+                    {reviewAskInfo.delayDays === 1 ? "day" : "days"} after they pay
                     <span className="ml-1 text-sm text-admin-muted">
-                      (a separate email on {reviewAskInfo.dueLabel})
+                      {reviewAskInfo.dueLabel
+                        ? `(a separate email on ${reviewAskInfo.dueLabel})`
+                        : "(a separate email)"}
                     </span>
                   </span>
                 </label>
@@ -396,7 +403,7 @@ export function SendInvoiceModal({
                     >
                       add {clientName?.trim() || "them"} to contacts
                     </button>{" "}
-                    before {reviewAskInfo.dueLabel} or no review ask will go out.
+                    before {reviewAskInfo.dueLabel ?? "then"} or no review ask will go out.
                   </p>
                 )}
               </div>

@@ -4,6 +4,8 @@
 
 import { DAY_MS, fyKeyOf } from "@/features/business/lib/financial-year";
 import { inFy } from "@/features/business/lib/tax/helpers";
+import type { KmVehiclePeriod } from "@/features/business/lib/tax/types";
+import { beforeKmVehicles } from "@/features/business/lib/tax/vehicle";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { parseDateKey } from "@/shared/lib/date-format";
 import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
@@ -70,6 +72,8 @@ export interface TripSuggestion {
   purpose: string;
   /** True for a no-show: the job was cancelled but the drive still happened. */
   noShow: boolean;
+  /** True once marked "Not a trip" (walked there, or no drive); listed apart, never added. */
+  dismissed: boolean;
 }
 
 /** Validated trip fields, ready for Prisma. */
@@ -144,6 +148,10 @@ export interface TripCandidate {
 export interface SuggestContext {
   /** Bookings that already have a trip; a job gets one round trip, so they drop out. */
   linkedBookingIds: ReadonlySet<string>;
+  /** Bookings marked "Not a trip"; they come back flagged as dismissed. */
+  dismissedBookingIds?: ReadonlySet<string>;
+  /** Km-rate vehicle periods; jobs before the first one were in a car that earns no km rate. */
+  kmPeriods?: readonly KmVehiclePeriod[];
   /** Round-trip km by {@link addressKey}, from {@link kmByAddressFrom}. */
   kmByAddress: ReadonlyMap<string, number>;
   /** FY start on the ledger scale (inclusive ISO). */
@@ -386,9 +394,10 @@ function isDrivenJob(b: TripCandidate, now: Date): boolean {
 
 /**
  * Jobs in the FY still needing a trip, one per booking, newest first. Each start is placed
- * on its NZ day before the ledger-scale window check.
+ * on its NZ day before the ledger-scale window check. Jobs before the first km-rate car are
+ * left out; jobs marked "Not a trip" stay in, flagged, so they can be put back.
  * @param candidates - Bookings around the FY (the caller pads the query by a day).
- * @param ctx - Linked bookings, km by address, the FY window and now.
+ * @param ctx - Linked and dismissed bookings, km periods, km by address, the FY window and now.
  * @returns The suggestions.
  */
 export function suggestTrips(
@@ -400,6 +409,8 @@ export function suggestTrips(
     if (!isDrivenJob(b, ctx.now) || ctx.linkedBookingIds.has(b.id)) continue;
     const dayIso = nzDayStartUtc(b.startAt).toISOString();
     if (!isInWindow(dayIso, ctx.startISO, ctx.endISO)) continue;
+    // A trip before the first km-rate car can't be claimed, so it isn't worth logging.
+    if (beforeKmVehicles(dayIso, ctx.kmPeriods ?? [])) continue;
     const there = b.travelMinsAtBooking;
     const name = b.name.trim();
     const bookingAddress = b.address?.trim() || null;
@@ -417,6 +428,7 @@ export function suggestTrips(
       suggestedKm: address ? (ctx.kmByAddress.get(addressKey(address)) ?? null) : null,
       purpose: `Job: ${name}${b.noShow ? " (no-show)" : ""}`,
       noShow: b.noShow,
+      dismissed: ctx.dismissedBookingIds?.has(b.id) ?? false,
     });
   }
   return out.sort((a, b) =>

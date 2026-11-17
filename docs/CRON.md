@@ -51,11 +51,11 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Calendar cache refresh  | `/api/cron/refresh-calendar-cache`  | GET    | every 30 minutes | Fetch Google Calendar events into the DB cache                                                                                                                                                                                           |
 | Reconcile booking times | `/api/cron/reconcile-booking-times` | GET    | every 30 minutes | Pull corrected times back from Calendar, flag deleted events, retry booking-event deletes Google refused                                                                                                                                 |
 | Booking reminders       | `/api/cron/send-booking-reminders`  | GET    | every 30 minutes | Email a 24h-out reminder for confirmed bookings                                                                                                                                                                                          |
-| Invoice reminders       | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each)                                                                                                                                                                                          |
-| Review asks             | `/api/cron/send-review-asks`        | GET    | daily 10:00 NZ   | Email the Google review ask N days after an invoice is sent                                                                                                                                                                              |
+| Invoice reminders       | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each); a Cashbook payment (exact, or same amount and a shared name) holds the nudge and pushes you to mark it paid                                                                             |
+| Review asks             | `/api/cron/send-review-asks`        | GET    | daily 10:00 NZ   | Email the one Google review ask per person N days after the invoice is paid; skips jobs where nothing could be fixed                                                                                                                     |
 | Sheets sync             | `/api/cron/sync-sheets`             | GET    | hourly           | Reconcile Cashbook/Expenses sheets with MongoDB                                                                                                                                                                                          |
 | Contacts sync           | `/api/cron/sync-contacts`           | GET    | every 3 hours    | Two-way incremental Google Contacts sync                                                                                                                                                                                                 |
-| Record subscriptions    | `/api/cron/record-subscriptions`    | GET    | daily 08:00 NZ   | Record due subscriptions as expenses + sheet row                                                                                                                                                                                         |
+| Subscription reminders  | `/api/cron/record-subscriptions`    | GET    | daily 08:00 NZ   | Push reminder for due subscriptions; records nothing (Record button on Expenses does)                                                                                                                                                    |
 | Purge price estimates   | `/api/cron/purge-price-estimates`   | GET    | daily            | Delete price estimate logs past retention                                                                                                                                                                                                |
 | Public holidays         | `/api/cron/refresh-public-holidays` | GET    | monthly          | Refresh NZ public holidays (current + next year)                                                                                                                                                                                         |
 | Scheduled publishing    | `/api/cron/publish-scheduled`       | GET    | every 5 minutes  | Post due social posts, send due emails, resume stuck runs, finish Resend broadcasts, bust the promo cache when a promo starts or ends, and once an hour line up posts in social schedules' empty time slots                              |
@@ -83,13 +83,15 @@ across DST changes.
   invoice reminders claim `reminderCount`/`reminderLastSentAt` (compare-and-set) before sending, and
   hand the claim back when Resend refuses so the next run retries (max 2 invoice nudges, offsets
   live in the comms settings). A function killed between claim and send skips that reminder.
-  record-subscriptions advances `nextDue` with a CAS guard and returns 500 when a record failed
-  after its claim (record that one by hand), review asks claim each invoice (`reviewAskOutcome` >
-  `sending`) before sending with a per-invoice Resend idempotency key, and the holidays refresh
-  upserts, then prunes only once every year has fetched.
+  record-subscriptions only sends a push (a repeat run re-sends the same tagged notification, which
+  replaces the last), the Record button advances `nextDue` with a CAS guard, review asks claim each
+  invoice (`reviewAskOutcome` > `sending`) before sending with a per-invoice Resend idempotency key,
+  and the holidays refresh upserts, then prunes only once every year has fetched.
 - Booking reminders send inside a window from `CANCELLATION.freeNoticeHours + 1` up to
   `comms.reminderLeadHours` before the start, so the reminder always lands while the customer can
-  still cancel free.
+  still cancel free. A booking only gets one once half the lead time has passed since it was made,
+  so a booking made close to the start relies on its confirmation instead. The email's "today" or
+  "tomorrow" is judged on the NZ date it lands, after any quiet-hours hold.
 - Tunable values (retention days, reminder lead hours, notification toggles) are read live from
   settings on every run; the reminder job no-ops cleanly when its toggle is off.
 - Review asks go out `reviewAskDelayDays` after the invoice is emailed (or after it is marked paid,

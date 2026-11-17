@@ -6,7 +6,7 @@ import { TravelCheck } from "@/features/areas/components/TravelCheck";
 import { getSuburbTravel } from "@/features/areas/lib/area-travel.server";
 import { commonSuburbs, regionSlug, travelFigure } from "@/features/areas/lib/areas";
 import { formatMoneyCompact } from "@/features/business/lib/business-format";
-import { travelCopy } from "@/features/business/lib/pricing-policy";
+import { travelCopy, unsuccessfulShareLabel } from "@/features/business/lib/pricing-policy";
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
   getActivePromo,
@@ -33,7 +33,7 @@ export const revalidate = 86400;
 
 const TITLE = "Computer Help Across Auckland - Areas and Travel Costs";
 const DESCRIPTION =
-  "Computer and IT help across Auckland: Central, West, North Shore, East and South. No call-out fee - check what travel costs to your suburb.";
+  "Computer and IT help across Auckland: Central, West, North Shore, East and South. You pay for the work time and one round trip - check what travel costs to your suburb.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -98,8 +98,8 @@ export default async function AreasPage(): Promise<React.ReactElement> {
         title="Computer help across Auckland"
         intro={
           <p>
-            I come to homes and businesses right across Auckland, fix the problem, explain what went
-            wrong in plain English, and don&apos;t leave until it actually works.
+            I come to homes and businesses right across Auckland, work through the problem with you
+            and explain what went wrong in plain English.
           </p>
         }
         note={<p>Put your suburb in below to see what travel costs before you book.</p>}
@@ -113,19 +113,21 @@ export default async function AreasPage(): Promise<React.ReactElement> {
               <>
                 <PromoPrice discounted={displayRate !== pricing.baseRate}>
                   {formatMoneyCompact(displayRate)}/hr
-                </PromoPrice>
-                , no call-out fee
+                </PromoPrice>{" "}
+                plus travel
               </>
             }
           >
             <p>
-              You pay for the time I work and one trip. There&apos;s no charge just for turning up.
+              You pay for the time I work and one round trip. A visit only costs you with no work
+              done if you cancel late or nobody&apos;s home.
             </p>
           </RuledBlock>
-          <RuledBlock title="Fixed before I leave">
+          <RuledBlock title="A straight answer">
             <p>
-              I keep going until it actually works, and I&apos;ll tell you straight if something
-              can&apos;t be fixed.
+              I keep working on it while you&apos;re happy to. If something can&apos;t be fixed,
+              I&apos;ll tell you straight and you pay{" "}
+              {unsuccessfulShareLabel(policy.UNSUCCESSFUL_WORK_FACTOR)}.
             </p>
           </RuledBlock>
           <RuledBlock title="Plain English">

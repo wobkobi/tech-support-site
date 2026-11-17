@@ -26,7 +26,11 @@ import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
 import { invoiceShareUrl } from "@/features/business/lib/invoice-share";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
-import { reviewAskClockStart, reviewAskDueAt } from "@/features/reviews/lib/review-ask-rules";
+import {
+  jobWhollyFailed,
+  reviewAskClockStart,
+  reviewAskDueAt,
+} from "@/features/reviews/lib/review-ask-rules";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
@@ -115,13 +119,15 @@ async function InvoiceRail({
 
   const recipient = invoiceRecipient(invoice.clientName, contact);
   const overdue = isInvoiceOverdue(invoice);
-  // Due date of a review ask still to come; none for quotes or with automatic asks off.
-  const { reviews } = await getSettings();
+  // Due date of a review ask still to come; none for quotes, unpaid or wholly failed jobs,
+  // or with automatic asks off.
+  const { reviews, pricing } = await getSettings();
   const askClock = reviewAskClockStart(invoice);
   const askDueAt =
     reviews.reviewAskEnabled &&
     !invoice.isQuote &&
     invoice.status !== "VOIDED" &&
+    !jobWhollyFailed(invoice, pricing.unsuccessfulWorkFactor) &&
     !invoice.reviewAskOutcome &&
     askClock
       ? reviewAskDueAt(askClock, reviews.reviewAskDelayDays)
@@ -350,15 +356,21 @@ export default async function InvoiceViewPage({
     <div>
       {recordedPayment && (
         <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-admin-text">
-          <p className="font-semibold text-amber-800">This invoice looks like it has been paid.</p>
+          <p className="font-semibold text-amber-800">
+            {recordedPayment.strength === "possible"
+              ? "This invoice may have been paid."
+              : "This invoice looks like it has been paid."}
+          </p>
           <p className="mt-1">
             {recordedPayment.strength === "linked"
               ? "A linked income entry exists, but the invoice is still marked SENT."
-              : "An income entry matches this invoice's customer and total, but nothing is recorded against the invoice."}{" "}
+              : recordedPayment.strength === "likely"
+                ? "An income entry matches this invoice's customer and total, but nothing is recorded against the invoice."
+                : `An income entry from "${recordedPayment.customer}" matches the amount owing and shares a name with this client. Check it's their payment.`}{" "}
             {formatNZD(recordedPayment.amount)} on {formatDateShort(recordedPayment.date)} via{" "}
             {recordedPayment.method}. Reminders are paused until it&apos;s recorded - use Record
             payment above
-            {recordedPayment.strength === "likely" && " (it links that entry, no second one)"}, or
+            {recordedPayment.strength !== "linked" && " (it links that entry, no second one)"}, or
             ignore this if it&apos;s a different job.
           </p>
         </div>
@@ -398,12 +410,13 @@ export default async function InvoiceViewPage({
             reminderLastSentAt={invoice.reminderLastSentAt?.toISOString() ?? null}
             apologySentAt={invoice.apologySentAt?.toISOString() ?? null}
             likelyIncome={
-              recordedPayment?.strength === "likely"
+              recordedPayment && recordedPayment.strength !== "linked"
                 ? {
                     id: recordedPayment.entryId,
                     amount: recordedPayment.amount,
                     date: recordedPayment.date.toISOString(),
                     method: recordedPayment.method,
+                    customer: recordedPayment.customer,
                   }
                 : null
             }

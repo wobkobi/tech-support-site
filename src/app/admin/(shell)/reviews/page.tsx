@@ -418,7 +418,9 @@ export default async function AdminReviewsPage({
       name: c.contact?.name || c.invoice.clientName,
       when:
         d.action === "wait"
-          ? `Due ${formatDateShort(d.dueAt)}`
+          ? d.dueAt
+            ? `Due ${formatDateShort(d.dueAt)}`
+            : `Waits until it's paid, then ${reviewSettings.reviewAskDelayDays} ${reviewSettings.reviewAskDelayDays === 1 ? "day" : "days"}`
           : d.action === "skip"
             ? "Skipped at the next run"
             : "Goes out at the next run",

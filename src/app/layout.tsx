@@ -1,7 +1,7 @@
 // src/app/layout.tsx
 // Root layout for the App Router. Injects global styles, metadata, and JSON-LD.
 
-import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import { getPublicPricing, publicRateCard } from "@/features/business/lib/pricing-policy.server";
 import { GoogleTag } from "@/shared/components/GoogleTag";
 import { MetaPixel } from "@/shared/components/MetaPixel";
 import { MobileActionBar } from "@/shared/components/MobileActionBar";
@@ -134,6 +134,11 @@ export default async function RootLayout({
     getPublicPricing(),
   ]);
   const telephone = identity.phoneTel.replace(/^tel:/, "");
+  // Cheapest to dearest public hourly rate, standard (no promo).
+  const hourly = publicRateCard(pricing, null).map((line) => line.price);
+  const [minRate, maxRate] = [Math.min(...hourly), Math.max(...hourly)];
+  const priceRange =
+    minRate === maxRate ? `NZ$${minRate} per hour` : `NZ$${minRate}-${maxRate} per hour`;
   const openingHoursSpecification = advertisedHours(identity, availability).map(
     ({ day, open, close }) => ({
       "@type": "OpeningHoursSpecification",
@@ -207,7 +212,7 @@ export default async function RootLayout({
         availableLanguage: ["English"],
       },
     ],
-    priceRange: `NZ$${pricing.baseRate} per hour`,
+    priceRange,
     paymentAccepted: ["Cash", "Bank Transfer"],
     currenciesAccepted: "NZD",
     knowsAbout: [

@@ -16,6 +16,7 @@ import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { BreakdownModal, type BreakdownData } from "@/features/business/components/BreakdownModal";
 import { ExpenseForm, type ExpenseFormState } from "@/features/business/components/ExpenseForm";
 import {
+  findRecurring,
   groupKey,
   matchCount,
   MIGRATE_MIN_MATCHES,
@@ -51,6 +52,8 @@ const BATCH = 25;
 
 /** Props for {@link ExpensesView}. */
 interface ExpensesViewProps {
+  /** Bumped by the parent to reload the entries (after a subscription payment is recorded). */
+  reloadKey?: number;
   /** Called after an expense is migrated to a subscription (bumps the sibling list). */
   onMigrated?: () => void;
   /** GST registration; sets the new-expense GST default and the totals' basis. */
@@ -86,6 +89,7 @@ async function fetchSubscribedKeys(): Promise<Set<string>> {
 /**
  * Client component for recording, filtering, and displaying expense entries.
  * @param props - Component props.
+ * @param props.reloadKey - Bumped by the parent to reload the entries.
  * @param props.onMigrated - Callback fired after a successful migrate-to-subscription.
  * @param props.gst - GST registration status from the pricing settings.
  * @param props.assetThreshold - Cost (on the GST basis) above which a row offers "Turn into an asset".
@@ -93,6 +97,7 @@ async function fetchSubscribedKeys(): Promise<Set<string>> {
  * @returns Expenses view element.
  */
 export function ExpensesView({
+  reloadKey = 0,
   onMigrated,
   gst,
   assetThreshold,
@@ -163,17 +168,7 @@ export function ExpensesView({
     () => Array.from(new Set(entries.map((e) => e.method))).sort(),
     [entries],
   );
-  // Supplier+description groups for recurrence detection.
-  const recurringGroups = useMemo(() => {
-    const m = new Map<string, ExpenseEntry[]>();
-    for (const e of entries) {
-      const k = groupKey(e);
-      const arr = m.get(k);
-      if (arr) arr.push(e);
-      else m.set(k, [e]);
-    }
-    return m;
-  }, [entries]);
+  const recurringRuns = useMemo(() => findRecurring(entries), [entries]);
   const linkedSet = useMemo(() => new Set(linkedExpenseIds), [linkedExpenseIds]);
 
   useEffect(() => {
@@ -181,7 +176,7 @@ export function ExpensesView({
       .then(setEntries)
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [reloadKey]);
 
   useEffect(() => {
     fetchSubscribedKeys()
@@ -221,7 +216,7 @@ export function ExpensesView({
   function canMigrate(e: ExpenseEntry): boolean {
     return (
       subscribedKeys !== null &&
-      matchCount(recurringGroups, e) >= MIGRATE_MIN_MATCHES &&
+      matchCount(recurringRuns, e) >= MIGRATE_MIN_MATCHES &&
       !subscribedKeys.has(groupKey(e))
     );
   }
@@ -556,7 +551,7 @@ export function ExpensesView({
           <>
             <ExpensesListCards
               rows={pager.visible}
-              recurringGroups={recurringGroups}
+              recurringRuns={recurringRuns}
               subscribedKeys={subscribedKeys}
               canMigrate={canMigrate}
               gst={gst}
@@ -568,7 +563,7 @@ export function ExpensesView({
             />
             <ExpensesListTable
               rows={pager.visible}
-              recurringGroups={recurringGroups}
+              recurringRuns={recurringRuns}
               subscribedKeys={subscribedKeys}
               canMigrate={canMigrate}
               gst={gst}
@@ -607,7 +602,7 @@ export function ExpensesView({
         <MigrateToSubscriptionDialog
           open
           expense={migrateTarget}
-          matches={recurringGroups.get(groupKey(migrateTarget))}
+          matches={recurringRuns.get(migrateTarget.id)}
           onClose={(migrated) => {
             setMigrateTarget(null);
             if (migrated) {

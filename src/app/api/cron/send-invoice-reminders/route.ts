@@ -1,11 +1,16 @@
 // src/app/api/cron/send-invoice-reminders/route.ts
 // Daily cron chasing overdue SENT invoices, idempotent via reminderCount. Invoices whose
-// payment is already in the income ledger are held back. See docs/CRON.md.
+// payment is already in the income ledger are held back and the owner gets a push to mark
+// them paid. See docs/CRON.md.
 
 import { balanceDue } from "@/features/business/lib/invoice-maths";
-import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
+import {
+  findRecordedPayment,
+  heldReminderPush,
+} from "@/features/business/lib/invoice-payment-match";
 import { sendOverdueReminder } from "@/features/business/lib/invoice-reminders";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
+import { sendOwnerPush } from "@/features/notifications/lib/push";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorised } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -65,17 +70,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         console.warn(
           `[cron/send-invoice-reminders] ${inv.number} not chased: nothing left owing - mark it paid`,
         );
+        await sendOwnerPush(heldReminderPush(inv, null));
         continue;
       }
 
       // Payment may be in the Cashbook but not against the invoice; chasing a payer is
-      // worse than a late nudge.
+      // worse than a late nudge. Even a name-only ("possible") match holds the reminder,
+      // and nothing is marked paid here: the push asks the owner to check.
       const payment = await findRecordedPayment(inv);
       if (payment) {
         results.paid++;
         console.warn(
-          `[cron/send-invoice-reminders] ${inv.number} not chased: ${payment.strength} payment of ${payment.amount} on ${payment.date.toISOString()} - mark it paid`,
+          `[cron/send-invoice-reminders] ${inv.number} not chased: ${payment.strength} payment of ${payment.amount} from "${payment.customer}" on ${payment.date.toISOString()} - mark it paid`,
         );
+        await sendOwnerPush(heldReminderPush(inv, payment));
         continue;
       }
 

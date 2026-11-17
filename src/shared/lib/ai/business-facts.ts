@@ -10,11 +10,16 @@ import {
   gstCopy,
   minimumsCopy,
   partsCopy,
+  ratesListCopy,
   travelCopy,
   unsuccessfulWorkCopy,
   workmanshipCopy,
 } from "@/features/business/lib/pricing-policy";
-import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import {
+  getPolicy,
+  getPublicPricing,
+  publicRateCard,
+} from "@/features/business/lib/pricing-policy.server";
 import { servedSuburbGroups } from "@/shared/lib/served-suburbs";
 import { SERVICE_AREAS } from "@/shared/lib/service-areas";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -102,12 +107,17 @@ export async function loadBusinessFacts(): Promise<BusinessFacts> {
       : `- ${m.label} surcharge: ${m.deltaDescription}/hr on labour. ${m.description}`,
   );
 
+  // Standard rates only: promo figures stay on /pricing.
+  const otherRates = ratesListCopy(
+    publicRateCard(pricing, null).filter((line) => line.key !== "on-site"),
+  );
+
   const body = [
     "## Key facts",
     "",
     `- Service area: ${identity.homeRegion}, within about ${identity.serviceRadiusKm} km of ${identity.baseAddress.locality}`,
     `- Hours: ${hours.join("; ")}`,
-    `- Standard rate: NZ$${pricing.baseRate} per hour; small-business rate NZ$${pricing.businessRate} per hour. Current offers: ${siteUrl}/pricing`,
+    `- Standard rate: NZ$${pricing.baseRate} per hour at your place${otherRates ? ` (${otherRates})` : ""}; small-business rate NZ$${pricing.businessRate} per hour. Current offers: ${siteUrl}/pricing`,
     ...(started ? [`- Running since: ${started}`] : []),
     `- Phone: ${identity.phone}`,
     `- Email: ${identity.email}`,
@@ -118,7 +128,7 @@ export async function loadBusinessFacts(): Promise<BusinessFacts> {
     "",
     `Quoted from the pricing page, where ${identity.name} writes as "I".`,
     "",
-    `- On-site visit: ${formatMoneyCompact(pricing.baseRate)}/hr for every job (no complex-work surcharge), plus travel.`,
+    `- At your place: ${formatMoneyCompact(pricing.baseRate)}/hr, plus travel.`,
     ...modifiers,
     `- Minimum charge: ${plain(minimumsCopy(policy.MIN_BILLABLE_MINS, policy.BILLING_INCREMENT_MINS))}`,
     `- Travel: ${plain(travelCopy(policy.TRAVEL_RATE_PER_HOUR, policy.MIN_TRAVEL_CHARGE))}`,

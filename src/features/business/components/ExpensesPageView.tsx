@@ -1,7 +1,7 @@
 "use client";
 // src/features/business/components/ExpensesPageView.tsx
-// Pairs ExpensesView with SubscriptionsView; a migrate bumps the `reloadKey` the
-// subscriptions view watches, so the new subscription appears at once.
+// Pairs ExpensesView with SubscriptionsView. A migrate bumps the subscriptions' `reloadKey` and
+// a recorded payment bumps the expenses', so each change shows in the other list at once.
 
 import { ExpensesView } from "@/features/business/components/ExpensesView";
 import { SubscriptionsView } from "@/features/business/components/SubscriptionsView";
@@ -33,16 +33,22 @@ export function ExpensesPageView({
   linkedExpenseIds,
 }: ExpensesPageViewProps): React.ReactElement {
   const [subsReloadKey, setSubsReloadKey] = useState(0);
+  const [expensesReloadKey, setExpensesReloadKey] = useState(0);
   return (
     <>
       <ExpensesView
+        reloadKey={expensesReloadKey}
         onMigrated={() => setSubsReloadKey((k) => k + 1)}
         gst={gst}
         assetThreshold={assetThreshold}
         linkedExpenseIds={linkedExpenseIds}
       />
       <div className="mt-6">
-        <SubscriptionsView reloadKey={subsReloadKey} gst={gst} />
+        <SubscriptionsView
+          reloadKey={subsReloadKey}
+          gst={gst}
+          onRecorded={() => setExpensesReloadKey((k) => k + 1)}
+        />
       </div>
     </>
   );

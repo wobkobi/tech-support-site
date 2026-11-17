@@ -1,13 +1,15 @@
 // src/app/api/cron/send-booking-reminders/route.ts
 // Cron (every 30 min, must not be slowed) sending a 24h-out reminder for confirmed
 // bookings, idempotent via emailReminderSentAt (claimed before the send). The lower bound
-// (freeNoticeHours + 1) keeps reminders inside free cancellation. The window can be just
-// 1 hour wide and a stepped-over booking is never revisited.
+// (freeNoticeHours + 1) keeps reminders inside free cancellation, and a booking made too close
+// to the start is skipped (reminderWindow). The window can be just 1 hour wide and a
+// stepped-over booking is never revisited.
 
 import {
   CALENDAR_EVENT_PRESENT_FILTER,
   combineUnitAndAddress,
 } from "@/features/booking/lib/booking";
+import { reminderWindow } from "@/features/booking/lib/booking-reminder";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { sendBookingReminderEmail } from "@/features/reviews/lib/email-booking";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -34,10 +36,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const now = new Date();
     const { CANCELLATION } = await getPolicy();
-    // Lower bound keeps the booking far enough out for free cancellation.
-    const lowerHours = CANCELLATION.freeNoticeHours + 1;
-    const fromTime = new Date(now.getTime() + lowerHours * 60 * 60 * 1000);
-    const upperTime = new Date(now.getTime() + comms.reminderLeadHours * 60 * 60 * 1000);
+    const bounds = reminderWindow(now, {
+      leadHours: comms.reminderLeadHours,
+      freeNoticeHours: CANCELLATION.freeNoticeHours,
+    });
 
     const unsent = {
       OR: [{ emailReminderSentAt: null }, { emailReminderSentAt: { isSet: false } }],
@@ -45,7 +47,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const emailCandidates = await prisma.booking.findMany({
       where: {
         status: "confirmed",
-        startAt: { gt: fromTime, lte: upperTime },
+        startAt: { gt: bounds.startAfter, lte: bounds.startBy },
+        // A fresh confirmation already did the reminder's job.
+        createdAt: { lte: bounds.bookedBy },
         // Under AND: a second top-level OR would overwrite the first.
         AND: [unsent, CALENDAR_EVENT_PRESENT_FILTER],
       },

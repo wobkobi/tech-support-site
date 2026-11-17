@@ -26,6 +26,7 @@ import {
   applyTakeDown,
   defaultTargets,
   freshRun,
+  neverWentUp,
   resetFailed,
   rollUpStatus,
   statusAfterTakeDown,
@@ -1012,6 +1013,18 @@ function checkTargets(): void {
     retried[0]!.status === "posted" &&
       retried[1]!.status === "pending" &&
       retried[1]!.error === null,
+  );
+  expect(
+    "a missed post that no app has can go back to a draft",
+    neverWentUp([target("facebook", "failed"), target("instagram", "skipped")]),
+  );
+  expect(
+    "a post up on one app can't",
+    !neverWentUp([target("facebook", "posted"), target("instagram", "failed")]),
+  );
+  expect(
+    "nor one an app is still processing",
+    !neverWentUp([{ ...target("facebook", "failed"), containerId: "c1" }]),
   );
   const fresh = freshRun([target("facebook", "posted"), target("instagram", "failed"), g]);
   expect(

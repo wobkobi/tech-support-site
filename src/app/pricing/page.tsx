@@ -9,6 +9,7 @@ import { formatMoneyCompact, goldCardOffText } from "@/features/business/lib/bus
 import {
   cancellationCopy,
   minimumsCopy,
+  ratesListCopy,
   travelCopy,
   unsuccessfulWorkCopy,
   workmanshipCopy,
@@ -17,6 +18,7 @@ import {
   getPolicy,
   getPublicPricing,
   getRateRows,
+  publicRateCard,
   toPublicRates,
 } from "@/features/business/lib/pricing-policy.server";
 import {
@@ -27,7 +29,6 @@ import {
   promoDisplayRate,
   promoForRateCard,
   promoLastDay,
-  promoModifierRate,
   promoTravelFactor,
   summariseForBanner,
 } from "@/features/business/lib/promos";
@@ -103,7 +104,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const promoSummary = promo ? summariseForBanner(promo, { fixedDate: true }) : null;
   const rateBlurb = promoSummary
     ? `Limited offer: ${promoSummary}.`
-    : `$${pricing.baseRate}/hr for every job - no complex-work surcharge.`;
+    : `${ratesListCopy(publicRateCard(pricing, null))}.`;
   // A promo title drops the brand suffix so the offer fits Google's ~60-char cut.
   const title = promoSummary
     ? `Computer Repair Prices Auckland - ${promoSummary}`
@@ -149,26 +150,16 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   const travelDiscounted = travelFactor < 1;
 
   // On-site first, then each public channel dearest first. A flat promo prices a channel at
-  // the gap it locked in, which promoModifierRate reads by label.
-  const channelLines = pricing.modifiers
-    .filter((mod) => mod.kind === "delta")
-    .map((mod): PriceLine => {
-      const price = promoModifierRate(
-        baseRate,
-        mod.effectiveRate,
-        mod.kind,
-        pricedPromo,
-        mod.label,
-      );
-      return {
-        key: mod.label,
-        name: mod.publicLabel,
-        note: mod.description,
-        before: price !== mod.effectiveRate ? mod.effectiveRate : null,
-        price,
-      };
-    })
-    .sort((a, b) => b.price - a.price);
+  // the gap it locked in, which publicRateCard reads by label.
+  const channelLines = publicRateCard(pricing, pricedPromo)
+    .filter((line) => line.key !== "on-site")
+    .map((line): PriceLine => ({
+      key: line.key,
+      name: line.name,
+      note: pricing.modifiers.find((m) => m.label === line.key)?.description ?? "",
+      before: line.price !== line.full ? line.full : null,
+      price: line.price,
+    }));
   const rateLines: PriceLine[] = [
     {
       key: "on-site",
@@ -340,7 +331,8 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
         <TickList className="mb-8">
           <TickItem>
-            <strong>No hidden fees.</strong> The price I quote is the price you pay.
+            <strong>No hidden fees.</strong> You pay for the time, the travel and any parts you
+            approved, and the invoice lists each one.
           </TickItem>
           <TickItem>
             <strong>No upselling.</strong> I don't sell hardware or earn commission on products.

@@ -7,7 +7,7 @@ import type { PromoWording } from "@/features/mailing/lib/render";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
 import type { PublishResult } from "@/features/social/lib/adapter";
 import { NOT_CONTENT } from "@/features/social/lib/filters";
-import { postHref } from "@/features/social/lib/links";
+import { SOCIAL_POSTS_PATH, postHref } from "@/features/social/lib/links";
 import {
   RESUME_AFTER_MS,
   canTakeDown,
@@ -15,6 +15,7 @@ import {
   formatOf,
 } from "@/features/social/lib/media";
 import { PLATFORMS } from "@/features/social/lib/platforms";
+import { sweepPromoQueues } from "@/features/social/lib/promo-retire.server";
 import {
   afterPublish,
   applyTakeDown,
@@ -37,12 +38,23 @@ import {
   validatePost,
   type SocialPlatformKey,
 } from "@/features/social/lib/validate";
+import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import type { SocialPost } from "@prisma/client";
 
 // A run "posting" for longer than this died part-way, and the cron resumes it. A
 // take-down "removing" for longer can be claimed again from the composer.
 const STUCK_AFTER_MS = 10 * 60 * 1000;
+
+/**
+ * A scheduled post more than this late isn't sent by the cron: it's closed as missed and the
+ * owner is told. The cron runs every 5 minutes, so a normal post goes within minutes and a
+ * cron-job.org or Vercel hiccup of an hour or two still gets through. Past 3 hours a post lands
+ * in a different part of the day (a morning post in the evening), words like "today" or "this
+ * weekend" may be wrong, and a cron coming back from an outage would post its whole backlog at
+ * once.
+ */
+const MISSED_AFTER_MS = 3 * 60 * 60 * 1000;
 
 /** Outcome of a publish, retry or schedule. */
 export type PublishOutcome =
@@ -112,12 +124,16 @@ export function scheduleProblems(post: SocialPost): { error: string; status: num
 }
 
 /**
- * Closes a scheduled post that can't go at its time as failed, keeping its slot, so it shows
- * under problems with Retry, and tells the owner. Claimed from "scheduled", so one push.
+ * Closes a scheduled post as failed, keeping its time, with the reason on every app it was going
+ * to, so it shows under problems with Retry and Back to draft.
  * @param post - The post.
- * @param error - Why it can't go.
+ * @param error - Why it didn't go.
+ * @returns True when this call closed it; false when it had already left "scheduled".
  */
-async function failAtSendTime(post: SocialPost, error: string): Promise<void> {
+async function closeScheduled(
+  post: Pick<SocialPost, "id" | "targets">,
+  error: string,
+): Promise<boolean> {
   const targets = freshRun(post.targets).map((t): TargetState =>
     t.status === "pending" ? { ...t, status: "failed", error } : t,
   );
@@ -125,13 +141,48 @@ async function failAtSendTime(post: SocialPost, error: string): Promise<void> {
     where: { id: post.id, status: "scheduled" },
     data: { status: "failed", targets },
   });
-  if (closed.count === 0) return;
+  return closed.count > 0;
+}
+
+/**
+ * Closes a scheduled post that can't go at its time as failed, keeping its slot, so it shows
+ * under problems with Retry, and tells the owner. Claimed from "scheduled", so one push.
+ * @param post - The post.
+ * @param error - Why it can't go.
+ */
+async function failAtSendTime(post: SocialPost, error: string): Promise<void> {
+  if (!(await closeScheduled(post, error))) return;
   await sendOwnerPush({
     title: "A scheduled post didn't go out",
     body: `"${post.name}" couldn't go at its time. Open it to see why.`,
     url: postHref(post),
     tag: `social-failed-${post.id}`,
   });
+}
+
+/**
+ * Tells the owner, in one push, which scheduled posts were too late to send on their own.
+ * @param missed - Posts just closed as missed, oldest first.
+ */
+async function pushMissed(
+  missed: { id: string; name: string; scheduledAt: Date }[],
+): Promise<void> {
+  const one = missed.length === 1 ? missed[0]! : null;
+  await sendOwnerPush(
+    one
+      ? {
+          title: "A scheduled post was missed",
+          body: `"${one.name}" was due ${formatDateTimeShort(one.scheduledAt)} and wasn't sent in time. Open it to post it now or pick a new time.`,
+          url: postHref(one),
+          tag: `social-missed-${one.id}`,
+        }
+      : {
+          title: `${missed.length} scheduled posts were missed`,
+          body: "They weren't sent in time. Open Posts to post them now or pick new times.",
+          url: SOCIAL_POSTS_PATH,
+          tag: "social-missed",
+        },
+  );
 }
 
 /**
@@ -375,9 +426,10 @@ export async function takeDownPost(id: string): Promise<PublishOutcome> {
 }
 
 /**
- * Cron: publishes due scheduled posts, checks on runs a platform is still processing once their
- * wait is over, and resumes runs that stalled part-way. Ignores quiet hours, since a post wakes
- * nobody.
+ * Cron: takes schedule postings off promos that aren't running, publishes due scheduled posts
+ * (closing any over {@link MISSED_AFTER_MS} late as missed, with one push), checks on runs a
+ * platform is still processing once their wait is over, and resumes runs that stalled part-way.
+ * Ignores quiet hours, since a post wakes nobody.
  * @returns One line per post touched.
  */
 export async function runScheduledSocialPosts(): Promise<
@@ -386,14 +438,30 @@ export async function runScheduledSocialPosts(): Promise<
   const now = new Date();
   const results: { id: string; name: string; result: PublishOutcome }[] = [];
 
+  // Before the due posts, so a schedule posting whose promo has ended is taken off rather than
+  // failing with a push. A failed sweep mustn't hold up the posts.
+  await sweepPromoQueues(now).catch((error: unknown) =>
+    console.error("[social/publish] promo sweep failed:", error),
+  );
+
   const due = await prisma.socialPost.findMany({
     where: { isPreset: false, status: "scheduled", scheduledAt: { lte: now }, ...NOT_CONTENT },
-    select: { id: true, name: true },
+    select: { id: true, name: true, scheduledAt: true, targets: true },
     orderBy: { scheduledAt: "asc" },
   });
+  const missed: { id: string; name: string; scheduledAt: Date }[] = [];
   for (const p of due) {
+    if (p.scheduledAt && now.getTime() - p.scheduledAt.getTime() > MISSED_AFTER_MS) {
+      const error = `Missed: it was due ${formatDateTimeShort(p.scheduledAt)}, and posts more than ${MISSED_AFTER_MS / 3_600_000} hours late aren't sent on their own. Press Retry failed to post it now, or Back to draft to pick a new time.`;
+      if (await closeScheduled(p, error)) {
+        missed.push({ id: p.id, name: p.name, scheduledAt: p.scheduledAt });
+      }
+      results.push({ id: p.id, name: p.name, result: { ok: false, error, status: 409 } });
+      continue;
+    }
     results.push({ id: p.id, name: p.name, result: await publishPost(p.id, true) });
   }
+  if (missed.length > 0) await pushMissed(missed);
 
   // A claimed run clears resumeAfter, so one still going is only picked up once it stalls.
   const stuck = await prisma.socialPost.findMany({

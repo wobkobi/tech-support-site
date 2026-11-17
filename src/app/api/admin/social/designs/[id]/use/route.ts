@@ -3,8 +3,9 @@
 // Google), updating its linked draft or starting a new one.
 
 import { parseObjectId } from "@/features/business/lib/validation";
+import { placeholderProblem, usesPromo } from "@/features/social-design/lib/bound";
 import { docHash, parseDesignDoc } from "@/features/social-design/lib/doc";
-import { loadBoundValues } from "@/features/social-design/lib/load-bound";
+import { loadBoundState } from "@/features/social-design/lib/load-bound";
 import {
   deleteUnusedMedia,
   writeKeepingUpdatedAt,
@@ -31,7 +32,8 @@ interface Ctx {
  * @param ctx - Route context.
  * @param ctx.params - Route params with the design id.
  * @returns JSON `{ postId, created, isContent, postingProblems? }` (postingProblems for a
- *   content item whose lined-up postings were updated), 409 when the pictures are out of date.
+ *   content item whose lined-up postings were updated), 409 when the pictures are out of date or
+ *   would show a bracketed reminder like "[No promo running]".
  */
 export async function POST(request: NextRequest, { params }: Ctx): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) return errorResponse("Unauthorized", 401);
@@ -45,7 +47,10 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
   const doc = parsed.doc;
 
   // Checked against current contact details and promo, so pictures are never stale.
-  const hash = docHash(doc, await loadBoundValues());
+  const { bound, promoId } = await loadBoundState();
+  const placeholder = placeholderProblem(doc, bound, ["feed-4x5", "google-4x3"]);
+  if (placeholder) return errorResponse(placeholder, 409);
+  const hash = docHash(doc, bound);
   /**
    * A size's stored picture, when it matches the design as it is now.
    * @param format - Size.
@@ -88,6 +93,9 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
       cropApprovedFor: null,
     };
   });
+  // Promo words in the picture tie the post to that promo, so publishing stops (and schedules
+  // retire it) once the promo ends. The hash match means the picture shows the promo running now.
+  const promo = usesPromo(doc) && promoId ? { promoId } : {};
   const picture = {
     imageUrl: feed.url,
     imageAlt: alt,
@@ -95,6 +103,7 @@ export async function POST(request: NextRequest, { params }: Ctx): Promise<NextR
     imageHeight: feed.height,
     imageOriginalUrl: null,
     targets,
+    ...promo,
   };
 
   let postId: string;

@@ -7,6 +7,7 @@ import {
   usePictureExporter,
   type PictureRequest,
 } from "@/features/social-design/components/canvas/export";
+import { placeholderProblem } from "@/features/social-design/lib/bound";
 import type { RenderRow } from "@/features/social-design/lib/design-row";
 import { docHash, type BoundValues, type DesignDoc } from "@/features/social-design/lib/doc";
 import { FORMATS, type FormatKey } from "@/features/social-design/lib/formats";
@@ -36,6 +37,8 @@ export interface Pictures {
   state: PictureState;
   progress: PictureProgress | null;
   failed: PictureFailure[];
+  /** Why no picture can be stored or downloaded yet, like "[No promo running]" showing; or null. */
+  blocked: string | null;
   /**
    * Saves, then draws and stores out-of-date (or given) sizes; true when all stored.
    */
@@ -85,10 +88,11 @@ export function usePictures({
     [stored, doc.formats],
   );
   const state = useMemo(() => pictureState(doc, bound, renders), [doc, bound, renders]);
+  const blocked = useMemo(() => placeholderProblem(doc, bound), [doc, bound]);
 
   const update = useCallback(
     async (only?: FormatKey[]): Promise<boolean> => {
-      if (busy.current) return false;
+      if (busy.current || placeholderProblem(current(), bound)) return false;
       busy.current = true;
       try {
         // Saved first: "Use in post" checks the pictures against the design as stored.
@@ -142,5 +146,5 @@ export function usePictures({
     [saveNow, current, bound, stored, exportPicture, designId],
   );
 
-  return { renders, state, progress, failed, update, exportPicture, stage };
+  return { renders, state, progress, failed, blocked, update, exportPicture, stage };
 }

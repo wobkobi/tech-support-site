@@ -38,7 +38,7 @@ type Filter = "ready" | "recent" | "reviewed" | "text_only" | "blocked" | "all";
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "ready", label: "Ready to ask" },
-  { value: "recent", label: "Asked recently" },
+  { value: "recent", label: "Already asked" },
   { value: "reviewed", label: "Reviewed on your site" },
   { value: "text_only", label: "Text only" },
   { value: "blocked", label: "Can't ask" },
@@ -48,6 +48,7 @@ const FILTERS: { value: Filter; label: string }[] = [
 const STATUS_PILL: Record<AskPersonStatus, { label: string; tone: StatusTone }> = {
   ready: { label: "Ready", tone: "success" },
   recent: { label: "Asked recently", tone: "warning" },
+  google_asked: { label: "Had their Google ask", tone: "warning" },
   reviewed: { label: "Reviewed on your site", tone: "violet" },
   text_only: { label: "Text only", tone: "info" },
   review_opt_out: { label: "Asked you to stop", tone: "neutral" },
@@ -87,7 +88,19 @@ function inFilter(status: AskPersonStatus, filter: Filter): boolean {
   if (filter === "blocked") {
     return status === "review_opt_out" || status === "mailing_opt_out" || status === "no_details";
   }
+  if (filter === "recent") return status === "recent" || status === "google_asked";
   return status === filter;
+}
+
+/**
+ * Whether a row can get a hand-sent email ask.
+ * @param status - The row's status.
+ * @returns True for every status an email can go to.
+ */
+function canEmail(status: AskPersonStatus): boolean {
+  return (
+    status === "ready" || status === "recent" || status === "google_asked" || status === "reviewed"
+  );
 }
 
 /**
@@ -96,9 +109,7 @@ function inFilter(status: AskPersonStatus, filter: Filter): boolean {
  * @returns True when the row gets a checkbox.
  */
 function canBulkSend(p: AskPerson): boolean {
-  return (
-    p.email !== null && (p.status === "ready" || p.status === "recent" || p.status === "reviewed")
-  );
+  return p.email !== null && canEmail(p.status);
 }
 
 /**
@@ -123,21 +134,13 @@ export function ReviewAskPeople({
   const [bulk, setBulk] = useState<BulkState>({ kind: "closed" });
 
   /**
-   * Moves just-asked rows to "Asked recently" (keeping "Reviewed on your site") at once.
+   * Moves just-asked rows to "Had their Google ask" at once; every ask now leads with Google.
    * @param match - Picks the rows that were just asked.
    */
   function markAsked(match: (p: AskPerson) => boolean): void {
     const at = new Date().toISOString();
     setPeople((prev) =>
-      prev.map((p) =>
-        match(p)
-          ? {
-              ...p,
-              lastAskedAt: at,
-              status: p.status === "reviewed" || gapDays === 0 ? p.status : "recent",
-            }
-          : p,
-      ),
+      prev.map((p) => (match(p) ? { ...p, lastAskedAt: at, status: "google_asked" } : p)),
     );
   }
 
@@ -167,6 +170,7 @@ export function ReviewAskPeople({
   const allSelected = selectable.length > 0 && selectable.every((p) => selected.has(p.id));
   const chosen = people.filter((p) => selected.has(p.id) && canBulkSend(p));
   const chosenRecent = chosen.filter((p) => p.status === "recent").length;
+  const chosenGoogle = chosen.filter((p) => p.status === "google_asked").length;
 
   /**
    * Ticks or unticks one row.
@@ -245,7 +249,7 @@ export function ReviewAskPeople({
         </AdminButton>
       );
     }
-    if (p.status !== "ready" && p.status !== "recent" && p.status !== "reviewed") return null;
+    if (!canEmail(p.status)) return null;
     return (
       <AdminButton
         variant={p.status === "ready" ? "outline" : "secondary"}
@@ -286,9 +290,10 @@ export function ReviewAskPeople({
         })}
       />
 
-      {filter === "recent" && gapDays > 0 && (
+      {filter === "recent" && (
         <p className="text-sm text-admin-muted">
-          Asked in the last {gapDays} days. You can still send again.
+          {gapDays > 0 ? `Asked in the last ${gapDays} days, or already` : "Already"} had their
+          Google review ask. Automatic asks go to each person once, but you can still send again.
         </p>
       )}
       {filter === "reviewed" && (
@@ -408,6 +413,12 @@ export function ReviewAskPeople({
               <p>
                 {chosenRecent} of them {chosenRecent === 1 ? "was" : "were"} asked in the last{" "}
                 {gapDays} days.
+              </p>
+            )}
+            {chosenGoogle > 0 && (
+              <p>
+                {chosenGoogle} of them {chosenGoogle === 1 ? "has" : "have"} already had their
+                Google review ask.
               </p>
             )}
             <ul className="max-h-64 divide-y divide-admin-border overflow-y-auto rounded-lg border border-admin-border">

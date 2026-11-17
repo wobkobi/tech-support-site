@@ -8,10 +8,12 @@ import {
   bestTimes,
   contentPerformance,
   dayGroups,
+  daysBetween,
   FIGURE_KEYS,
   GOOGLE_LAG_DAYS,
   hasPostStats,
   NO_FIGURES,
+  reportedThrough,
   sumDays,
   sumFigures,
   type AnalyticsRange,
@@ -89,7 +91,14 @@ export interface AnalyticsData {
   cards: AnalyticsCard[];
   /** The Business Profile's figures, or null when Google isn't on show. */
   googleCards: AnalyticsCard[] | null;
-  chart: { series: SocialPlatformKey[]; groups: ChartGroup[] };
+  chart: {
+    series: SocialPlatformKey[];
+    groups: ChartGroup[];
+    /** The chart's last day: the newest every app on show has reported, at most `to`. */
+    through: string;
+    /** Whether each column is a week. */
+    weekly: boolean;
+  };
   posts: AnalyticsPost[];
   content: ContentRow[];
   times: { cells: TimeCell[]; counted: number; measure: "engagements" | "views" };
@@ -188,24 +197,57 @@ export async function loadAnalytics(
    * @param key - The account figure.
    * @param label - Its label.
    * @param postKey - The post figure to fall back on, if any.
+   * @param sub - The line under an account figure; the app names when left out.
+   * @param postLabel - The label when the figure comes from the posts instead.
    * @returns The card.
    */
-  function metaCard(key: DayFigureKey, label: string, postKey: FigureKey | null): AnalyticsCard {
-    if (metaDays[key] !== undefined) return { key, label, value: metaDays[key], sub: appNames };
+  function metaCard(
+    key: DayFigureKey,
+    label: string,
+    postKey: FigureKey | null,
+    sub: string = appNames,
+    postLabel: string = label,
+  ): AnalyticsCard {
+    if (metaDays[key] !== undefined) return { key, label, value: metaDays[key], sub };
     const fromPosts = postKey ? postTotals[postKey] : null;
-    if (fromPosts !== null)
-      return { key, label, value: fromPosts, sub: "From posts in this range" };
+    if (fromPosts !== null) {
+      return { key, label: postLabel, value: fromPosts, sub: "Added up from posts in this range" };
+    }
     return { key, label, value: null, sub: "Not given yet" };
   }
+  // Labels say what the apps give: reach is a count per day (so it's added up, not people
+  // reached across the range), follows leave unfollows out, and the account clicks are taps on
+  // the Page's buttons and the profile's website link, not post link clicks.
+  const unfollows = metaDays.unfollows;
+  const follows = metaDays.follows;
   const cards =
     metaApps.length === 0
       ? []
       : [
-          metaCard("views", "Views", "views"),
-          metaCard("reach", "Reach", "reach"),
+          metaCard("views", "Views", "views", `Times shown on ${appNames}`),
+          metaCard(
+            "reach",
+            "Reach, day by day",
+            "reach",
+            "Added up, so someone reached on 2 days counts twice",
+            "Reach, post by post",
+          ),
           metaCard("engagements", "Engagements", "engagements"),
-          metaCard("follows", "New followers", null),
-          metaCard("clicks", "Link clicks", "clicks"),
+          metaCard(
+            "follows",
+            "Follows",
+            null,
+            follows !== undefined && unfollows !== undefined
+              ? `${unfollows.toLocaleString("en-NZ")} unfollows, so ${follows - unfollows >= 0 ? "+" : ""}${(follows - unfollows).toLocaleString("en-NZ")} overall`
+              : "Unfollows not taken off",
+          ),
+          metaCard(
+            "clicks",
+            "Profile clicks",
+            "clicks",
+            "Page buttons and profile website link",
+            "Post clicks",
+          ),
         ];
 
   const googleDays = sumDays(days.filter((d) => d.platform === "google").map((d) => d.figures));
@@ -305,9 +347,18 @@ export async function loadAnalytics(
   if (apps.includes("google")) {
     notes.push({
       tone: "info",
-      text: `Google's figures run ${GOOGLE_LAG_DAYS} days behind, and Google gives none for single posts.`,
+      text: `Google figures run about ${GOOGLE_LAG_DAYS} days behind, so its newest days aren't in yet, and Google gives none for single posts.`,
     });
   }
+
+  // The chart ends on the last day every app has reported, rather than plotting days not in yet
+  // as 0 (the chart can't draw a gap).
+  const viewDays = days.map((d) => ({
+    platform: d.platform,
+    day: d.day,
+    value: d.figures.views ?? null,
+  }));
+  const through = reportedThrough(viewDays, from, to, apps) ?? to;
 
   return {
     range,
@@ -318,12 +369,9 @@ export async function loadAnalytics(
     googleCards,
     chart: {
       series: apps,
-      groups: dayGroups(
-        days.map((d) => ({ platform: d.platform, day: d.day, value: d.figures.views ?? null })),
-        from,
-        to,
-        apps,
-      ),
+      groups: dayGroups(viewDays, from, through, apps),
+      through,
+      weekly: daysBetween(from, through).length > 31,
     },
     posts,
     content,
@@ -537,27 +585,22 @@ export interface ViewsWeek {
 }
 
 /**
- * Loads the Overview's views chart: the seven days up to yesterday, since today is never in yet.
+ * Loads the Overview's views chart: the seven days up to the last one every app has reported
+ * (yesterday at best, since today is never in), so a day not in yet isn't shown as 0.
  * @param now - Now.
  * @returns The chart's data.
  */
 export async function loadViewsWeek(now: Date): Promise<ViewsWeek> {
-  const to = addDaysToDateKey(nzDateKey(now), -1);
-  const from = addDaysToDateKey(to, -6);
+  const yesterday = addDaysToDateKey(nzDateKey(now), -1);
+  // Read back far enough to fill seven days behind Google's lag.
+  const earliest = addDaysToDateKey(yesterday, -(6 + GOOGLE_LAG_DAYS));
   const rows = await prisma.socialAccountDay.findMany({
-    where: { day: { gte: from, lte: to } },
+    where: { day: { gte: earliest, lte: yesterday } },
     select: { platform: true, day: true, views: true },
   });
   const series = SOCIAL_PLATFORMS.filter((p) => rows.some((r) => r.platform === p));
-  return {
-    from,
-    to,
-    series,
-    groups: dayGroups(
-      rows.map((r) => ({ ...r, value: r.views })),
-      from,
-      to,
-      series,
-    ),
-  };
+  const days = rows.map((r) => ({ ...r, value: r.views }));
+  const to = reportedThrough(days, earliest, yesterday, series) ?? yesterday;
+  const from = addDaysToDateKey(to, -6);
+  return { from, to, series, groups: dayGroups(days, from, to, series) };
 }

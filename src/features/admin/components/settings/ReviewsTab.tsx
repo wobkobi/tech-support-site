@@ -43,16 +43,6 @@ export function ReviewsTab({ initial, defaults }: Props): React.ReactElement {
   return (
     <SettingsTabBody changed={form.changedPaths}>
       <div className="divide-y divide-admin-border">
-        <NumberField
-          id="homepageFeaturedCount"
-          meta={m.homepageFeaturedCount}
-          value={draft.homepageFeaturedCount}
-          min={0}
-          max={50}
-          error={fieldErrors.homepageFeaturedCount}
-          customised={draft.homepageFeaturedCount !== defaults.homepageFeaturedCount}
-          onChange={(v) => set({ homepageFeaturedCount: v ?? 0 })}
-        />
         <ToggleField
           id="autoApproveVerified"
           meta={m.autoApproveVerified}

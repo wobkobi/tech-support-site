@@ -459,8 +459,6 @@ function validateComms(c: CommsSettings): FieldError[] {
  */
 function validateReviews(r: ReviewsSettings): FieldError[] {
   const errors: FieldError[] = [];
-  if (!inRange(r.homepageFeaturedCount, 0, 50))
-    errors.push({ field: "homepageFeaturedCount", message: "Must be 0-50 reviews." });
   if (typeof r.autoApproveVerified !== "boolean")
     errors.push({ field: "autoApproveVerified", message: "Must be on or off." });
   if (typeof r.googleReviewUrl !== "string")

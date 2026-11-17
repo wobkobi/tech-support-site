@@ -124,6 +124,13 @@ export const CANCELLATION: CancellationPolicy = {
   autoSendCancellationInvoice: true,
 };
 
+/**
+ * Cancelling within this many hours of making the booking is always free, whatever the notice.
+ * Bookings open well inside the free-notice window, so a quick change of mind would otherwise
+ * cost the fee. Never applies to a no-show.
+ */
+export const FREE_CANCEL_GRACE_HOURS = 1;
+
 /** Which cancellation fee is being billed. */
 export type CancellationReason = "late-cancellation" | "no-show";
 
@@ -145,13 +152,15 @@ export interface CancellationCharge {
 
 /**
  * Applies the cancellation policy to one booking. In person: free, then callOutFee, then full
- * call-out plus travel inside travelChargeHours. Remote: free or remoteFee. No-shows always pay.
+ * call-out plus travel inside travelChargeHours. Remote: free or remoteFee. No-shows always pay;
+ * a cancel within {@link FREE_CANCEL_GRACE_HOURS} of booking never does.
  * @param bookingStart - When the booking was due to start.
  * @param cancelledAt - When the client called it off; ignored for a no-show.
  * @param options - Booking shape.
  * @param options.reason - Late cancellation or no-show.
  * @param options.meetingType - On site or remote.
  * @param options.policy - Live policy (defaults to the module constant).
+ * @param options.bookedAt - When the booking was made, for the grace period; omit to skip it.
  * @returns The fee, whether travel is added, and which tier applied.
  */
 export function assessCancellation(
@@ -161,10 +170,15 @@ export function assessCancellation(
     reason: CancellationReason;
     meetingType: CancelMeetingType;
     policy?: CancellationPolicy;
+    bookedAt?: Date;
   },
 ): CancellationCharge {
   const p = options.policy ?? CANCELLATION;
   const noShow = options.reason === "no-show";
+
+  if (!noShow && options.bookedAt && isWithinBookingGrace(options.bookedAt, cancelledAt)) {
+    return { fee: 0, travelApplies: false, isFullCallOut: false };
+  }
 
   if (options.meetingType === "remote") {
     const charged =
@@ -283,6 +297,17 @@ export function isWithinCancellationWindow(
 ): boolean {
   const msUntil = bookingStart.getTime() - now.getTime();
   return msUntil < freeNoticeHours * 60 * 60 * 1000;
+}
+
+/**
+ * True when a cancel lands inside the free grace period after the booking was made.
+ * @param bookedAt - When the booking was made (Booking.createdAt).
+ * @param now - Reference time (defaults to current time).
+ * @returns True when less than {@link FREE_CANCEL_GRACE_HOURS} have passed since booking.
+ */
+export function isWithinBookingGrace(bookedAt: Date, now: Date = new Date()): boolean {
+  const msSince = now.getTime() - bookedAt.getTime();
+  return msSince >= 0 && msSince < FREE_CANCEL_GRACE_HOURS * 60 * 60 * 1000;
 }
 
 /**
@@ -421,6 +446,9 @@ export function cancellationCopy(
     `**Remote sessions:** free if cancelled at least **${hours(p.remoteFreeNoticeHours)}** before ` +
     `your appointment. Inside that window, or if you are not there, a **$${p.remoteFee} fee** ` +
     `applies.`;
+  const grace =
+    `Changed your mind? Cancelling within **${hours(FREE_CANCEL_GRACE_HOURS)}** of making the ` +
+    `booking is always free.`;
   const closing = `Please cancel using the link in your confirmation email, or by phone or text.`;
 
   // A booking's emails show just its own tier; general pages (pricing, FAQ) get both.
@@ -431,7 +459,7 @@ export function cancellationCopy(
         ? [remote]
         : [inPerson, remote];
 
-  return [...tiers, closing].join("\n\n");
+  return [...tiers, grace, closing].join("\n\n");
 }
 
 /**
@@ -528,6 +556,39 @@ export function minimumsCopy(
     `Quick calls and emails stay **free** - time counts once I log in to your computer ` +
     `or we start fixing something over the phone.`
   );
+}
+
+/** Where the figure goes in a rate sentence ("Remote or phone help is {rate}."). */
+export const RATE_SLOT = "{rate}";
+
+/** One hourly rate as public copy quotes it. */
+export interface RateCopyLine {
+  /** $/hr charged, after any promo. */
+  price: number;
+  /** Words after the figure in a short list, e.g. "at your place". */
+  shortPhrase: string;
+  /** Full sentence with {@link RATE_SLOT} where the figure goes. */
+  sentence: string;
+}
+
+/**
+ * The hourly rates as one short list, for meta descriptions and one-line summaries.
+ * @param lines - Rates in display order.
+ * @returns e.g. "$100/hr at your place, $75/hr remote or by phone and $70/hr for work I take away".
+ */
+export function ratesListCopy(lines: ReadonlyArray<RateCopyLine>): string {
+  const parts = lines.map((l) => `${perHourLabel(l.price)} ${l.shortPhrase}`);
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+}
+
+/**
+ * The hourly rates as full sentences, one per rate, for FAQ-style answers.
+ * @param lines - Rates in display order.
+ * @returns e.g. "Work at your place is $100/hr. Remote or phone help is $75/hr."
+ */
+export function rateSentencesCopy(lines: ReadonlyArray<RateCopyLine>): string {
+  return lines.map((l) => l.sentence.replace(RATE_SLOT, perHourLabel(l.price))).join(" ");
 }
 
 /**

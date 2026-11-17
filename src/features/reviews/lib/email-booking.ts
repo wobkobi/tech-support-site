@@ -2,6 +2,7 @@
 // Booking emails: owner notifications, customer confirmations, reminders and manage links.
 
 import { buildAppointmentDescription, parseBookingNotes } from "@/features/booking/lib/booking";
+import { reminderDayPhrase } from "@/features/booking/lib/booking-reminder";
 import { buildIcs } from "@/features/booking/lib/ics";
 import type { OwnerBookingSummary } from "@/features/booking/lib/owner-booking-summary.server";
 import type { OwnerQuoteBreakdown } from "@/features/booking/lib/owner-quote";
@@ -19,6 +20,7 @@ import {
   escapeHtml,
   htmlToText,
   missingEmailEnv,
+  outreachHoldUntil,
   renderEmphasisedHtml,
   renderNotificationEmail,
   sendNow,
@@ -588,7 +590,8 @@ ${await buildEmailSignature(siteUrl)}
 
 /**
  * Sends a "your appointment is tomorrow" reminder. Fired by the
- * /api/cron/send-booking-reminders cron. Failures are logged - never throws.
+ * /api/cron/send-booking-reminders cron. The day word comes from the NZ date the email lands
+ * on, after any quiet-hours hold. Failures are logged - never throws.
  * @param booking - Booking details (same shape as the confirmation helper).
  * @returns True if Resend accepted the message, false on misconfig / failure.
  */
@@ -624,11 +627,13 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
   const identity = await getIdentity();
   const promoLine = promoPanel(booking);
   const attachments = await bookingIcsAttachment(booking);
+  // One hold for both the copy and the send, so "today" can't go out as "tomorrow".
+  const holdUntil = await outreachHoldUntil();
+  const dayPhrase = reminderDayPhrase(booking.startAt, holdUntil ?? new Date());
 
-  // "Tomorrow" wording assumes comms.reminderLeadHours stays near 24h.
   const html = renderNotificationEmail(`
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName}, just a reminder</h2>
-    <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with ${escapeHtml(brandName(identity))} is coming up tomorrow.</p>
+    <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with ${escapeHtml(brandName(identity))} is coming up ${dayPhrase}.</p>
 
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">When</p>
     <p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
@@ -666,12 +671,14 @@ ${await buildEmailSignature(siteUrl)}
         from,
         replyTo: process.env.ADMIN_EMAIL,
         to: booking.email,
-        subject: `Reminder: appointment tomorrow - ${start}`,
+        subject: `Reminder: appointment ${dayPhrase} - ${start}`,
         html,
         text: htmlToText(html),
         attachments,
       },
       booking.id,
+      undefined,
+      holdUntil,
     );
     // Resend rejects with { error }, not a throw; returning true would stop the cron retrying.
     if (result.error) {

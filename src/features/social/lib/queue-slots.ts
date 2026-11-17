@@ -227,6 +227,8 @@ export interface QueueCandidate {
   maxPosts: number | null;
   /** When each of its postings went out or is lined up for, in ms. */
   times: number[];
+  /** For an item tied to a promo: when the promo can be advertised, from (included) and to, in ms. */
+  promoWindow?: { from: number; to: number };
 }
 
 /** The schedule's side of a pick. */
@@ -241,8 +243,9 @@ export interface PickRules {
 }
 
 /**
- * Whether an item can fill a slot: not finished by then, recycling or never posted, no posting
- * within the gap either side, and at least one app in common with the schedule.
+ * Whether an item can fill a slot: not finished by then, inside its promo's dates when it has
+ * one, recycling or never posted, no posting within the gap either side, and at least one app in
+ * common with the schedule.
  * @param c - The item.
  * @param rules - The schedule's rules.
  * @param at - The slot.
@@ -251,10 +254,11 @@ export interface PickRules {
 export function canFill(c: QueueCandidate, rules: PickRules, at: Date): boolean {
   const stats = { count: c.times.length, lastPostedAt: null, nextAt: null };
   if (spentReason(c, stats, at)) return false;
+  const ms = at.getTime();
+  if (c.promoWindow && (ms < c.promoWindow.from || ms >= c.promoWindow.to)) return false;
   if (!c.recycle && c.times.length > 0) return false;
   if (!c.platforms.some((p) => rules.platforms.includes(p))) return false;
   const gap = rules.minGapDays * DAY_MS;
-  const ms = at.getTime();
   // A gap of 0 still keeps one item to one posting at a time.
   return !c.times.some((t) => Math.abs(t - ms) < Math.max(gap, 1));
 }

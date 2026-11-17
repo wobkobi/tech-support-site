@@ -73,9 +73,12 @@ model Booking {
   bufferBeforeMin Int @default(0)
   bufferAfterMin  Int @default(0)
 
-  // How many times this booking has been rescheduled via /booking/edit; gates
-  // the optional max-reschedules pricing setting.
-  rescheduleCount Int @default(0)
+  // Every move of the start, by the customer or the operator; becomes the
+  // calendar file's SEQUENCE, so it must rise on each move.
+  rescheduleCount         Int @default(0)
+  // Moves the customer made via /booking/edit; only these count toward the
+  // max-reschedules pricing setting, so an operator move never uses one up.
+  customerRescheduleCount Int @default(0)
 
   // Booking lifecycle state.
   status BookingStatus @default(confirmed)

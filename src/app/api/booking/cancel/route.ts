@@ -27,7 +27,7 @@ interface CancelPayload {
  * GET /api/booking/cancel?token=...
  * Booking info for the confirmation gate. Never mutates state.
  * @param request - Incoming request, expects ?token=... in the query string.
- * @returns JSON `{ ok, startAt, status, meetingType, cancellation }` or `{ ok: false, error }`.
+ * @returns JSON `{ ok, startAt, bookedAt, status, meetingType, cancellation }` or `{ ok: false, error }`.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimitOrReject(request, "booking-cancel-info", 10, 60_000);
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const booking = await prisma.booking.findFirst({
     where: { cancelToken: token },
-    select: { startAt: true, status: true, meetingType: true },
+    select: { startAt: true, createdAt: true, status: true, meetingType: true },
   });
   if (!booking) {
     return errorResponse("Booking not found.", 404);
@@ -52,6 +52,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     ok: true,
     startAt: booking.startAt.toISOString(),
+    // For the grace period: a cancel soon after booking is free.
+    bookedAt: booking.createdAt.toISOString(),
     status: booking.status,
     meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
     cancellation: {
@@ -111,6 +113,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       reason: "late-cancellation",
       meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
       policy: CANCELLATION,
+      bookedAt: booking.createdAt,
     });
     const lateCancellation = charge.fee > 0;
     const travelChargeApplies = charge.travelApplies;

@@ -19,13 +19,20 @@ import {
   GST_RATE,
   HOME_REGION,
   NZ_REGION,
+  RATE_SLOT,
   type DateSurcharge,
   type Policy,
+  type RateCopyLine,
 } from "@/features/business/lib/pricing-policy";
+import {
+  promoDisplayRate,
+  promoModifierRate,
+  type ActivePromo,
+} from "@/features/business/lib/promos";
 import type { PublicRate } from "@/features/business/types/pricing";
 import { roundCents } from "@/shared/lib/money";
 import { prisma } from "@/shared/lib/prisma";
-import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getSettings, SETTINGS_TAG } from "@/shared/lib/settings/get-settings";
 import { dateKeyParts, nzDateKey, weekdayOf } from "@/shared/lib/timezone-utils";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
@@ -73,6 +80,33 @@ export const getRateRows = unstable_cache(
 );
 
 /**
+ * When the pricing settings group last really changed, from its audit trail (a save that
+ * changed nothing writes no audit row). Busted with every settings write.
+ * @returns ISO timestamp, or null when the group has never been saved.
+ */
+const getPricingSettingsChangedAt = unstable_cache(
+  async (): Promise<string | null> => {
+    const row = await prisma.settingAudit.findFirst({
+      where: { group: "pricing" },
+      orderBy: { changedAt: "desc" },
+      select: { changedAt: true },
+    });
+    return row ? row.changedAt.toISOString() : null;
+  },
+  ["pricing-settings-changed-at"],
+  { tags: [SETTINGS_TAG], revalidate: false },
+);
+
+/**
+ * Latest of several ISO timestamps; ISO strings compare lexicographically.
+ * @param isos - Timestamps, nulls skipped.
+ * @returns The latest, or null when none are set.
+ */
+function latestIso(isos: ReadonlyArray<string | null>): string | null {
+  return isos.reduce<string | null>((max, iso) => (iso && (!max || iso > max) ? iso : max), null);
+}
+
+/**
  * Live policy bundle from the settings panel, deduped per request. {@link GST_RATE} stays a
  * legislated constant; client code receives these values as props.
  * @returns The current policy values the operator has configured.
@@ -116,6 +150,20 @@ interface PublicModifier {
   deltaDescription: string;
   /** Brief context line shown beneath the rate (e.g. "data recovery, hardware repair"). */
   description: string;
+  /** Words after the figure in a short rate list, e.g. "remote or by phone". */
+  shortPhrase: string;
+  /** Full sentence quoting this rate, with {@link RATE_SLOT} where the figure goes. */
+  rateSentence: string;
+}
+
+/** One hourly rate on the public rate card: on-site first, then each public channel. */
+export interface RateCardLine extends RateCopyLine {
+  /** Rate label, or "on-site" for the base rate. */
+  key: string;
+  /** Name shown to customers. */
+  name: string;
+  /** $/hr before any promo. */
+  full: number;
 }
 
 /** Shape consumed by the pricing page. Built from the live RateConfig rows. */
@@ -134,7 +182,10 @@ export interface PublicPricing {
   modifiers: PublicModifier[];
   /** Gold Card share off home labour (0.15 = 15%); null when there's no Gold Card row. */
   goldCardPercent: number | null;
-  /** Most-recent updatedAt across all RateConfig rows; powers the "rates last updated" footer. */
+  /**
+   * Latest change to any RateConfig row or the pricing settings (surcharges, travel, minimums,
+   * fees); powers the "rates last updated" footer.
+   */
   ratesUpdatedAt: Date | null;
 }
 
@@ -154,6 +205,18 @@ const MODIFIER_DESCRIPTIONS: Record<string, string> = {
   "At home":
     "Bigger jobs like data recovery or hardware repairs, where I take the device away and work on it here.",
   Weekend: "Applied automatically on Saturdays and Sundays (not on top of a holiday).",
+};
+
+/** Each public channel's short-list wording, after its figure. */
+const MODIFIER_SHORT_PHRASES: Record<string, string> = {
+  Remote: "remote or by phone",
+  "At home": "for work I take away",
+};
+
+/** Each public channel's rate as a full sentence, for FAQ-style answers. */
+const MODIFIER_RATE_SENTENCES: Record<string, string> = {
+  Remote: `Remote or phone help is ${RATE_SLOT}.`,
+  "At home": `Bigger jobs I take back to my place, like data recovery or hardware repairs, are ${RATE_SLOT}.`,
 };
 
 /** $/hr modifiers customers can see; the rest (Business and any added later) stay admin-only. */
@@ -201,7 +264,12 @@ export function toPublicRates(rows: readonly CachedRateRow[]): PublicRate[] {
  * @returns Live pricing snapshot.
  */
 export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
-  const [rows, { pricing }] = await Promise.all([getRateRows(), getSettings()]);
+  const [rows, { pricing }, settingsChangedAt] = await Promise.all([
+    getRateRows(),
+    getSettings(),
+    // A failed lookup only costs the footer the settings date, never the page.
+    getPricingSettingsChangedAt().catch(() => null),
+  ]);
 
   const baseRate = baseRateOf(rows) ?? FALLBACK_BASE_RATE;
   // Same Remote lookup the estimators use, so the remote figures here match their quotes.
@@ -223,13 +291,16 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
   for (const row of rows) {
     if (row.unit !== "modifier") continue;
     if (PUBLIC_DELTA_LABELS.has(row.label) && row.hourlyDelta !== null) {
+      const publicLabel = MODIFIER_PUBLIC_LABELS[row.label] ?? row.label;
       modifiers.push({
         label: row.label,
-        publicLabel: MODIFIER_PUBLIC_LABELS[row.label] ?? row.label,
+        publicLabel,
         kind: "delta",
         effectiveRate: roundCents(baseRate + row.hourlyDelta),
         deltaDescription: row.hourlyDelta > 0 ? `+$${row.hourlyDelta}` : `-$${-row.hourlyDelta}`,
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
+        shortPhrase: MODIFIER_SHORT_PHRASES[row.label] ?? publicLabel.toLowerCase(),
+        rateSentence: MODIFIER_RATE_SENTENCES[row.label] ?? `${publicLabel}: ${RATE_SLOT}.`,
       });
     }
   }
@@ -247,6 +318,8 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
       effectiveRate: roundCents(baseRate + perHour),
       deltaDescription: `+${formatMoneyCompact(perHour)}`,
       description,
+      shortPhrase: label.toLowerCase(),
+      rateSentence: `${label}: ${RATE_SLOT}.`,
     });
   };
   if (pricing.weekendPerHour > 0) {
@@ -268,12 +341,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
     );
   }
 
-  // Latest mtime for the "Rates last updated" footer; ISO strings compare lexicographically.
-  const isoMax = rows.reduce<string | null>((max, r) => {
-    if (!r.updatedAt) return max;
-    if (!max) return r.updatedAt;
-    return r.updatedAt > max ? r.updatedAt : max;
-  }, null);
+  const isoMax = latestIso([...rows.map((r) => r.updatedAt), settingsChangedAt]);
 
   return {
     baseRate,
@@ -286,6 +354,38 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
     ratesUpdatedAt: isoMax ? new Date(isoMax) : null,
   };
 });
+
+/**
+ * The public hourly rates in display order: at your place first, then each public channel
+ * dearest first, priced the way the pricing grid prices them under a promo.
+ * @param pricing - Live pricing from {@link getPublicPricing}.
+ * @param promo - Rate-card promo (already through promoForRateCard), or null for standard rates.
+ * @returns One line per rate.
+ */
+export function publicRateCard(pricing: PublicPricing, promo: ActivePromo | null): RateCardLine[] {
+  const channels = pricing.modifiers
+    .filter((m) => m.kind === "delta")
+    .map((m): RateCardLine => ({
+      key: m.label,
+      name: m.publicLabel,
+      full: m.effectiveRate,
+      price: promoModifierRate(pricing.baseRate, m.effectiveRate, m.kind, promo, m.label),
+      shortPhrase: m.shortPhrase,
+      sentence: m.rateSentence,
+    }))
+    .sort((a, b) => b.price - a.price);
+  return [
+    {
+      key: "on-site",
+      name: "At your place",
+      full: pricing.baseRate,
+      price: promoDisplayRate(pricing.baseRate, promo),
+      shortPhrase: "at your place",
+      sentence: `Work at your place is ${RATE_SLOT}.`,
+    },
+    ...channels,
+  ];
+}
 
 /**
  * Looks up the NZ or home-region public holiday a date (NZ-local) bills, from the

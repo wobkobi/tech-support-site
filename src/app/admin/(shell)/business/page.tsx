@@ -19,7 +19,7 @@ import { TaxSummaryCard } from "@/features/business/components/tax/TaxSummaryCar
 import { listFinancialYears } from "@/features/business/lib/financial-year";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import { fyMonthGroups, fyTotalGroups } from "@/features/business/lib/ledger-chart";
-import { setAsideTargets } from "@/features/business/lib/tax";
+import { setAsideOutlook } from "@/features/business/lib/tax";
 import {
   expenseTaxBasis,
   gstStatusFromPricing,
@@ -31,6 +31,7 @@ import { loadShownResults } from "@/features/business/lib/tax/view.server";
 import { gstToPay, sumTaxEstimates } from "@/features/business/lib/tax/workings";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { roundCents } from "@/shared/lib/money";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
@@ -159,8 +160,8 @@ export default async function BusinessPage({
         },
       }),
       prisma.invoice.findMany({
-        // Quotes are excluded: a quoted total is not revenue.
-        where: { ...NOT_A_QUOTE_FILTER },
+        // Quotes are excluded (a quoted total is not revenue), and so are voided invoices.
+        where: { ...NOT_A_QUOTE_FILTER, status: { not: "VOIDED" } },
         orderBy: { issueDate: "desc" },
         select: {
           id: true,
@@ -223,12 +224,24 @@ export default async function BusinessPage({
   const taxInputs = allTaxInputs.filter((input) => scope.isAllTime || input.fy.key === scope.key);
   const taxResults = await loadShownResults(taxInputs);
   const taxEstimate = taxResults.length > 0 ? sumTaxEstimates(taxResults) : null;
+  // Profit exactly as the Tax page shows it (computeTaxYear's), FYs added up for All time.
+  const taxProfit =
+    taxResults.length > 0 ? roundCents(taxResults.reduce((s, r) => s + r.profit, 0)) : null;
   // A weekly pace only means something for the year still running.
   const currentTaxInput = scope.isCurrentFy ? taxInputs[0] : undefined;
   const currentTaxResult = scope.isCurrentFy ? taxResults[0] : undefined;
   const taxTargets =
     currentTaxInput && currentTaxResult
-      ? setAsideTargets(currentTaxResult.totalToSetAside, currentTaxInput.fy, now)
+      ? setAsideOutlook(
+          currentTaxResult,
+          {
+            brackets: currentTaxInput.settings.brackets,
+            ietc: currentTaxInput.settings.ietc,
+            accRate: currentTaxInput.year.accRate ?? currentTaxInput.settings.acc,
+          },
+          currentTaxInput.fy,
+          now,
+        )
       : null;
   // GST roll-up; gstToPay does its own registration-date gating.
   const gstRollup = gst.registered ? gstToPay(income, expenses, gst) : null;
@@ -316,6 +329,7 @@ export default async function BusinessPage({
         monthStartISO={monthStart.toISOString()}
         monthEndISO={monthEnd.toISOString()}
         taxEstimate={taxEstimate}
+        taxProfit={taxProfit}
         taxHref={taxHref}
       />
 
@@ -331,7 +345,8 @@ export default async function BusinessPage({
           series={incomeExpenseSeries(gst.registered)}
           groups={chartGroups}
           groupHeading={scope.isAllTime ? "Financial year" : "Month"}
-          differenceLabel="Profit"
+          // Not "Profit": the Tax page's profit depreciates assets and claims km, not fuel.
+          differenceLabel="Income less expenses"
           emptyText="No income or expenses recorded in this period."
         />
 

@@ -12,6 +12,7 @@ import {
 } from "@/features/reviews/lib/review-ask-queue.server";
 import {
   contactAddresses,
+  GOOGLE_ASKS_FROM,
   type ReviewAskSkipReason,
 } from "@/features/reviews/lib/review-ask-rules";
 import { prisma } from "@/shared/lib/prisma";
@@ -38,7 +39,10 @@ export interface ReviewAskRunResult {
 export interface ReviewAskRunOptions {
   /** Only this invoice (local testing, Send now). */
   onlyInvoiceId?: string;
-  /** Send now: ignore delay, gap and the auto switch. Opt-outs apply; person-level skips are reported, not stamped. */
+  /**
+   * Send now: ignore delay, payment, gap, the one-Google-ask limit and the auto switch.
+   * Opt-outs apply; person-level skips are reported, not stamped.
+   */
   force?: boolean;
 }
 
@@ -80,13 +84,13 @@ async function stampSkip(invoiceId: string, reason: ReviewAskSkipReason, now: Da
 }
 
 /**
- * Whether another of this person's invoices is mid-send or (unless forced) was asked
- * inside the gap since the loader ran.
+ * Whether another of this person's invoices is mid-send or (unless forced) had a Google
+ * ask or one inside the gap since the loader ran.
  * @param candidate - The claimed candidate (has a contact).
  * @param gapDays - Minimum days between asks; ignored when forced.
  * @param force - Send now.
  * @param now - Current instant.
- * @returns True when this ask should be skipped as asked_recently.
+ * @returns True when this ask should be skipped.
  */
 async function askedElsewhere(
   candidate: ReviewAskCandidate,
@@ -100,7 +104,9 @@ async function askedElsewhere(
     { contactId: contact.id },
     ...addresses.map((a) => ({ clientEmail: { equals: a, mode: "insensitive" as const } })),
   ];
+  // Either rule reduces to "asked since" the earlier of the gap start and the Google switch.
   const sinceGap = new Date(now.getTime() - gapDays * DAY_MS);
+  const since = gapDays > 0 && sinceGap < GOOGLE_ASKS_FROM ? sinceGap : GOOGLE_ASKS_FROM;
   const other = await prisma.invoice.findFirst({
     where: {
       id: { not: candidate.invoice.id },
@@ -109,7 +115,7 @@ async function askedElsewhere(
         {
           OR: [
             { reviewAskOutcome: "sending" },
-            ...(!force && gapDays > 0 ? [{ reviewLinkSentAt: { gte: sinceGap } }] : []),
+            ...(!force ? [{ reviewLinkSentAt: { gte: since } }] : []),
           ],
         },
       ],
@@ -156,9 +162,10 @@ async function sendOne(
   if (claim.count === 0) return "lost_claim";
 
   if (await askedElsewhere(candidate, ctx.gapDays, ctx.force, now)) {
+    // Any ask landing now is a Google one, so that's the reason (a send in flight included).
     await prisma.invoice.update({
       where: { id: invoice.id },
-      data: { reviewAskOutcome: "skipped", reviewAskNote: "asked_recently" },
+      data: { reviewAskOutcome: "skipped", reviewAskNote: "google_asked" },
     });
     return "skipped";
   }
@@ -236,9 +243,9 @@ export async function runReviewAsks(
 
   await recoverStuckClaims(now);
 
-  // Forced: due straight away, and no gap.
+  // Forced: due straight away, paid or not, and no gap or one-ask limit.
   const timing = force
-    ? { delayDays: 0, gapDays: 0 }
+    ? { delayDays: 0, gapDays: 0, manual: true }
     : { delayDays: reviews.reviewAskDelayDays, gapDays: reviews.reviewAskGapDays };
   const candidates = await loadReviewAskCandidates(now, timing, {
     onlyInvoiceId: opts.onlyInvoiceId,
@@ -266,7 +273,7 @@ export async function runReviewAsks(
 
       const contactId = candidate.contact!.id;
       if (askedThisRun.has(contactId)) {
-        await stampSkip(invoice.id, "asked_recently", now);
+        await stampSkip(invoice.id, "google_asked", now);
         result.skipped++;
         continue;
       }
@@ -279,7 +286,7 @@ export async function runReviewAsks(
         result.sent++;
       } else if (outcome === "skipped") {
         result.skipped++;
-        if (force) result.blockedBy = "asked_recently";
+        if (force) result.blockedBy = "google_asked";
       } else {
         result.failed++;
         result.errors.push(`${invoice.number}: send failed`);

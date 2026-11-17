@@ -27,7 +27,11 @@ export {
   incomeTaxOnBrackets,
   independentEarnerCredit,
 } from "@/features/business/lib/tax/income-tax";
-export { setAsideTargets } from "@/features/business/lib/tax/set-aside";
+export {
+  projectedYearTotal,
+  setAsideOutlook,
+  setAsideTargets,
+} from "@/features/business/lib/tax/set-aside";
 export { computeTaxYear, toTaxFy } from "@/features/business/lib/tax/tax-year";
 export type * from "@/features/business/lib/tax/types";
 export {

@@ -12,6 +12,11 @@ import {
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import {
+  FREE_CANCEL_GRACE_HOURS,
+  isWithinCancellationWindow,
+  type CancellationPolicy,
+} from "@/features/business/lib/pricing-policy";
 import { focusAndReveal } from "@/shared/lib/focus-and-reveal";
 import { isPlausibleName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
@@ -389,4 +394,55 @@ export async function verifyBookingAddress(address: string): Promise<string[] | 
   } catch {
     return null;
   }
+}
+
+/** Live cancellation figures the form's short-notice note quotes. */
+export type BookingCancelTerms = Pick<
+  CancellationPolicy,
+  | "freeNoticeHours"
+  | "travelChargeHours"
+  | "callOutFee"
+  | "fullCallOutFee"
+  | "remoteFreeNoticeHours"
+  | "remoteFee"
+>;
+
+/**
+ * Hour count for the form's plain-English notes.
+ * @param n - Number of hours.
+ * @returns e.g. "1 hour", "12 hours".
+ */
+function hoursText(n: number): string {
+  return `${n} hour${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * Note shown under the time picker when the chosen start is already inside the free-cancel
+ * window, so a short-notice booking isn't surprised by a fee. An unchosen meeting type reads as
+ * in person, the longer window.
+ * @param slotStart - The chosen start, or null before a time is picked.
+ * @param now - When the form was opened.
+ * @param meetingType - The chosen meeting type ("" before one is picked).
+ * @param terms - Live cancellation figures.
+ * @param isNewBooking - True on a new booking, which still has the free grace period ahead.
+ * @returns The note, or null when the chosen time is outside the window.
+ */
+export function shortNoticeCancelNote(
+  slotStart: Date | null,
+  now: Date,
+  meetingType: "in-person" | "remote" | "",
+  terms: BookingCancelTerms,
+  isNewBooking: boolean,
+): string | null {
+  if (!slotStart) return null;
+  const remote = meetingType === "remote";
+  const windowHours = remote ? terms.remoteFreeNoticeHours : terms.freeNoticeHours;
+  if (!isWithinCancellationWindow(slotStart, now, windowHours)) return null;
+  const fee = remote
+    ? `$${terms.remoteFee}`
+    : `$${terms.callOutFee} ($${terms.fullCallOutFee} plus travel in the last ${terms.travelChargeHours === 1 ? "hour" : hoursText(terms.travelChargeHours)})`;
+  const grace = isNewBooking
+    ? ` If you change your mind within ${hoursText(FREE_CANCEL_GRACE_HOURS)} of booking, cancelling is free.`
+    : "";
+  return `This time is less than ${hoursText(windowHours)} away, so cancelling it would cost ${fee}.${grace}`;
 }

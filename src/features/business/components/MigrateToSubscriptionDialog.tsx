@@ -21,7 +21,7 @@ interface MigrateToSubscriptionDialogProps {
   open: boolean;
   /** The expense being migrated (prefills the subscription). */
   expense: ExpenseEntry;
-  /** All expenses sharing this supplier+description (>= 2 means recurring). */
+  /** The expense's recurring run, oldest first (>= 2 means recurring). */
   matches?: ExpenseEntry[];
   /** Close handler; `migrated` is true when a subscription was created. */
   onClose: (migrated: boolean) => void;
@@ -70,7 +70,7 @@ function defaultNextDue(isoDate: string, frequency: string): string {
  * @param props - Component props.
  * @param props.open - Whether the dialog is shown.
  * @param props.expense - The expense being migrated.
- * @param props.matches - All expenses sharing its supplier+description.
+ * @param props.matches - The expense's recurring run.
  * @param props.onClose - Close handler; receives whether a subscription was created.
  * @returns The dialog element.
  */

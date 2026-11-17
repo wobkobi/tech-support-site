@@ -53,12 +53,13 @@ export async function GET(
     // The already-paid deposit row isn't the payment.
     hasLinkedIncome: linked.some((e) => e.id !== invoice.alreadyPaidIncomeId),
     likelyIncome:
-      recorded?.strength === "likely"
+      recorded && recorded.strength !== "linked"
         ? {
             id: recorded.entryId,
             amount: recorded.amount,
             date: recorded.date.toISOString(),
             method: recorded.method,
+            customer: recorded.customer,
           }
         : null,
   });

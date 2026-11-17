@@ -9,14 +9,19 @@ import {
   gstCopy,
   noShowCopy,
   partsCopy,
+  RATE_SLOT,
+  rateSentencesCopy,
   surchargeCaveat,
   unsuccessfulWorkCopy,
   workmanshipCopy,
 } from "@/features/business/lib/pricing-policy";
-import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import {
+  getPolicy,
+  getPublicPricing,
+  publicRateCard,
+} from "@/features/business/lib/pricing-policy.server";
 import {
   getActivePromo,
-  promoDisplayRate,
   promoForRateCard,
   promoTravelFactor,
 } from "@/features/business/lib/promos";
@@ -34,6 +39,7 @@ import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
+import { Fragment } from "react";
 
 const TITLE = "FAQ - Tech Support Questions Answered";
 const DESCRIPTION =
@@ -91,11 +97,10 @@ export default async function FaqPage(): Promise<React.ReactElement> {
   // Quote promo prices to match the banner, except day- or spend-restricted promos,
   // which the FAQ can't check.
   const pricedPromo = promoForRateCard(promo);
-  const displayRate = promoDisplayRate(pricing.baseRate, pricedPromo);
+  const rateCard = publicRateCard(pricing, pricedPromo);
   const travelFactor = promoTravelFactor(pricedPromo);
   const displayTravelRate = roundCents(pricing.travelRatePerHour * travelFactor);
   const displayMinTravel = roundCents(policy.MIN_TRAVEL_CHARGE * travelFactor);
-  const rateDiscounted = displayRate !== pricing.baseRate;
   const travelDiscounted = travelFactor < 1;
   // Flat $/hr, which no promo discounts; empty when both surcharges are off.
   const surchargeText = surchargeCaveat({
@@ -202,15 +207,23 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     {
       group: "prices",
       question: "How much does it cost?",
-      plainAnswer: `Work is ${formatMoneyCompact(displayRate)}/hr whatever the job - troubleshooting, setup, data recovery, hardware repairs, the lot.${surchargeSentence}${goldCardSentence} On-site visits also include round-trip drive time at ${formatMoneyCompact(displayTravelRate)}/hr (${formatMoneyCompact(displayMinTravel)} minimum). I'll always confirm the expected cost before any work starts so there are no surprises on the bill.`,
+      plainAnswer: `${rateSentencesCopy(rateCard)}${surchargeSentence}${goldCardSentence} On-site visits also include round-trip drive time at ${formatMoneyCompact(displayTravelRate)}/hr (${formatMoneyCompact(displayMinTravel)} minimum). I'll always confirm the expected cost before any work starts so there are no surprises on the bill.`,
       answer: (
         <>
           <p>
-            Work is{" "}
-            <PromoPrice discounted={rateDiscounted} className="font-bold">
-              {formatMoneyCompact(displayRate)}/hr
-            </PromoPrice>{" "}
-            whatever the job - troubleshooting, setup, data recovery, hardware repairs, the lot.
+            {rateCard.map((line, i) => {
+              const [before, after] = line.sentence.split(RATE_SLOT);
+              return (
+                <Fragment key={line.key}>
+                  {i > 0 && " "}
+                  {before}
+                  <PromoPrice discounted={line.price !== line.full} className="font-bold">
+                    {formatMoneyCompact(line.price)}/hr
+                  </PromoPrice>
+                  {after}
+                </Fragment>
+              );
+            })}
             {surchargeSentence}
             {goldCardSentence} I confirm the expected cost before any work starts, so there are no
             surprises on the invoice.
@@ -244,7 +257,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       group: "prices",
       question: "What if the job takes longer than the estimate?",
       plainAnswer:
-        "You'll never be surprised by the bill. I confirm the expected cost before starting, and if the work is heading past it, I pause and check with you before carrying on - you decide whether to continue. A booked time slot isn't a hard cutoff either: if the job needs longer and the calendar allows, I stay until it's sorted. And if it genuinely needs a second visit, the extra trip's travel is on me.",
+        "You'll never be surprised by the bill. I confirm the expected cost before starting, and if the work is heading past it, I pause and check with you before carrying on - you decide whether to continue. A booked time slot isn't a hard cutoff either: if the job needs longer and the calendar allows, I keep working on it. And if it genuinely needs a second visit, the extra trip's travel is on me.",
       answer: (
         <>
           <p>
@@ -254,8 +267,8 @@ export default async function FaqPage(): Promise<React.ReactElement> {
           </p>
           <p className="mt-2 text-rich-black/80">
             A booked time slot isn't a hard cutoff either: if the job needs longer and the calendar
-            allows, I stay until it's sorted. And if it genuinely needs a second visit, the extra
-            trip's travel is on me.
+            allows, I keep working on it. And if it genuinely needs a second visit, the extra trip's
+            travel is on me.
           </p>
         </>
       ),

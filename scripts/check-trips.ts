@@ -4,6 +4,7 @@
 // Run with: npm test -- trips
 
 import { listFinancialYears } from "@/features/business/lib/financial-year";
+import { ledgerDay } from "@/features/business/lib/tax/helpers";
 import { kmClaim, splitTripKm } from "@/features/business/lib/tax/vehicle";
 import {
   addressKey,
@@ -372,6 +373,7 @@ function main(): void {
       suggestedKm: 22,
       purpose: "Job: Jane Smith",
       noShow: false,
+      dismissed: false,
     },
   );
   expectEqual(
@@ -388,6 +390,7 @@ function main(): void {
       suggestedKm: null,
       purpose: "Job: Past Confirmed",
       noShow: false,
+      dismissed: false,
     },
   );
   expectEqual(
@@ -404,6 +407,7 @@ function main(): void {
       suggestedKm: null,
       purpose: "Job: No Show (no-show)",
       noShow: true,
+      dismissed: false,
     },
   );
   expectEqual(
@@ -420,6 +424,7 @@ function main(): void {
       suggestedKm: 22,
       purpose: "Job: Late Job",
       noShow: false,
+      dismissed: false,
     },
   );
   expectEqual("drafts prefill from suggestedKm", kmDraftsFor(suggestions, {}), {
@@ -432,6 +437,57 @@ function main(): void {
     "drafts keep typed km and drop jobs that left the list",
     kmDraftsFor(suggestions, { "b-done": "30", gone: "9" }),
     { "b-lastday": "22", "b-past": "", "b-done": "30", "b-noshow": "" },
+  );
+
+  console.log("\nNot a trip, and jobs before the km-rate car:");
+  const marked = suggestTrips(
+    [
+      candidate({ id: "b-walked" }),
+      candidate({ id: "b-drove" }),
+      // 11 Aug 2026 NZ, before the car came onto the register.
+      candidate({
+        id: "b-family-car",
+        startAt: new Date("2026-08-10T22:00:00.000Z"),
+        endAt: new Date("2026-08-10T23:00:00.000Z"),
+      }),
+      // 26 Aug 2026 NZ, the car's first day: listed.
+      candidate({
+        id: "b-first-day",
+        startAt: new Date("2026-08-25T22:00:00.000Z"),
+        endAt: new Date("2026-08-25T23:00:00.000Z"),
+      }),
+    ],
+    {
+      linkedBookingIds: new Set(),
+      dismissedBookingIds: new Set(["b-walked"]),
+      kmPeriods: [{ from: ledgerDay("2026-08-26").toISOString(), to: null }],
+      kmByAddress,
+      startISO: FY_START,
+      endISO: FY_END,
+      now: NOW,
+    },
+  );
+  expectEqual(
+    "marked job stays listed, flagged; pre-car job left out",
+    marked.map((s) => [s.bookingId, s.dismissed]),
+    [
+      ["b-walked", true],
+      ["b-drove", false],
+      ["b-first-day", false],
+    ],
+  );
+  const noCar = suggestTrips([candidate({ id: "b-family-car-2" })], {
+    linkedBookingIds: new Set(),
+    kmPeriods: [],
+    kmByAddress,
+    startISO: FY_START,
+    endISO: FY_END,
+    now: NOW,
+  });
+  expectEqual(
+    "no km-rate car on the register: nothing left out",
+    noCar.map((s) => s.bookingId),
+    ["b-family-car-2"],
   );
 
   finish();

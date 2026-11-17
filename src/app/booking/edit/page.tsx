@@ -180,7 +180,7 @@ export default async function EditBookingPage({
           startAt: true,
           endAt: true,
           status: true,
-          rescheduleCount: true,
+          customerRescheduleCount: true,
           calendarEventId: true,
           duration: true,
         },
@@ -214,12 +214,14 @@ export default async function EditBookingPage({
   const closed = isBookingClosed(booking, now);
   const hoursUntilStart = (booking.startAt.getTime() - now.getTime()) / 3_600_000;
   const cutoffBlocked = reschedule.cutoffHours > 0 && hoursUntilStart < reschedule.cutoffHours;
-  const limitBlocked =
-    reschedule.maxReschedules !== null && booking.rescheduleCount >= reschedule.maxReschedules;
-  const blocked = closed || cutoffBlocked || limitBlocked;
+  // Only the customer's own moves count. At the limit just the time locks; details still save.
+  const timeLocked =
+    reschedule.maxReschedules !== null &&
+    booking.customerRescheduleCount >= reschedule.maxReschedules;
+  const blocked = closed || cutoffBlocked;
   const changesLeft =
     reschedule.maxReschedules !== null
-      ? Math.max(0, reschedule.maxReschedules - booking.rescheduleCount)
+      ? Math.max(0, reschedule.maxReschedules - booking.customerRescheduleCount)
       : null;
 
   // The booked length, not the event's span: the operator may have moved the finish since.
@@ -310,7 +312,9 @@ export default async function EditBookingPage({
           <p className="text-base text-rich-black">
             {blocked
               ? "This booking can no longer be changed online."
-              : "Update your appointment details below. If you pick a new time, a new calendar invite is sent when you save."}
+              : timeLocked
+                ? "Update your details below. The appointment time stays as it is."
+                : "Update your appointment details below. If you pick a new time, your calendar invite moves to match when you save."}
           </p>
         </section>
 
@@ -319,18 +323,12 @@ export default async function EditBookingPage({
                can only fail - explain why and offer the paths that still work. */
           <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
             <h2 className="mb-2 text-lg font-bold text-rich-black sm:text-xl">
-              {closed
-                ? "This appointment has passed"
-                : cutoffBlocked
-                  ? "Too close to your appointment"
-                  : "Move limit reached"}
+              {closed ? "This appointment has passed" : "Too close to your appointment"}
             </h2>
             <p className="mb-4 text-base text-rich-black/80 sm:text-lg">
               {closed
                 ? "This appointment has already started or finished."
-                : cutoffBlocked
-                  ? `Bookings can't be changed within ${reschedule.cutoffHours} hours of the appointment.`
-                  : "This booking has already been moved the maximum number of times."}{" "}
+                : `Bookings can't be changed within ${reschedule.cutoffHours} hours of the appointment.`}{" "}
               Give me a call or text and I'll sort it out for you.
             </p>
             <div className="flex flex-wrap gap-3">
@@ -353,9 +351,9 @@ export default async function EditBookingPage({
         ) : (
           <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
             {/* Only worth saying when a limit is actually configured. */}
-            {(changesLeft !== null || reschedule.cutoffHours > 0) && (
+            {((changesLeft !== null && !timeLocked) || reschedule.cutoffHours > 0) && (
               <p className="mb-4 border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black/80">
-                {changesLeft !== null && (
+                {changesLeft !== null && !timeLocked && (
                   <>
                     You can move this booking to a new time{" "}
                     <strong>
@@ -379,6 +377,8 @@ export default async function EditBookingPage({
               initialValues={initialValues}
               phone={identity.phone}
               phoneTel={identity.phoneTel}
+              cancelTerms={pricing.cancellation}
+              timeLocked={timeLocked}
             />
           </section>
         )}

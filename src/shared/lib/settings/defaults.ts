@@ -260,9 +260,8 @@ export const DEFAULT_SETTINGS: Settings = {
     suggestWeekendEndHour: 17,
   },
 
-  // Source: page.tsx getApprovedReviews (take 20) + reviews POST + review-ask-run.server.ts.
+  // Source: reviews POST + review-ask-run.server.ts.
   reviews: {
-    homepageFeaturedCount: 20,
     // false preserves today's behaviour: every review starts as pending.
     autoApproveVerified: false,
     googleReviewUrl: "https://g.page/r/CaI0P_QTKDJaEBM/review",

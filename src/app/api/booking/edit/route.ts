@@ -1,6 +1,6 @@
 // src/app/api/booking/edit/route.ts
-// API route to edit an existing booking by cancel token. A new time is a reschedule (new
-// invite, counts toward the change limit); an edit that keeps the time updates the details.
+// API route to edit an existing booking by cancel token. A new time is a reschedule (the
+// invite moves in place, counts toward the change limit); a kept time updates the details.
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
@@ -18,6 +18,7 @@ import {
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import { bookingEventSummary } from "@/features/booking/lib/booking-event.server";
+import { confirmationCoversReminder } from "@/features/booking/lib/booking-reminder";
 import {
   loadBlockingBookings,
   loadBlockingEvents,
@@ -34,6 +35,8 @@ import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { parseString } from "@/features/business/lib/validation";
 import {
   createBookingEvent,
+  isEventGone,
+  patchBookingEvent,
   patchBookingEventDetails,
 } from "@/features/calendar/lib/google-calendar";
 import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
@@ -75,8 +78,9 @@ interface EditBookingPayload {
 
 /**
  * POST /api/booking/edit
- * Updates an existing booking. A new time replaces the calendar event and emails a
- * reschedule; the same time patches the event's details and emails an update.
+ * Updates an existing booking. A new time moves the calendar event in place (Google sends an
+ * "updated" notice, never a cancellation) and emails a reschedule; the same time patches the
+ * event's details and emails an update.
  * @param request - Next.js request containing edit payload.
  * @returns JSON response with ok flag or error.
  */
@@ -150,7 +154,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const now = new Date();
 
     // Reschedule cutoff + max count; 0 / null turns a rule off.
-    const { reschedule } = (await getSettings()).pricing;
+    const settings = await getSettings();
+    const { reschedule } = settings.pricing;
     const hoursUntilStart = (booking.startAt.getTime() - now.getTime()) / 3_600_000;
     if (reschedule.cutoffHours > 0 && hoursUntilStart < reschedule.cutoffHours) {
       return NextResponse.json(
@@ -189,9 +194,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Only a new time is a reschedule. Fixing the notes or a phone number keeps the slot as
     // booked, even one today's new-booking rules (notice, morning guard) would turn down.
     if (slotMoved) {
+      // Only the customer's own moves count; an operator move never uses one up.
       if (
         reschedule.maxReschedules !== null &&
-        booking.rescheduleCount >= reschedule.maxReschedules
+        booking.customerRescheduleCount >= reschedule.maxReschedules
       ) {
         return errorResponse(
           "This booking has already been moved the maximum number of times. Please call or text me to reschedule.",
@@ -270,11 +276,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const eventSummary = bookingEventSummary(cleanName, duration, durationMinutes);
     const eventLocation = meetingType === "in-person" && canonicalAddress ? canonicalAddress : null;
 
-    // A new time gets a new event. It goes in first and the old one comes out only once the
-    // row points at it, so a failure on the way leaves the booking and its event as they were.
-    // A kept time updates the existing event after the save instead, so no new invite goes out.
+    // The existing event is moved or updated in place after the save, so the customer never
+    // gets a "cancelled" email. Only a booking without an event gets a new one, made first so
+    // a failure leaves the booking as it was.
     let newEventId: string | null = null;
-    if (slotMoved || !booking.calendarEventId) {
+    if (!booking.calendarEventId) {
       try {
         const calendarResult = await createBookingEvent({
           summary: eventSummary,
@@ -351,16 +357,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       endAt,
       calendarEventId,
       activeSlotKey: startAt.toISOString(),
-      // The ICS SEQUENCE comes from rescheduleCount and must rise when the time moves.
+      // rescheduleCount is the ICS SEQUENCE and rises on every move; the move limit reads
+      // customerRescheduleCount.
       ...(slotMoved
         ? {
             bufferAfterMin: config.bookingBufferAfterMin,
             rescheduleCount: booking.rescheduleCount + 1,
+            customerRescheduleCount: booking.customerRescheduleCount + 1,
           }
         : {}),
-      // Clear the reminder stamp so the 24h nudge fires again, but only when the
-      // start moved - a notes-only edit shouldn't re-send it.
-      ...(startMoved ? { emailReminderSentAt: null } : {}),
+      // A moved start re-arms the reminder, unless this reschedule notice already does its job
+      // (the same rule that skips a reminder for a booking made close to the start).
+      ...(startMoved
+        ? {
+            emailReminderSentAt: confirmationCoversReminder(startAt, now, {
+              leadHours: settings.comms.reminderLeadHours,
+              freeNoticeHours: settings.pricing.cancellation.freeNoticeHours,
+            })
+              ? now
+              : null,
+          }
+        : {}),
       ...(movedPromo?.changed ? bookingPromoColumns(movedPromo.promo) : {}),
       ...(holidayName !== undefined ? { publicHolidayName: holidayName } : {}),
       phone: phoneE164,
@@ -399,53 +416,135 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       throw error;
     }
 
+    /**
+     * The booking's event was deleted in Calendar: invites the customer to a new one at the new
+     * time and points the row at it. Throws when the create fails, so the move is undone.
+     */
+    const replaceGoneEvent = async (): Promise<void> => {
+      console.warn(
+        `[booking/edit] ${booking.id}'s event is gone from Calendar; creating a new one`,
+      );
+      const { eventId } = await createBookingEvent({
+        summary: eventSummary,
+        description: calendarDescription,
+        startAt,
+        endAt,
+        timeZone: config.timeZone,
+        attendeeEmail: booking.email,
+        attendeeName: cleanName,
+        location: eventLocation ?? undefined,
+      });
+      // Clearing the missing flag lets the reminder cron see the booking again.
+      const pointed = await prisma.booking
+        .updateMany({
+          where: { id: booking.id, status: "confirmed" },
+          data: { calendarEventId: eventId, calendarEventMissingAt: null },
+        })
+        .catch((err: unknown) => {
+          console.error(`[booking/edit] Couldn't store ${booking.id}'s new event:`, err);
+          return { count: 0 };
+        });
+      // Cancelled meanwhile, or the write failed: nothing points at the new event.
+      if (pointed.count === 0) await removeBookingEvent({ eventId });
+    };
+
+    /**
+     * Puts every field the update wrote back to its earlier value, while still active.
+     * @returns True once the row holds its old values (or was cancelled meanwhile); false when
+     * the old start's slot key went to another booking, so the move has to stay.
+     */
+    const revertMove = async (): Promise<boolean> => {
+      const revert = Object.fromEntries(
+        Object.keys(update).map((key) => [key, booking[key as keyof typeof update]]),
+      ) as Prisma.BookingUpdateManyMutationInput;
+      try {
+        await prisma.booking.updateMany({
+          where: { id: booking.id, status: "confirmed" },
+          data: revert,
+        });
+        return true;
+      } catch (err) {
+        console.error(`[booking/edit] ${booking.id} couldn't be reverted:`, err);
+        return false;
+      }
+    };
+
     // Same re-check as a new booking: a request checked in the same moment can take an
-    // overlapping start. Of two that clash, whichever reads last backs out.
+    // overlapping start. Of two that clash, whichever reads last backs out. The existing event
+    // hasn't moved yet, so backing out never touches it (or emails the customer).
     if (slotMoved) {
       const others = await loadBlockingBookings(now, { excludeId: booking.id });
       if (!isSlotFree(startAt, endAt, others, [], 0)) {
         console.warn(
           `[booking/edit] ${booking.id} overlaps a booking made alongside it; reverting`,
         );
-        // Every field the update wrote, back to its earlier value.
-        const revert = Object.fromEntries(
-          Object.keys(update).map((key) => [key, booking[key as keyof typeof update]]),
-        ) as Prisma.BookingUpdateManyMutationInput;
-        let reverted: { count: number } | null = null;
-        try {
-          reverted = await prisma.booking.updateMany({
-            where: { id: booking.id, status: "confirmed" },
-            data: revert,
-          });
-        } catch (err) {
-          // The old start's slot key went to another booking meanwhile: keep the move and
-          // leave the overlap for the operator rather than strand the row without an event.
-          console.error(`[booking/edit] ${booking.id} couldn't be reverted:`, err);
-          await sendOwnerPush({
-            title: "Bookings overlap",
-            body: `${cleanName}'s reschedule overlaps another booking. Check the schedule.`,
-            url: `/admin/bookings/${booking.id}`,
-            tag: `booking-overlap-${booking.id}`,
-          });
-        }
-        if (reverted) {
+        if (await revertMove()) {
           if (newEventId) await removeBookingEvent({ eventId: newEventId });
-          // Cancelled in the meantime: nothing points at the old event either.
-          if (reverted.count === 0 && booking.calendarEventId) {
-            await removeBookingEvent({ eventId: booking.calendarEventId });
-          }
           return NextResponse.json(
             { ok: false, error: "This time slot is no longer available." },
             { status: 409 },
           );
         }
+        // Kept: the overlap is left for the operator, and the event still moves below.
+        await sendOwnerPush({
+          title: "Bookings overlap",
+          body: `${cleanName}'s reschedule overlaps another booking. Check the schedule.`,
+          url: `/admin/bookings/${booking.id}`,
+          tag: `booking-overlap-${booking.id}`,
+        });
       }
     }
 
-    if (newEventId) {
-      // Only now retire the old event; a failed delete is queued for the reconcile cron.
-      if (booking.calendarEventId) await removeBookingEvent({ eventId: booking.calendarEventId });
-    } else if (booking.calendarEventId) {
+    if (slotMoved && booking.calendarEventId) {
+      // Moved in place with sendUpdates "all": Google sends an "updated" invite, not a
+      // cancellation plus a new one. An event deleted in Calendar gets a fresh invite instead.
+      try {
+        const moved = await patchBookingEvent({
+          eventId: booking.calendarEventId,
+          startAt,
+          endAt,
+          timeZone: config.timeZone,
+          notifyAttendees: true,
+          summary: eventSummary,
+          description: calendarDescription,
+          location: eventLocation,
+        });
+        if (moved.cancelled) await replaceGoneEvent();
+      } catch (calendarError) {
+        console.error("[booking/edit] Failed to move the calendar event:", calendarError);
+        // Gone (404/410): the old flow's new-invite behaviour. Any other failure undoes the move.
+        let replaced = false;
+        if (isEventGone(calendarError)) {
+          replaced = await replaceGoneEvent().then(
+            () => true,
+            (err: unknown) => {
+              console.error("[booking/edit] Couldn't create a replacement event:", err);
+              return false;
+            },
+          );
+        }
+        // The reconcile cron pulls rows back to their event's time, so a row left at the new
+        // time would snap back anyway: undo the save and let the customer retry.
+        if (!replaced) {
+          if (await revertMove()) {
+            return NextResponse.json(
+              {
+                ok: false,
+                error:
+                  "Couldn't move your calendar invite. Please try again, or call or text me and I'll sort it.",
+              },
+              { status: 500 },
+            );
+          }
+          await sendOwnerPush({
+            title: "Calendar event didn't move",
+            body: `${cleanName}'s reschedule saved, but the calendar still shows the old time. Fix it in Google Calendar.`,
+            url: `/admin/bookings/${booking.id}`,
+            tag: `booking-calendar-${booking.id}`,
+          });
+        }
+      }
+    } else if (!newEventId && booking.calendarEventId) {
       // Best-effort: the invite's time is still right, and the booking holds the new details.
       await patchBookingEventDetails({
         eventId: booking.calendarEventId,
