@@ -41,8 +41,8 @@ export type ExpenseSortDir = "asc" | "desc";
 interface ExpenseRowsProps {
   /** Entries on screen (the pager's visible slice). */
   rows: ExpenseEntry[];
-  /** Supplier+description groups, for the recurring marker. */
-  recurringGroups: Map<string, ExpenseEntry[]>;
+  /** Recurring runs by entry id, for the recurring marker. */
+  recurringRuns: Map<string, ExpenseEntry[]>;
   /** Group keys with an active subscription, or null until loaded. */
   subscribedKeys: Set<string> | null;
   /** Whether a row offers Migrate. */
@@ -97,25 +97,25 @@ function AssetLink({
  * The "subscription" / "recurring ×N" text for a repeat cost, or null for a one-off.
  * @param props - Component props.
  * @param props.entry - The expense row.
- * @param props.recurringGroups - Supplier+description groups.
+ * @param props.recurringRuns - Recurring runs by entry id.
  * @param props.subscribedKeys - Group keys with an active subscription.
  * @returns The marker, or null.
  */
 function RecurringMarker({
   entry,
-  recurringGroups,
+  recurringRuns,
   subscribedKeys,
 }: {
   entry: ExpenseEntry;
-  recurringGroups: Map<string, ExpenseEntry[]>;
+  recurringRuns: Map<string, ExpenseEntry[]>;
   subscribedKeys: Set<string> | null;
 }): React.ReactElement | null {
-  if (matchCount(recurringGroups, entry) < MIGRATE_MIN_MATCHES) return null;
+  // A subscribed cost keeps its marker even on an off-amount month outside the run.
+  const subscribed = subscribedKeys?.has(groupKey(entry)) ?? false;
+  if (!subscribed && matchCount(recurringRuns, entry) < MIGRATE_MIN_MATCHES) return null;
   return (
     <StatusPill tone="violet" className="ml-2 font-semibold">
-      {subscribedKeys?.has(groupKey(entry))
-        ? "subscription"
-        : `recurring ×${matchCount(recurringGroups, entry)}`}
+      {subscribed ? "subscription" : `recurring ×${matchCount(recurringRuns, entry)}`}
     </StatusPill>
   );
 }
@@ -177,7 +177,7 @@ function ExpenseRowActions({
  * Phone card list.
  * @param props - Component props.
  * @param props.rows - Entries on screen.
- * @param props.recurringGroups - Supplier+description groups.
+ * @param props.recurringRuns - Recurring runs by entry id.
  * @param props.subscribedKeys - Group keys with an active subscription.
  * @param props.canMigrate - Whether a row offers Migrate.
  * @param props.gst - GST registration status.
@@ -190,7 +190,7 @@ function ExpenseRowActions({
  */
 export function ExpensesListCards({
   rows,
-  recurringGroups,
+  recurringRuns,
   subscribedKeys,
   ...actions
 }: ExpenseRowsProps): React.ReactElement {
@@ -203,11 +203,12 @@ export function ExpensesListCards({
               <p className="truncate text-[0.9375rem] font-semibold text-admin-text">
                 {e.supplier}
               </p>
+              <p className="truncate text-sm text-admin-text-secondary">{e.description}</p>
               <p className="flex flex-wrap items-center gap-y-1 text-sm text-admin-muted">
                 <span className="min-w-0 truncate">{e.category}</span>
                 <RecurringMarker
                   entry={e}
-                  recurringGroups={recurringGroups}
+                  recurringRuns={recurringRuns}
                   subscribedKeys={subscribedKeys}
                 />
                 {!e.receipt && (
@@ -238,7 +239,7 @@ export function ExpensesListCards({
  * Desktop table with sortable columns and the actions column pinned right.
  * @param props - Component props.
  * @param props.rows - Entries on screen.
- * @param props.recurringGroups - Supplier+description groups.
+ * @param props.recurringRuns - Recurring runs by entry id.
  * @param props.subscribedKeys - Group keys with an active subscription.
  * @param props.canMigrate - Whether a row offers Migrate.
  * @param props.gst - GST registration status.
@@ -254,7 +255,7 @@ export function ExpensesListCards({
  */
 export function ExpensesListTable({
   rows,
-  recurringGroups,
+  recurringRuns,
   subscribedKeys,
   sortKey,
   sortDir,
@@ -306,7 +307,7 @@ export function ExpensesListTable({
                 {e.supplier}
                 <RecurringMarker
                   entry={e}
-                  recurringGroups={recurringGroups}
+                  recurringRuns={recurringRuns}
                   subscribedKeys={subscribedKeys}
                 />
                 {!e.receipt && (
@@ -314,6 +315,7 @@ export function ExpensesListTable({
                     no receipt
                   </span>
                 )}
+                <p className="mt-0.5 text-sm font-normal text-admin-muted">{e.description}</p>
               </td>
               <td className={cn(LEDGER_TD_CLS, "text-admin-text-secondary")}>{e.category}</td>
               <td className={cn(LEDGER_TD_CLS, "whitespace-nowrap text-admin-text-secondary")}>

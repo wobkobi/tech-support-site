@@ -1,7 +1,8 @@
 "use client";
 // src/features/business/components/SubscriptionsView.tsx
-// Records and lists recurring subscription expenses (description, supplier, amount, GST,
-// frequency, next due) and flags overdue ones. The rows render in SubscriptionsListRows.
+// Lists recurring subscription expenses (description, supplier, amount, GST, frequency, next
+// due) and flags overdue ones. Payments are recorded by hand through RecordSubscriptionDialog;
+// the daily cron only sends a reminder. The rows render in SubscriptionsListRows.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -11,6 +12,7 @@ import { Card } from "@/features/admin/components/ui/Card";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { EmptyState } from "@/features/admin/components/ui/EmptyState";
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { RecordSubscriptionDialog } from "@/features/business/components/RecordSubscriptionDialog";
 import {
   SubscriptionsListCards,
   SubscriptionsListTable,
@@ -26,7 +28,7 @@ import type { GstStatus } from "@/features/business/lib/tax/types";
 import type { Subscription } from "@/features/business/types/business";
 import { moneyInputText } from "@/shared/lib/money";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface FormState {
   description: string;
@@ -64,14 +66,17 @@ function emptyForm(gst: GstStatus): FormState {
  * @param props - Component props.
  * @param props.reloadKey - Bumped by the parent to force a reload (e.g. after an expense migrate).
  * @param props.gst - GST registration status, for a new subscription's default rate.
+ * @param props.onRecorded - Called after a payment is recorded, so the expenses list can reload.
  * @returns Subscriptions view element.
  */
 export function SubscriptionsView({
   reloadKey = 0,
   gst,
+  onRecorded,
 }: {
   reloadKey?: number;
   gst: GstStatus;
+  onRecorded?: () => void;
 }): React.ReactElement {
   const { toast } = useToast();
   const [subs, setSubs] = useState<Subscription[]>([]);
@@ -82,7 +87,7 @@ export function SubscriptionsView({
   const [form, setForm] = useState<FormState>(() => emptyForm(gst));
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [recording, setRecording] = useState<string | null>(null);
+  const [recordTarget, setRecordTarget] = useState<Subscription | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDeleteSub, setConfirmDeleteSub] = useState<Subscription | null>(null);
 
@@ -105,6 +110,16 @@ export function SubscriptionsView({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load, reloadKey]);
+
+  // The reminder push opens #subscriptions, but the browser jumps before either list has
+  // loaded, so scroll once the rows are in; scroll anchoring holds it as the expenses fill in.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (loading || jumped.current) return;
+    jumped.current = true;
+    if (window.location.hash === "#subscriptions") rootRef.current?.scrollIntoView();
+  }, [loading]);
 
   /**
    * Populates the form with an existing subscription's values and opens the edit form.
@@ -166,39 +181,6 @@ export function SubscriptionsView({
   }
 
   /**
-   * Records a payment for a subscription, advancing its next due date.
-   * @param sub - Subscription to record payment for.
-   */
-  async function handleRecord(sub: Subscription): Promise<void> {
-    setRecording(sub.id);
-    try {
-      const res = await fetch(`/api/business/subscriptions/${sub.id}/record`, {
-        method: "POST",
-      });
-      const data = (await res.json()) as {
-        ok: boolean;
-        nextDue?: string;
-        sheetSyncWarning?: boolean;
-        error?: string;
-      };
-      if (res.ok && data.ok) {
-        const msg = data.sheetSyncWarning
-          ? "Payment recorded - sheet sync failed, add row manually."
-          : "Payment recorded.";
-        toast(msg, { tone: data.sheetSyncWarning ? "warning" : "success" });
-        await load();
-      } else {
-        // A 409 means the period was already claimed (cron got there first, or a
-        // double click), so show the server's wording rather than "failed".
-        toast(data.error ?? "Record failed.", { tone: "error" });
-        if (res.status === 409) await load();
-      }
-    } finally {
-      setRecording(null);
-    }
-  }
-
-  /**
    * Toggles the isActive flag on a subscription.
    * @param sub - Subscription to toggle.
    */
@@ -233,7 +215,8 @@ export function SubscriptionsView({
   }
 
   return (
-    <div>
+    // Reminder pushes link to #subscriptions.
+    <div id="subscriptions" ref={rootRef} className="scroll-mt-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-admin-text">Subscriptions</h2>
         {!showForm && (
@@ -399,23 +382,36 @@ export function SubscriptionsView({
         <>
           <SubscriptionsListCards
             subs={subs}
-            recording={recording}
+            recording={recordTarget?.id ?? null}
             deleting={deleting}
-            onRecord={(sub) => void handleRecord(sub)}
+            onRecord={setRecordTarget}
             onToggleActive={(sub) => void handleToggleActive(sub)}
             onEdit={startEdit}
             onDelete={setConfirmDeleteSub}
           />
           <SubscriptionsListTable
             subs={subs}
-            recording={recording}
+            recording={recordTarget?.id ?? null}
             deleting={deleting}
-            onRecord={(sub) => void handleRecord(sub)}
+            onRecord={setRecordTarget}
             onToggleActive={(sub) => void handleToggleActive(sub)}
             onEdit={startEdit}
             onDelete={setConfirmDeleteSub}
           />
         </>
+      )}
+
+      {recordTarget && (
+        <RecordSubscriptionDialog
+          sub={recordTarget}
+          onClose={(recorded) => {
+            setRecordTarget(null);
+            if (recorded) {
+              void load();
+              onRecorded?.();
+            }
+          }}
+        />
       )}
 
       <ConfirmDialog
