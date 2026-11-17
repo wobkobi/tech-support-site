@@ -1,7 +1,8 @@
 "use client";
 // src/features/business/components/trips/TripSuggestions.tsx
 // "Jobs without a trip": completed jobs in the FY with no trip logged. Each row takes
-// round-trip km (prefilled or fetched from Google) and adds a trip linked to the booking.
+// round-trip km (prefilled or fetched from Google) and adds a trip linked to the booking, or
+// is marked "Not a trip" (walked there) and listed apart, where it can be put back.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
@@ -12,11 +13,20 @@ import { formatMins } from "@/features/business/lib/business-format";
 import { MAX_TRIP_KM, type TripSuggestion } from "@/features/business/lib/trips";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
+import { useState } from "react";
 
 /** Props for {@link TripSuggestions}. */
 interface TripSuggestionsProps {
   /** Jobs still waiting for a trip, newest first. */
   suggestions: readonly TripSuggestion[];
+  /** Jobs marked "Not a trip", newest first. */
+  dismissed: readonly TripSuggestion[];
+  /** Booking whose "Not a trip" or "Put back" is in flight, or null. */
+  togglingId: string | null;
+  /** Marks a job "Not a trip" (true) or puts it back on the list (false). */
+  onNotATrip: (suggestion: TripSuggestion, notATrip: boolean) => void;
+  /** First day of the first km-rate car (ISO); earlier jobs aren't listed. Null when none. */
+  listedFrom: string | null;
   /** Km typed per job, by booking id. */
   kmDrafts: Readonly<Record<string, string>>;
   /** Booking whose Add is in flight, or null. */
@@ -58,6 +68,10 @@ function hintFor(s: TripSuggestion): string {
  * The jobs-without-a-trip card.
  * @param props - Component props.
  * @param props.suggestions - Jobs still waiting for a trip.
+ * @param props.dismissed - Jobs marked "Not a trip".
+ * @param props.togglingId - Booking whose "Not a trip" or "Put back" is in flight.
+ * @param props.onNotATrip - Marks a job "Not a trip", or puts it back.
+ * @param props.listedFrom - First day of the first km-rate car, or null.
  * @param props.kmDrafts - Km typed per job.
  * @param props.addingId - Booking whose Add is in flight.
  * @param props.addingAll - Whether "Add all" is running.
@@ -72,6 +86,10 @@ function hintFor(s: TripSuggestion): string {
  */
 export function TripSuggestions({
   suggestions,
+  dismissed,
+  togglingId,
+  onNotATrip,
+  listedFrom,
   kmDrafts,
   addingId,
   addingAll,
@@ -84,19 +102,23 @@ export function TripSuggestions({
   className,
 }: TripSuggestionsProps): React.ReactElement {
   const busy = addingAll || addingId !== null;
+  const [showDismissed, setShowDismissed] = useState(false);
+  const fromNote = listedFrom
+    ? ` Jobs before ${formatDateShort(listedFrom)} aren't listed: the car then wasn't on km rates.`
+    : "";
   return (
     <Card padding="none" className={className}>
       {/* No bottom margin: the header's rule doubles as the first row's top edge. */}
       <CardHeader
         title="Jobs without a trip"
-        description={`Completed jobs ${yearPhrase} with no trip logged. Each job is one round trip: get the km from Google or type it, then add it.`}
+        description={`Completed jobs ${yearPhrase} with no trip logged. Each job is one round trip: get the km from Google or type it, then add it. Walked there? Mark it Not a trip.${fromNote}`}
         actions={
           suggestions.length > 0 ? (
             <AdminButton
               variant="outline"
               onClick={onAddAll}
               busy={addingAll}
-              disabled={addingId !== null}
+              disabled={addingId !== null || togglingId !== null}
             >
               Add all
             </AdminButton>
@@ -107,7 +129,11 @@ export function TripSuggestions({
       {suggestions.length === 0 ? (
         <EmptyState
           title="No jobs waiting"
-          body={`Every completed job ${yearPhrase} has a trip logged.`}
+          body={
+            dismissed.length > 0
+              ? `Every other completed job ${yearPhrase} has a trip logged.`
+              : `Every completed job ${yearPhrase} has a trip logged.`
+          }
         />
       ) : (
         <ul className="divide-y divide-admin-border">
@@ -158,16 +184,63 @@ export function TripSuggestions({
                     variant="secondary"
                     onClick={() => onAdd(s)}
                     busy={addingId === s.bookingId}
-                    disabled={busy && addingId !== s.bookingId}
+                    disabled={(busy && addingId !== s.bookingId) || togglingId === s.bookingId}
                     aria-label={`Add trip for ${s.name}`}
                   >
                     Add
+                  </AdminButton>
+                  <AdminButton
+                    variant="ghost"
+                    onClick={() => onNotATrip(s, true)}
+                    busy={togglingId === s.bookingId}
+                    disabled={busy || (togglingId !== null && togglingId !== s.bookingId)}
+                    aria-label={`Not a trip: ${s.name}`}
+                  >
+                    Not a trip
                   </AdminButton>
                 </div>
               </li>
             );
           })}
         </ul>
+      )}
+      {dismissed.length > 0 && (
+        <div className="border-t border-admin-border px-4 py-3 sm:px-5">
+          <button
+            type="button"
+            onClick={() => setShowDismissed((v) => !v)}
+            aria-expanded={showDismissed}
+            className="flex w-full items-center justify-between text-left text-sm font-medium text-admin-text-secondary hover:text-admin-text"
+          >
+            {showDismissed ? "Hide" : "Show"} {dismissed.length} marked not a trip
+            <span className="text-admin-muted">{showDismissed ? "▲" : "▼"}</span>
+          </button>
+          {showDismissed && (
+            <ul className="mt-2 divide-y divide-admin-border">
+              {dismissed.map((s) => (
+                <li key={s.bookingId} className="flex items-center gap-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-admin-text">{s.name}</p>
+                    <p className="text-sm text-admin-text-secondary">
+                      {formatDateShort(s.date)}
+                      {s.address ? `, ${s.address}` : ""}
+                    </p>
+                  </div>
+                  <AdminButton
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => onNotATrip(s, false)}
+                    busy={togglingId === s.bookingId}
+                    disabled={togglingId !== null && togglingId !== s.bookingId}
+                    aria-label={`Put ${s.name} back on the list`}
+                  >
+                    Put back
+                  </AdminButton>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </Card>
   );

@@ -18,7 +18,7 @@ interface TaxSummaryCardProps {
   isAllTime: boolean;
   /** Summed estimate for the scope, or null when there are no FYs. */
   estimate: TaxEstimateSummary | null;
-  /** Weekly pace for the current FY; null for a past FY or all time. */
+  /** Weekly pace for the tax still to come in the current FY; null for a past FY or all time. */
   targets: { weeksLeft: number; perWeek: number } | null;
   /** GST roll-up when registered, else null. */
   gst: GstRollup | null;
@@ -74,8 +74,9 @@ export function TaxSummaryCard({
           </p>
           {targets && (
             <p className="mt-1 text-[0.9375rem] text-admin-text-secondary">
-              Put aside about {formatNZD(targets.perWeek)} a week to be on pace by 31 March (
-              {targets.weeksLeft} {targets.weeksLeft === 1 ? "week" : "weeks"} left).
+              That should be put aside already. For the rest of the year, about{" "}
+              {formatNZD(targets.perWeek)} a week covers the tax still to come if work keeps the
+              same pace ({targets.weeksLeft} {targets.weeksLeft === 1 ? "week" : "weeks"} left).
             </p>
           )}
           {estimate.provisionalWarning && (

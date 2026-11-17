@@ -1,11 +1,19 @@
 // src/features/business/lib/sheets-import.ts
 // Sheet > site reconciliation for the Cashbook and Expenses tabs; the sheet wins, joined on the
-// column-Z Sync ID. Also self-heals entries whose sheet append failed, under a Setting lock.
+// column-Z Sync ID. Also self-heals entries whose sheet append failed, and removes site rows
+// deleted in the Sheet (guarded by sheets-deletions.ts), under a Setting lock.
 import { calcGstFromInclusive } from "@/features/business/lib/business";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { withRetry } from "@/features/business/lib/google-retry";
 import { getSheetId, getSheetsClient } from "@/features/business/lib/google-sheets";
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
+import {
+  describeLedgerRow,
+  planSheetDeletions,
+  rowHasData,
+  type LinkedLedgerRow,
+  type SheetDeletionPlan,
+} from "@/features/business/lib/sheets-deletions";
 import {
   appendRowWithSyncId,
   backfillSyncIds,
@@ -17,6 +25,7 @@ import { expenseGstRateOn } from "@/features/business/lib/tax/gst-basis";
 import { loadGstStatus } from "@/features/business/lib/tax/load";
 import type { GstStatus } from "@/features/business/lib/tax/types";
 import { parseObjectId } from "@/features/business/lib/validation";
+import { sendOwnerPush } from "@/features/notifications/lib/push";
 import { parseSheetDate } from "@/shared/lib/date-format";
 import { roundCents } from "@/shared/lib/money";
 import { prisma } from "@/shared/lib/prisma";
@@ -32,6 +41,15 @@ const SYNC_ID_COLUMN_INDEX = 25;
 
 /** Site entries younger than this with no sheet row are self-heal appended. */
 const SELF_HEAL_MAX_AGE_MS = 24 * 60 * 60_000;
+
+/** Even with no workbook changed, read them all this often so the deletion pass re-checks. */
+const FULL_SCAN_EVERY_MS = 24 * 60 * 60_000;
+
+/** Columns the owner types into: date, customer, description, amount (Cashbook). */
+const CASHBOOK_DATA_COLUMNS = [0, 1, 2, 4] as const;
+
+/** Columns the owner types into: date, supplier, description, amount incl. GST (Expenses). */
+const EXPENSES_DATA_COLUMNS = [0, 1, 2, 6] as const;
 
 /**
  * Strips currency symbols and commas, returning a float or null.
@@ -68,7 +86,36 @@ interface PerSheetCounts {
   expensesImported: number;
   expensesUpdated: number;
   expensesSkipped: number;
+  /** True when both tabs came back with no rows at all. */
+  empty: boolean;
   errors: string[];
+}
+
+/** One site row in a deletion report. */
+interface DeletionReportRow {
+  kind: "income" | "expense";
+  id: string;
+  /** Ledger date, YYYY-MM-DD. */
+  date: string;
+  /** Customer or supplier. */
+  party: string;
+  description: string;
+  amount: number;
+  invoiceId: string | null;
+  /** Why a held row was left in place. */
+  held?: "half-edited" | "recent";
+}
+
+/** What the deletion pass did (or, on a dry run, would do). */
+export interface DeletionReport {
+  /** "skipped" when the run didn't read every workbook, so it couldn't tell. */
+  status: "applied" | "dry-run" | "blocked" | "skipped";
+  /** Why a blocked pass removed nothing. */
+  reason?: string;
+  /** Rows removed (applied), that would be removed (dry-run), or held back (blocked). */
+  rows: DeletionReportRow[];
+  /** Missing rows left for a later run: half-edited in the Sheet, or written very recently. */
+  held: DeletionReportRow[];
 }
 
 export interface ImportResult {
@@ -91,6 +138,8 @@ export interface ImportResult {
   warnings?: string[];
   /** Per-spreadsheet breakdown when scanning a Drive folder. */
   perSheet?: PerSheetCounts[];
+  /** Site rows deleted in the Sheet, and what was done about them. */
+  deletions?: DeletionReport;
   /** Source mode used: "folder" when scanning, "single" when falling back to GOOGLE_SHEET_ID. */
   source?: "folder" | "single";
 }
@@ -106,6 +155,8 @@ interface SyncState {
   expenseByDedup: Map<string, ExpenseEntry>;
   /** Every Sync ID observed (or minted) in the scanned sheets this run. */
   seenSyncIds: Set<string>;
+  /** Sync IDs on rows that hold some data but didn't parse, so aren't in seenSyncIds. */
+  partialSyncIds: Set<string>;
   /** GST registration, for an Expenses row with no GST rate. */
   gst: GstStatus;
 }
@@ -227,6 +278,22 @@ function amountDiffers(a: number, b: number): boolean {
 }
 
 /**
+ * Notes the Sync ID of a skipped row that still holds some data, so the deletion pass treats
+ * it as half-edited rather than deleted.
+ * @param row - The row's cells.
+ * @param dataColumns - Columns the owner types into.
+ * @param state - Run state collecting the IDs.
+ */
+function notePartialRow(
+  row: readonly string[],
+  dataColumns: readonly number[],
+  state: SyncState,
+): void {
+  const syncId = (row[SYNC_ID_COLUMN_INDEX] ?? "").trim();
+  if (syncId && rowHasData(row, dataColumns)) state.partialSyncIds.add(syncId);
+}
+
+/**
  * Reconciles one spreadsheet's tabs against the DB (sheet wins). Rows without a Sync ID match
  * on date+amount+description and get one backfilled; row errors don't abort the run.
  * @param spreadsheetId - The Google Sheet ID to read.
@@ -268,6 +335,7 @@ async function importFromSheet(
     const row = cashRows[i]!;
     const date = parseSheetDate(row[0] ?? "");
     if (!date) {
+      notePartialRow(row, CASHBOOK_DATA_COLUMNS, state);
       incomeSkipped++;
       continue;
     }
@@ -278,6 +346,7 @@ async function importFromSheet(
     const notes = (row[7] ?? "").trim() || null;
 
     if (!customer || !description || amount === null || amount <= 0) {
+      notePartialRow(row, CASHBOOK_DATA_COLUMNS, state);
       incomeSkipped++;
       continue;
     }
@@ -395,6 +464,7 @@ async function importFromSheet(
     const row = expRows[i]!;
     const date = parseSheetDate(row[0] ?? "");
     if (!date) {
+      notePartialRow(row, EXPENSES_DATA_COLUMNS, state);
       expensesSkipped++;
       continue;
     }
@@ -410,6 +480,7 @@ async function importFromSheet(
     const notes = (row[10] ?? "").trim() || null;
 
     if (!supplier || !description || amountIncl === null || amountIncl <= 0) {
+      notePartialRow(row, EXPENSES_DATA_COLUMNS, state);
       expensesSkipped++;
       continue;
     }
@@ -543,6 +614,7 @@ async function importFromSheet(
     expensesImported,
     expensesUpdated,
     expensesSkipped,
+    empty: cashRows.length === 0 && expRows.length === 0,
     errors,
   };
 }
@@ -621,11 +693,181 @@ async function healUnsyncedEntries(warnings: string[], errors: string[]): Promis
   return healed;
 }
 
+/** Setting key holding when the last run read every workbook cleanly. */
+const LAST_FULL_SCAN_KEY = "sheets:last-full-scan";
+
+/** Setting key holding the last blocked-deletion push, so an unchanged block isn't re-sent hourly. */
+const DELETION_BLOCK_PUSHED_KEY = "sheets:deletion-block-pushed";
+
+/**
+ * Reads a plain string Setting.
+ * @param key - Setting key.
+ * @returns The value, or null when unset or unreadable.
+ */
+async function readSettingValue(key: string): Promise<string | null> {
+  try {
+    const row = await prisma.setting.findUnique({ where: { key } });
+    return row?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Writes a plain string Setting.
+ * @param key - Setting key.
+ * @param value - Value to store.
+ */
+async function writeSettingValue(key: string, value: string): Promise<void> {
+  await prisma.setting.upsert({ where: { key }, create: { key, value }, update: { value } });
+}
+
+/**
+ * Reads the Sync IDs in a retired workbook's Z columns. Retired workbooks aren't imported, but
+ * a row still listed in one isn't treated as deleted.
+ * @param spreadsheetId - The retired workbook.
+ * @returns Every Sync ID found in either tab.
+ */
+async function readRetiredSyncIds(spreadsheetId: string): Promise<string[]> {
+  const sheets = getSheetsClient();
+  const res = await withRetry(
+    () =>
+      sheets.spreadsheets.values.batchGet({
+        spreadsheetId,
+        ranges: ["Cashbook!Z:Z", "Expenses!Z:Z"],
+      }),
+    { label: "sheets-import" },
+  );
+  return (res.data.valueRanges ?? []).flatMap((range) =>
+    ((range.values ?? []) as string[][]).map((r) => (r[0] ?? "").trim()).filter(Boolean),
+  );
+}
+
+/**
+ * The run's DB snapshot of Sheet-linked rows, in the deletion planner's shape.
+ * @param state - Run state.
+ * @returns Every linked income and expense row.
+ */
+function linkedRowsFrom(state: SyncState): LinkedLedgerRow[] {
+  const income = [...state.incomeByKey].map(([syncId, e]) => ({
+    kind: "income" as const,
+    id: e.id,
+    syncId,
+    date: e.date,
+    party: e.customer,
+    description: e.description,
+    amount: e.amount,
+    invoiceId: e.invoiceId,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  }));
+  const expenses = [...state.expenseByKey].map(([syncId, e]) => ({
+    kind: "expense" as const,
+    id: e.id,
+    syncId,
+    date: e.date,
+    party: e.supplier,
+    description: e.description,
+    amount: e.amountIncl,
+    invoiceId: null,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  }));
+  return [...income, ...expenses];
+}
+
+/**
+ * A ledger row as the import result reports it.
+ * @param row - The row.
+ * @param held - Why it was held back, if it was.
+ * @returns The report row.
+ */
+function reportRow(row: LinkedLedgerRow, held?: DeletionReportRow["held"]): DeletionReportRow {
+  return {
+    kind: row.kind,
+    id: row.id,
+    date: row.date.toISOString().slice(0, 10),
+    party: row.party,
+    description: row.description,
+    amount: row.amount,
+    invoiceId: row.invoiceId,
+    ...(held ? { held } : {}),
+  };
+}
+
+/**
+ * Removes the planned rows, each only while it still carries the Sync ID the plan saw, so a
+ * row relinked mid-run survives.
+ * @param rows - Rows to remove.
+ * @param errors - Run-level error sink.
+ * @returns The rows actually removed.
+ */
+async function applySheetDeletions(
+  rows: readonly LinkedLedgerRow[],
+  errors: string[],
+): Promise<LinkedLedgerRow[]> {
+  const removed: LinkedLedgerRow[] = [];
+  for (const row of rows) {
+    try {
+      const where = { id: row.id, sheetRowKey: row.syncId };
+      const { count } =
+        row.kind === "income"
+          ? await prisma.incomeEntry.deleteMany({ where })
+          : await prisma.expenseEntry.deleteMany({ where });
+      if (count > 0) removed.push(row);
+    } catch (err) {
+      errors.push(`Removing ${row.kind} ${row.id}: ${String(err)}`);
+    }
+  }
+  return removed;
+}
+
+/**
+ * Tells the owner what the deletion pass did: rows removed, or a guard that held them back.
+ * A block that hasn't changed since the last push stays quiet. Lock-screen safe: counts only.
+ * @param plan - The plan this run made.
+ * @param removed - Rows actually removed.
+ */
+async function notifyDeletionOutcome(
+  plan: SheetDeletionPlan,
+  removed: readonly LinkedLedgerRow[],
+): Promise<void> {
+  if (removed.length > 0) {
+    const n = removed.length;
+    await sendOwnerPush({
+      title: `${n} ${n === 1 ? "row" : "rows"} removed from the books`,
+      body: `${n === 1 ? "It was" : "They were"} deleted in the Sheet, so the site's totals now match it.`,
+      url: "/admin/business",
+      tag: "sheets-deleted",
+    });
+  }
+  // An unreadable workbook already fails the cron run, so it doesn't push as well.
+  if (plan.status !== "blocked" || plan.block === "unreadable" || plan.candidates.length === 0) {
+    if ((await readSettingValue(DELETION_BLOCK_PUSHED_KEY)) !== null) {
+      await prisma.setting.deleteMany({ where: { key: DELETION_BLOCK_PUSHED_KEY } });
+    }
+    return;
+  }
+  const fingerprint = JSON.stringify([plan.reason, plan.candidates.map((r) => r.id).sort()]);
+  if ((await readSettingValue(DELETION_BLOCK_PUSHED_KEY)) === fingerprint) return;
+  const n = plan.candidates.length;
+  await sendOwnerPush({
+    title: "Sheet deletions held back",
+    body: `${n} site ${n === 1 ? "row is" : "rows are"} missing from the Sheet but weren't removed: ${plan.reason}. Check the Sheet.`,
+    url: "/admin/business",
+    tag: "sheets-deletion-blocked",
+  });
+  await writeSettingValue(DELETION_BLOCK_PUSHED_KEY, fingerprint);
+}
+
 /**
  * Reconciles every spreadsheet in the Drive folder (else `GOOGLE_SHEET_ID`) with the DB. Real
- * runs take a lock, self-heal failed appends, and warn on linked entries missing a sheet row.
+ * runs take a lock and self-heal failed appends. Workbooks are read all together or not at
+ * all: when none changed since the last clean read (and one ran in the last day) the run
+ * reads nothing, otherwise it reads every one, so the deletion pass always sees every Sync
+ * ID. A dry run reads everything and reports the deletions it would make.
  * @param dryRun - When true, counts what would change without writing anywhere.
- * @returns Aggregate counts plus a per-spreadsheet breakdown.
+ * @returns Aggregate counts plus a per-spreadsheet breakdown and the deletion report.
  */
 export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
   const zero = {
@@ -654,6 +896,7 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
       expenseByKey: new Map(),
       expenseByDedup: new Map(),
       seenSyncIds: new Set(),
+      partialSyncIds: new Set(),
       gst,
     };
     for (const r of incomeRows) {
@@ -670,42 +913,47 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
         if (!state.expenseByDedup.has(key)) state.expenseByDedup.set(key, r);
       }
     }
+    // Snapshot before any Sheet is read: rows the import creates or links this run are
+    // seen by construction, so only rows already linked can come up as deleted.
+    const linkedAtStart = linkedRowsFrom(state);
 
     const folderId = process.env.GOOGLE_BUSINESS_SHEETS_FOLDER_ID?.trim();
     const warnings: string[] = [];
     let result: ImportResult;
-    let allSheetsClean = true;
+    let scanComplete = true;
+    let readEverything = true;
     let unreadableSheets = 0;
-    // A scan that skipped workbooks can't tell a deleted row from an archived one.
-    let excludedCount = 0;
-    let skippedCount = 0;
+    const emptyWorkbooks: string[] = [];
 
     if (folderId) {
       const allSheets = await listSpreadsheetsInFolder(folderId);
-      // Skip retired "old" workbooks; they duplicate their replacement's transactions.
-      const sheetsToImport = allSheets.filter((s) => {
-        const fileName = s.name.split(" / ").pop() ?? s.name;
-        return !fileName.toLowerCase().startsWith("old");
-      });
-      excludedCount = allSheets.length - sheetsToImport.length;
+      /**
+       * Whether a workbook is retired ("old..."): it duplicates its replacement's
+       * transactions, so it's never imported, but its Sync IDs still count as seen.
+       * @param name - The workbook's "folder / file" breadcrumb.
+       * @returns True for a retired workbook.
+       */
+      const isRetired = (name: string): boolean =>
+        (name.split(" / ").pop() ?? name).toLowerCase().startsWith("old");
+      const sheetsToImport = allSheets.filter((s) => !isRetired(s.name));
+      const retiredSheets = allSheets.filter((s) => isRetired(s.name));
 
-      // Skip workbooks Drive says are untouched since the last clean import.
+      // Read everything, or nothing when no workbook changed and a full read ran recently.
       const lastSeen = dryRun ? {} : await readWorkbookMtimes();
-      const seenNow: Record<string, string> = {};
+      const lastFullScan = dryRun ? null : await readSettingValue(LAST_FULL_SCAN_KEY);
+      const anyChanged = sheetsToImport.some(
+        (s) => s.modifiedTime === null || lastSeen[s.fileId] !== s.modifiedTime,
+      );
+      // NaN (never ran, or an unreadable mark) fails the comparison, so it counts as due.
+      const sinceFullScan = Date.now() - (lastFullScan ? Date.parse(lastFullScan) : NaN);
+      const fullScanDue = !(sinceFullScan <= FULL_SCAN_EVERY_MS);
+      readEverything = dryRun || anyChanged || fullScanDue;
 
+      const seenNow: Record<string, string> = {};
       const aggregate = { ...zero, errors: [] as string[] };
       const perSheet: PerSheetCounts[] = [];
 
-      for (const sheet of sheetsToImport) {
-        if (
-          !dryRun &&
-          sheet.modifiedTime !== null &&
-          lastSeen[sheet.fileId] === sheet.modifiedTime
-        ) {
-          skippedCount++;
-          seenNow[sheet.fileId] = sheet.modifiedTime;
-          continue;
-        }
+      for (const sheet of readEverything ? sheetsToImport : []) {
         try {
           const counts = await importFromSheet(sheet.fileId, dryRun, state);
           if (sheet.modifiedTime !== null) seenNow[sheet.fileId] = sheet.modifiedTime;
@@ -716,55 +964,94 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
           aggregate.expensesUpdated += counts.expensesUpdated;
           aggregate.expensesSkipped += counts.expensesSkipped;
           aggregate.errors.push(...counts.errors.map((e) => `[${sheet.name}] ${e}`));
+          if (counts.empty) emptyWorkbooks.push(sheet.name);
           perSheet.push({ fileId: sheet.fileId, name: sheet.name, ...counts });
         } catch (err) {
-          allSheetsClean = false;
+          scanComplete = false;
           unreadableSheets++;
           const message = `[${sheet.name}] ${String(err)}`;
           aggregate.errors.push(message);
-          perSheet.push({ fileId: sheet.fileId, name: sheet.name, ...zero, errors: [message] });
+          perSheet.push({
+            fileId: sheet.fileId,
+            name: sheet.name,
+            ...zero,
+            empty: false,
+            errors: [message],
+          });
+        }
+      }
+      if (readEverything) {
+        for (const sheet of retiredSheets) {
+          try {
+            for (const id of await readRetiredSyncIds(sheet.fileId)) state.seenSyncIds.add(id);
+          } catch (err) {
+            scanComplete = false;
+            aggregate.errors.push(`[${sheet.name}] retired workbook unreadable: ${String(err)}`);
+          }
         }
       }
 
-      if (!dryRun) await writeWorkbookMtimes(seenNow);
+      // A run that read nothing leaves the marks as they were.
+      if (!dryRun && readEverything) {
+        await writeWorkbookMtimes(seenNow);
+        if (scanComplete) {
+          await writeSettingValue(LAST_FULL_SCAN_KEY, new Date().toISOString());
+        }
+      }
       result = { ok: true, source: "folder", perSheet, unreadableSheets, ...aggregate };
     } else {
       const counts = await importFromSheet(getSheetId(), dryRun, state);
+      if (counts.empty) emptyWorkbooks.push("GOOGLE_SHEET_ID");
       result = { ok: true, source: "single", ...counts };
     }
 
-    if (!dryRun) {
-      result.healed = await healUnsyncedEntries(warnings, result.errors);
+    if (!dryRun) result.healed = await healUnsyncedEntries(warnings, result.errors);
 
-      // Log-only: linked entries missing from every scanned sheet were likely deleted there.
-      // Listed only after a full scan, since excluded or skipped workbooks hide archived rows.
-      const scanWasComplete = allSheetsClean && excludedCount === 0 && skippedCount === 0;
-      const unmatched = [...state.incomeByKey.keys(), ...state.expenseByKey.keys()].filter(
-        (key) => !state.seenSyncIds.has(key),
-      ).length;
-
-      if (folderId && !scanWasComplete && unmatched > 0) {
+    // Deletion pass: only a run that read every workbook can tell a deleted row from an unread one.
+    if (readEverything) {
+      const plan = planSheetDeletions({
+        linked: linkedAtStart,
+        seen: state.seenSyncIds,
+        partial: state.partialSyncIds,
+        scanComplete,
+        emptyWorkbooks,
+        now: new Date(),
+      });
+      const held = plan.held.map((h) => reportRow(h.row, h.reason));
+      if (plan.status === "blocked") {
+        result.deletions = {
+          status: "blocked",
+          reason: plan.reason,
+          rows: plan.candidates.map((r) => reportRow(r)),
+          held,
+        };
         warnings.push(
-          `${unmatched} linked row(s) were not seen in this scan, but it did not read every workbook (${excludedCount} retired, ${skippedCount} unchanged since last import). They may be archived rather than deleted - not listing them.`,
+          `Sheet deletions held back (${plan.reason}): ${plan.candidates.map(describeLedgerRow).join("; ")}`,
+        );
+        if (!dryRun) await notifyDeletionOutcome(plan, []);
+      } else if (dryRun) {
+        result.deletions = {
+          status: "dry-run",
+          rows: plan.toDelete.map((r) => reportRow(r)),
+          held,
+        };
+      } else {
+        const removed = await applySheetDeletions(plan.toDelete, result.errors);
+        result.deletions = { status: "applied", rows: removed.map((r) => reportRow(r)), held };
+        if (removed.length > 0) {
+          console.info(
+            `[sheets-import] Removed ${removed.length} row(s) deleted in the Sheet: ${removed.map(describeLedgerRow).join("; ")}`,
+          );
+        }
+        await notifyDeletionOutcome(plan, removed);
+      }
+      for (const h of plan.held) {
+        warnings.push(
+          `${describeLedgerRow(h.row)} is missing from the Sheet but was left in place (${h.reason === "recent" ? "written in the last two hours" : "its Sheet row is half-filled"})`,
         );
       }
-
-      if (folderId && scanWasComplete) {
-        for (const [key, entry] of state.incomeByKey) {
-          if (!state.seenSyncIds.has(key)) {
-            warnings.push(
-              `Income ${entry.id} (${entry.description}) is linked to sheet row ${key} but no scanned sheet has it - deleted in the sheet?`,
-            );
-          }
-        }
-        for (const [key, entry] of state.expenseByKey) {
-          if (!state.seenSyncIds.has(key)) {
-            warnings.push(
-              `Expense ${entry.id} (${entry.description}) is linked to sheet row ${key} but no scanned sheet has it - deleted in the sheet?`,
-            );
-          }
-        }
-      }
+    } else {
+      result.deletions = { status: "skipped", rows: [], held: [] };
     }
 
     if (warnings.length > 0) {

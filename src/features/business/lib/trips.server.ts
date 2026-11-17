@@ -1,10 +1,12 @@
 // src/features/business/lib/trips.server.ts
-// Server side of the trips log: loaders, "jobs without a trip", Google km lookup and the
-// invoice auto-trip. Eligibility and km rules live in trips.ts.
+// Server side of the trips log: loaders, "jobs without a trip" and its "Not a trip" list,
+// Google km lookup and the invoice auto-trip. Eligibility and km rules live in trips.ts.
 
 import "server-only";
 
 import { DAY_MS, type FinancialYear } from "@/features/business/lib/financial-year";
+import { toAssetInput } from "@/features/business/lib/tax/load";
+import { kmVehiclePeriods } from "@/features/business/lib/tax/vehicle";
 import { lookupRoundTripDistance } from "@/features/business/lib/travel-distance";
 import {
   kmByAddressFrom,
@@ -19,6 +21,42 @@ import {
   type TripSuggestion,
 } from "@/features/business/lib/trips";
 import { prisma } from "@/shared/lib/prisma";
+
+/** Setting key listing the booking ids marked "Not a trip" (walked, or no drive). */
+const NOT_A_TRIP_KEY = "trips:not-a-trip";
+
+/**
+ * Booking ids marked "Not a trip". A missing or unreadable row means none.
+ * @returns The ids.
+ */
+export async function loadNotATripIds(): Promise<string[]> {
+  const row = await prisma.setting.findUnique({ where: { key: NOT_A_TRIP_KEY } });
+  if (!row) return [];
+  try {
+    const parsed: unknown = JSON.parse(row.value);
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Marks a job "Not a trip", or puts it back on the jobs list.
+ * @param bookingId - The job's booking id.
+ * @param notATrip - True to take it off the list, false to put it back.
+ * @returns The marked ids now.
+ */
+export async function setNotATrip(bookingId: string, notATrip: boolean): Promise<string[]> {
+  const now = await loadNotATripIds();
+  const next = notATrip ? [...new Set([...now, bookingId])] : now.filter((id) => id !== bookingId);
+  const value = JSON.stringify(next);
+  await prisma.setting.upsert({
+    where: { key: NOT_A_TRIP_KEY },
+    create: { key: NOT_A_TRIP_KEY, value },
+    update: { value },
+  });
+  return next;
+}
 
 /** Fields a {@link TripRow} needs, shared by the page and every trips route. */
 export const TRIP_SELECT = {
@@ -78,6 +116,7 @@ export async function loadTrips(window: { start: Date; end: Date } | null): Prom
 /**
  * Finished in-person jobs in the FY with no trip yet, with a km prefill from the latest
  * trip to the same address. Contacts match by email; their address fills a blank booking's.
+ * Jobs before the first km-rate car are left out; "Not a trip" jobs come back flagged.
  * @param fy - The financial year (ledger-scale bounds).
  * @param now - Reference time for "has this confirmed job ended".
  * @returns Suggestions, newest first.
@@ -87,7 +126,7 @@ export async function loadTripSuggestions(
   now: Date,
 ): Promise<TripSuggestion[]> {
   // Real instants vs ledger-scale bounds: pad a day each side; suggestTrips places NZ days.
-  const [bookings, trips, contacts] = await Promise.all([
+  const [bookings, trips, contacts, kmCars, notATrip] = await Promise.all([
     prisma.booking.findMany({
       where: {
         startAt: {
@@ -116,6 +155,8 @@ export async function loadTripSuggestions(
       where: { deletedAt: null },
       select: { id: true, email: true, altEmails: true, address: true },
     }),
+    prisma.asset.findMany({ where: { vehicleMethod: "km" } }),
+    loadNotATripIds(),
   ]);
 
   // Every trip ever linked to a job counts, whatever FY the trip is dated in.
@@ -156,6 +197,8 @@ export async function loadTripSuggestions(
 
   return suggestTrips(candidates, {
     linkedBookingIds: new Set(linkedIds),
+    dismissedBookingIds: new Set(notATrip),
+    kmPeriods: kmVehiclePeriods(kmCars.map(toAssetInput)),
     kmByAddress,
     startISO: fy.start.toISOString(),
     endISO: fy.end.toISOString(),

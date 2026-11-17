@@ -21,7 +21,7 @@ import {
 } from "@/features/business/components/tax/TaxEstimateCards";
 import { formatNZD } from "@/features/business/lib/business";
 import { fyKeyOf, type FinancialYear } from "@/features/business/lib/financial-year";
-import { irdRatesFor, setAsideTargets } from "@/features/business/lib/tax";
+import { irdRatesFor, setAsideOutlook } from "@/features/business/lib/tax";
 import { kmRatesFor, loadAllFys } from "@/features/business/lib/tax/load";
 import { loadTaxYearView } from "@/features/business/lib/tax/view.server";
 import { fuelLabel } from "@/features/business/lib/tax/workings";
@@ -133,8 +133,17 @@ export default async function TaxPage({
   const provisionalOver = filed
     ? "the provisional tax threshold"
     : formatNZD(input.settings.provisionalThreshold);
-  // Nothing records what has already been put aside, so the whole total is "remaining".
-  const targets = setAsideTargets(result.totalToSetAside, input.fy, now);
+  // The weekly pace covers only tax on income still to come; tax so far should be aside already.
+  const targets = setAsideOutlook(
+    result,
+    {
+      brackets: input.settings.brackets,
+      ietc: input.settings.ietc,
+      accRate: input.year.accRate ?? input.settings.acc,
+    },
+    input.fy,
+    now,
+  );
   const irdDefaults = irdRatesFor(fyKey);
   const kmDefaults = kmRatesFor(irdDefaults, input.settings.vehicleFuel);
 

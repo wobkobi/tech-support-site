@@ -132,6 +132,7 @@ export function TripsView({
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addingAll, setAddingAll] = useState(false);
   const [lookingUpId, setLookingUpId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   // Same rule as computeTaxYear: only trips on a day a km-rate vehicle was in service count.
   const split = splitTripKm(trips, kmPeriods);
@@ -153,6 +154,8 @@ export function TripsView({
     }
   }
   const firstKmDay = kmPeriods.map((p) => p.from).sort()[0];
+  const activeSuggestions = suggestions.filter((s) => !s.dismissed);
+  const dismissedSuggestions = suggestions.filter((s) => s.dismissed);
   const claimedTrips = trips.length - unclaimed.size;
 
   /** Opens the dialog for a new trip. */
@@ -351,12 +354,12 @@ export function TripsView({
    * disabled until the run and any 409 refresh finish.
    */
   async function handleAddAll(): Promise<void> {
-    const ready = suggestions.flatMap((s) => {
+    const ready = activeSuggestions.flatMap((s) => {
       const km = parseKm(kmDrafts[s.bookingId] ?? "");
       return km === null ? [] : [{ s, km }];
     });
     // Typed but unusable km (0, or over the cap) is reported apart from blank rows.
-    const outOfRange = suggestions.filter(
+    const outOfRange = activeSuggestions.filter(
       (s) => (kmDrafts[s.bookingId] ?? "").trim() !== "" && parseKm(kmDrafts[s.bookingId]) === null,
     ).length;
     const rangeNote = `${outOfRange} ${outOfRange === 1 ? "job needs" : "jobs need"} km between 0.1 and ${MAX_TRIP_KM.toLocaleString("en-NZ")}.`;
@@ -378,7 +381,7 @@ export function TripsView({
     }
     const refreshed = linked > 0 ? await refreshAfterConflict() : false;
     setAddingAll(false);
-    const waiting = suggestions.length - ready.length - outOfRange;
+    const waiting = activeSuggestions.length - ready.length - outOfRange;
     const parts = [`Added ${added} ${added === 1 ? "trip" : "trips"}.`];
     if (linked > 0) {
       const had = `${linked} already had ${linked === 1 ? "a trip" : "trips"}`;
@@ -394,6 +397,38 @@ export function TripsView({
       parts.push(`${waiting} ${waiting === 1 ? "job still needs" : "jobs still need"} km.`);
     }
     toast(parts.join(" "), { tone: failed > 0 || outOfRange > 0 ? "warning" : "success" });
+  }
+
+  /**
+   * Marks a job "Not a trip" (walked there) or puts it back; saved server-side so it stays
+   * put across reloads.
+   * @param s - The job.
+   * @param notATrip - True to take it off the list, false to put it back.
+   */
+  async function handleNotATrip(s: TripSuggestion, notATrip: boolean): Promise<void> {
+    setTogglingId(s.bookingId);
+    try {
+      const res = await fetch("/api/business/trips/not-a-trip", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ bookingId: s.bookingId, notATrip }),
+      });
+      const d = (await res.json()) as { ok?: boolean; error?: string };
+      if (!d.ok) {
+        toast(d.error ?? `Couldn't update ${s.name}. Try again.`, { tone: "error" });
+        return;
+      }
+      setSuggestions((prev) =>
+        prev.map((x) => (x.bookingId === s.bookingId ? { ...x, dismissed: notATrip } : x)),
+      );
+      toast(notATrip ? `${s.name} marked not a trip.` : `${s.name} is back on the list.`, {
+        tone: "success",
+      });
+    } catch {
+      toast(`Couldn't update ${s.name}. Check your connection.`, { tone: "error" });
+    } finally {
+      setTogglingId(null);
+    }
   }
 
   /** Deletes the trip the confirm dialog is asking about. */
@@ -501,7 +536,12 @@ export function TripsView({
         </p>
       )}
       <TripSuggestions
-        suggestions={suggestions}
+        suggestions={activeSuggestions}
+        dismissed={dismissedSuggestions}
+        togglingId={togglingId}
+        onNotATrip={(s, notATrip) => void handleNotATrip(s, notATrip)}
+        // Only worth saying in the FY the car arrived (or an earlier one).
+        listedFrom={firstKmDay && firstKmDay > startISO ? firstKmDay : null}
         kmDrafts={kmDrafts}
         addingId={addingId}
         addingAll={addingAll}

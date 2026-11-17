@@ -261,6 +261,16 @@ export interface SetAsidePlan {
   perMonth: number;
 }
 
+/** A year's set-aside plan; the per-week and per-month pace covers `stillToCome` only. */
+export interface SetAsideOutlook extends SetAsidePlan {
+  /** Tax plus ACC on income so far, which should already be aside. */
+  soFar: number;
+  /** The whole year's bill if the rest of the year runs like the year so far. */
+  projectedTotal: number;
+  /** projectedTotal - soFar: what the weekly and monthly amounts spread out. */
+  stillToCome: number;
+}
+
 /** Deduction totals for one FY. */
 export interface TaxDeductions {
   /** Expense rows on the GST basis x category business %, after exclusions. */

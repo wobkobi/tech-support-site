@@ -1,9 +1,22 @@
 // src/features/business/lib/tax/set-aside.ts
-// Weekly and monthly set-aside targets: what is still owed spread over the time left in the FY.
+// Weekly and monthly set-aside targets. Nothing records what has been put aside, so the plan
+// assumes the tax on income earned so far is already aside and paces only the tax still to
+// come: the full-year bill projected from the year so far, less what has already accrued.
 
 import { DAY_MS } from "@/features/business/lib/financial-year";
 import { ledgerDay, roundCents } from "@/features/business/lib/tax/helpers";
-import type { SetAsidePlan, TaxFy } from "@/features/business/lib/tax/types";
+import {
+  incomeTaxOnBrackets,
+  independentEarnerCredit,
+} from "@/features/business/lib/tax/income-tax";
+import type {
+  IetcConfig,
+  SetAsideOutlook,
+  SetAsidePlan,
+  TaxBracket,
+  TaxFy,
+  TaxYearResult,
+} from "@/features/business/lib/tax/types";
 
 /**
  * Spreads the tax still owed from NZ today (or FY start) to FY end, part weeks and months
@@ -35,4 +48,76 @@ export function setAsideTargets(remaining: number, fy: TaxFy, now: Date): SetAsi
     perWeek: roundCents(owed / weeksLeft),
     perMonth: roundCents(owed / monthsLeft),
   };
+}
+
+/** Fewest days of history a projection divides by. */
+const MIN_PROJECTION_DAYS = 28;
+
+/** The tax rules a full-year projection needs. */
+export interface SetAsideRules {
+  brackets: readonly TaxBracket[];
+  ietc: IetcConfig;
+  /** The year's ACC levy rate as a fraction. */
+  accRate: number;
+}
+
+/**
+ * Projects the whole FY's income tax plus ACC if the rest of the year earns at the pace of
+ * the year so far. Income, expenses and km scale with the days elapsed; depreciation, home
+ * office, recovery and disposal figures are already full-year amounts, so they stay as they
+ * are. Never below the tax already accrued.
+ * @param result - computeTaxYear output for the FY (income to date).
+ * @param rules - Brackets, IETC and ACC rate for the year.
+ * @param fy - The financial year.
+ * @param now - Current instant.
+ * @returns Projected total to set aside for the year.
+ */
+export function projectedYearTotal(
+  result: TaxYearResult,
+  rules: SetAsideRules,
+  fy: TaxFy,
+  now: Date,
+): number {
+  const today = ledgerDay(now).getTime();
+  if (today < fy.start.getTime() || today >= fy.end.getTime()) return result.totalToSetAside;
+  // Today counts as elapsed, since its income is already on the books. The floor keeps one
+  // big job in the first days of April from projecting a huge year.
+  const elapsedDays = Math.round((today - fy.start.getTime()) / DAY_MS) + 1;
+  const fyDays = Math.round((fy.end.getTime() - fy.start.getTime()) / DAY_MS);
+  const scale = fyDays / Math.max(elapsedDays, MIN_PROJECTION_DAYS);
+
+  const d = result.deductions;
+  const earned = result.income - d.expenses - d.km;
+  const fixed =
+    result.recoveryIncome -
+    (d.depreciation + d.lowValueWriteOffs + d.investmentBoost + d.homeOffice + d.lossOnDisposal);
+  const taxable = Math.max(0, earned * scale + fixed);
+  const incomeTax = Math.max(
+    0,
+    incomeTaxOnBrackets(taxable, rules.brackets) - independentEarnerCredit(taxable, rules.ietc),
+  );
+  const projected = roundCents(incomeTax + taxable * rules.accRate);
+  return Math.max(projected, result.totalToSetAside);
+}
+
+/**
+ * The set-aside plan for a year: the tax on income so far (to have aside already), the
+ * projected bill, and the weekly and monthly pace for the part still to come. A year that
+ * has ended asks for nothing more.
+ * @param result - computeTaxYear output for the FY.
+ * @param rules - Brackets, IETC and ACC rate for the year.
+ * @param fy - The financial year.
+ * @param now - Current instant.
+ * @returns The outlook, with the pace for {@link SetAsideOutlook.stillToCome}.
+ */
+export function setAsideOutlook(
+  result: TaxYearResult,
+  rules: SetAsideRules,
+  fy: TaxFy,
+  now: Date,
+): SetAsideOutlook {
+  const soFar = result.totalToSetAside;
+  const projectedTotal = projectedYearTotal(result, rules, fy, now);
+  const stillToCome = roundCents(Math.max(0, projectedTotal - soFar));
+  return { ...setAsideTargets(stillToCome, fy, now), soFar, projectedTotal, stillToCome };
 }

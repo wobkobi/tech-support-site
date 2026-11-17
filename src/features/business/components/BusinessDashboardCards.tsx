@@ -70,6 +70,8 @@ interface Props {
   monthEndISO: string;
   /** Tax page estimate for the same scope (FYs summed for all time), or null with no FYs. */
   taxEstimate: TaxEstimateSummary | null;
+  /** Tax page profit for the same scope (FYs summed for all time), or null with no FYs. */
+  taxProfit: number | null;
   /** Tax page link for the same scope. */
   taxHref: string;
 }
@@ -149,6 +151,7 @@ function sumExpense(rows: ExpenseRow[], field: "basisAmount" | "gstClaimable"): 
  * @param props.monthStartISO - ISO start of the active month.
  * @param props.monthEndISO - ISO end of the active month.
  * @param props.taxEstimate - Tax page estimate for the same scope, or null.
+ * @param props.taxProfit - Tax page profit for the same scope, or null.
  * @param props.taxHref - Tax page link for the same scope.
  * @returns Cards section.
  */
@@ -160,6 +163,7 @@ export function BusinessDashboardCards({
   monthStartISO,
   monthEndISO,
   taxEstimate,
+  taxProfit,
   taxHref,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<BreakdownData | null>(null);
@@ -167,7 +171,8 @@ export function BusinessDashboardCards({
   const totalIncome = sumIncome(income);
   const totalExpensesBasis = sumExpense(expenses, "basisAmount");
   const totalGst = sumExpense(expenses, "gstClaimable");
-  const profit = totalIncome - totalExpensesBasis;
+  // The Tax page's profit, so the two pages agree; plain income less expenses only with no FYs.
+  const profit = taxProfit ?? totalIncome - totalExpensesBasis;
   const taxToSetAside = taxEstimate?.totalToSetAside ?? 0;
   const monthIncome = inRange(income, monthStartISO, monthEndISO);
   const monthExpenses = inRange(expenses, monthStartISO, monthEndISO);
@@ -194,15 +199,37 @@ export function BusinessDashboardCards({
     viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
 
-  /** Calculation walk-through for "Profit". */
-  const profitBreakdown: BreakdownData = {
-    title: "Profit",
-    calculation: [
-      { label: incomePrefix, value: formatNZD(totalIncome) },
-      { label: expensesPrefix, value: formatNZD(totalExpensesBasis), subtract: true },
-    ],
-    total: { label: "Profit", value: formatNZD(profit) },
-  };
+  /**
+   * "Profit" walk-through from the Tax page's figures. Its deductions differ from the
+   * Expenses card, so the note says why.
+   */
+  const profitBreakdown: BreakdownData =
+    taxEstimate && taxProfit !== null
+      ? {
+          title: "Profit",
+          note: "The same profit as the Tax page. Tax deductions aren't the Expenses card: a car or other asset is claimed through depreciation rather than its price, and trips logged at the km rate are claimed instead of fuel.",
+          calculation: [
+            {
+              label: scope.isAllTime ? "Income for tax, each year added up" : "Income for tax",
+              value: formatNZD(taxEstimate.income),
+            },
+            {
+              label: scope.isAllTime ? "Tax deductions, each year added up" : "Tax deductions",
+              value: formatNZD(taxEstimate.deductions),
+              subtract: true,
+            },
+          ],
+          total: { label: "Profit", value: formatNZD(profit) },
+          viewAll: { label: "Open tax page", href: taxHref },
+        }
+      : {
+          title: "Profit",
+          calculation: [
+            { label: incomePrefix, value: formatNZD(totalIncome) },
+            { label: expensesPrefix, value: formatNZD(totalExpensesBasis), subtract: true },
+          ],
+          total: { label: "Profit", value: formatNZD(profit) },
+        };
 
   /**
    * "Tax to set aside" walk-through from the Tax page's estimate, so its figures can differ

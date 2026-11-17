@@ -1,12 +1,13 @@
 // src/features/business/components/tax/TaxEstimateCards.tsx
 // Headline figures for one FY on the Tax page: the summary strip, and the set-aside card
-// with weekly and monthly amounts to reach the total by 31 March. Server-safe.
+// with the tax on income so far and a weekly and monthly pace for the tax still to come.
+// Server-safe.
 
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { formatNZD } from "@/features/business/lib/business";
-import type { TaxYearResult } from "@/features/business/lib/tax";
+import type { SetAsideOutlook, TaxYearResult } from "@/features/business/lib/tax";
 import type React from "react";
 
 /** Props for {@link TaxEstimateCards}. */
@@ -21,8 +22,8 @@ interface TaxEstimateCardsProps {
 interface SetAsideCardProps {
   /** computeTaxYear output for the FY. */
   result: TaxYearResult;
-  /** setAsideTargets output for the FY's total to set aside. */
-  targets: { weeksLeft: number; monthsLeft: number; perWeek: number; perMonth: number };
+  /** setAsideOutlook output for the FY. */
+  targets: SetAsideOutlook;
   /** True when the FY is still running. */
   current: boolean;
   /** FY display label. */
@@ -83,7 +84,8 @@ export function TaxEstimateCards({ result, fyLabel }: TaxEstimateCardsProps): Re
 }
 
 /**
- * Renders the set-aside card: the year's total and the weekly and monthly pace to 31 March.
+ * Renders the set-aside card: tax on income so far, then the weekly and monthly pace to
+ * 31 March for the tax still to come.
  * @param props - Component props.
  * @param props.result - computeTaxYear output for the FY.
  * @param props.targets - Set-aside targets for the weeks and months left.
@@ -102,25 +104,36 @@ export function SetAsideCard({
   return (
     <Card className={className}>
       <CardHeader title="Set aside" />
-      <p className="text-sm text-admin-muted">Total for {fyLabel}</p>
+      <p className="text-sm text-admin-muted">
+        {current ? "Tax on income so far" : "Total"} for {fyLabel}
+      </p>
       <p className="mt-0.5 text-[1.875rem] leading-tight font-semibold tracking-tight text-amber-700 tabular-nums">
         {formatNZD(result.totalToSetAside)}
       </p>
       {current ? (
-        <dl className="mt-4 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 border-t border-admin-border pt-4 text-[0.9375rem]">
-          <dt className="text-admin-text-secondary">Each week</dt>
-          <dd className="text-right font-semibold text-admin-text tabular-nums">
-            {formatNZD(targets.perWeek)}
-          </dd>
-          <dt className="text-admin-text-secondary">Each month</dt>
-          <dd className="text-right font-semibold text-admin-text tabular-nums">
-            {formatNZD(targets.perMonth)}
-          </dd>
-          <dt className="text-admin-text-secondary">Left to 31 March</dt>
-          <dd className="text-right text-admin-text tabular-nums">
-            {plural(targets.weeksLeft, "week")}, {plural(targets.monthsLeft, "month")}
-          </dd>
-        </dl>
+        <>
+          <p className="mt-1 text-[0.9375rem] text-admin-text-secondary">
+            Have this put aside already. The amounts below are for the rest of the year.
+          </p>
+          <dl className="mt-4 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 border-t border-admin-border pt-4 text-[0.9375rem]">
+            <dt className="text-admin-text-secondary">Each week</dt>
+            <dd className="text-right font-semibold text-admin-text tabular-nums">
+              {formatNZD(targets.perWeek)}
+            </dd>
+            <dt className="text-admin-text-secondary">Each month</dt>
+            <dd className="text-right font-semibold text-admin-text tabular-nums">
+              {formatNZD(targets.perMonth)}
+            </dd>
+            <dt className="text-admin-text-secondary">Left to 31 March</dt>
+            <dd className="text-right text-admin-text tabular-nums">
+              {plural(targets.weeksLeft, "week")}, {plural(targets.monthsLeft, "month")}
+            </dd>
+          </dl>
+          <p className="mt-3 text-sm text-admin-muted">
+            If the rest of the year earns at the pace so far, the year comes to about{" "}
+            {formatNZD(targets.projectedTotal)}, so about {formatNZD(targets.stillToCome)} more.
+          </p>
+        </>
       ) : (
         <p className="mt-4 border-t border-admin-border pt-4 text-[0.9375rem] text-admin-text-secondary">
           Year ended. The full amount is due. Your accountant can confirm the date.

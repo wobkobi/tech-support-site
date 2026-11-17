@@ -23,6 +23,8 @@ import {
   kmClaim,
   kmVehiclePeriods,
   lowValueGroupTotals,
+  projectedYearTotal,
+  setAsideOutlook,
   setAsideTargets,
   splitTripKm,
   toTaxFy,
@@ -520,6 +522,121 @@ function checkSetAside(): void {
     setAsideTargets(-50, fy2627, new Date("2026-10-08T20:00:00.000Z")).perWeek,
     0,
   );
+}
+
+/**
+ * A result with only the fields the set-aside projection reads, taxed at a flat 10%.
+ * @param income - Income so far.
+ * @param depreciation - Full-year depreciation.
+ * @param expenses - Expenses so far.
+ * @returns The result.
+ */
+function flatResult(income: number, depreciation = 0, expenses = 0): TaxYearResult {
+  const taxable = Math.max(0, income - depreciation - expenses);
+  return {
+    ...SNAPSHOT_RESULT,
+    fyKey: "2026-27",
+    income,
+    recoveryIncome: 0,
+    deductions: {
+      ...SNAPSHOT_RESULT.deductions,
+      expenses,
+      depreciation,
+      km: 0,
+      homeOffice: 0,
+      lowValueWriteOffs: 0,
+      investmentBoost: 0,
+      lossOnDisposal: 0,
+    },
+    taxable,
+    totalToSetAside: roundCents(taxable * 0.1),
+  };
+}
+
+/** Runs the set-aside outlook fixtures: the pace covers only the tax still to come. */
+function checkSetAsideOutlook(): void {
+  console.log("\nSet-aside outlook (FY 2026-27, flat 10%, no ACC):");
+  const fy2627 = fy(2026);
+  const rules = {
+    brackets: [{ upTo: null, rate: 0.1 }],
+    ietc: { ...DEFAULT_IETC, enabled: false },
+  };
+  const flat = { ...rules, accRate: 0 };
+  // 9 Oct 2026 NZ: 1 Apr > 9 Oct inclusive = 192 days of 365. 19,200 so far > 36,500 for the
+  // year > 3,650 tax; 1,920 accrued, 1,730 still to come over 25 weeks and 6 months.
+  const oct9 = new Date("2026-10-08T20:00:00.000Z");
+  expectEqual(
+    "pace covers only the tax still to come",
+    setAsideOutlook(flatResult(19_200), flat, fy2627, oct9),
+    {
+      weeksLeft: 25,
+      monthsLeft: 6,
+      perWeek: 69.2,
+      perMonth: 288.33,
+      soFar: 1920,
+      projectedTotal: 3650,
+      stillToCome: 1730,
+    },
+  );
+  // Full-year depreciation isn't scaled: 36,500 - 1,000 = 35,500 > 3,550, less 1,820 so far.
+  const dep = setAsideOutlook(flatResult(19_200, 1000), flat, fy2627, oct9);
+  expectEqual(
+    "fixed deductions stay whole",
+    [dep.soFar, dep.projectedTotal, dep.stillToCome],
+    [1820, 3550, 1730],
+  );
+  // ACC rides on the projected taxable: 36,500 x 1.67% = 609.55 on top of 3,650.
+  expectEqual(
+    "ACC projected too",
+    projectedYearTotal(flatResult(19_200), { ...rules, accRate: 0.0167 }, fy2627, oct9),
+    4259.55,
+  );
+  // A loss so far projects a bigger loss: nothing to come, never below what accrued.
+  expectEqual(
+    "loss year asks for nothing more",
+    setAsideOutlook(flatResult(1000, 0, 3000), flat, fy2627, oct9).stillToCome,
+    0,
+  );
+  // 3 April: 3 days elapsed, floored to 28, so 1,000 > 13,035.71 (not 121,666.67).
+  expectEqual(
+    "early April projection is floored",
+    projectedYearTotal(flatResult(1000), flat, fy2627, new Date("2026-04-02T20:00:00.000Z")),
+    1303.57,
+  );
+  const ended = setAsideOutlook(
+    flatResult(19_200),
+    flat,
+    fy2627,
+    new Date("2027-05-01T00:00:00.000Z"),
+  );
+  expectEqual(
+    "ended FY: nothing still to come",
+    [ended.projectedTotal, ended.stillToCome, ended.perWeek],
+    [1920, 0, 0],
+  );
+
+  // A steady 400 a week from 1 April: following the weekly figure each week (on top of the
+  // tax on income so far) lands near the real bill, where spreading the running total over
+  // the weeks left saved several times it.
+  let followed = 0;
+  let oldWay = 0;
+  let bill = 0;
+  for (let week = 0; week < 52; week++) {
+    const now = new Date(Date.UTC(2026, 3, 1 + week * 7) - 4 * 3_600_000);
+    const income = 400 * (week + 1);
+    const outlook = setAsideOutlook(flatResult(income), flat, fy2627, now);
+    const accruedThisWeek = week === 0 ? outlook.soFar : 0;
+    followed += accruedThisWeek + (week === 0 ? 0 : outlook.perWeek);
+    oldWay += setAsideTargets(outlook.soFar, fy2627, now).perWeek;
+    bill = outlook.soFar;
+  }
+  expectEqual("steady earner's bill", bill, 2080);
+  expectEqual(
+    "following the pace lands within 10% of the bill",
+    Math.abs(followed - bill) / bill < 0.1,
+    true,
+  );
+  expectEqual("the old pace saved over twice the bill", oldWay > bill * 2, true);
 }
 
 const BUSINESS_START = new Date("2025-10-01T00:00:00.000Z");
@@ -1835,6 +1952,7 @@ function main(): void {
   checkKmAndHomeOffice();
   checkIncomeTax();
   checkSetAside();
+  checkSetAsideOutlook();
   checkDepreciation();
   checkTaxYear();
   checkSnapshots();
