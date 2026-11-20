@@ -15,6 +15,7 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContactAdminList } from "./ContactAdminList";
 import type { ContactRow } from "./ContactCard";
+import { NewContactModal } from "./NewContactModal";
 
 /** Small uppercase label above each conflict's pick buttons. */
 const CONFLICT_LABEL_CLS = "text-sm font-semibold tracking-wide text-admin-muted uppercase";
@@ -62,6 +63,7 @@ export function ContactsAdminView({
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [syncConfirmPending, setSyncConfirmPending] = useState(false);
+  const [addingContact, setAddingContact] = useState(false);
   const [checkingAddresses, setCheckingAddresses] = useState(false);
   const [addressResult, setAddressResult] = useState<string | null>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
@@ -227,6 +229,9 @@ export function ContactsAdminView({
         description={description}
         actions={
           <>
+            <AdminButton variant="primary" onClick={() => setAddingContact(true)}>
+              New contact
+            </AdminButton>
             <AdminButton
               variant="secondary"
               onClick={() => setSyncConfirmPending(true)}
@@ -246,6 +251,7 @@ export function ContactsAdminView({
           </>
         }
       />
+      {addingContact && <NewContactModal onClose={() => setAddingContact(false)} />}
       {summary}
 
       <div className="flex flex-col gap-6">

@@ -1,6 +1,6 @@
 // src/app/api/location/owntracks/route.ts
 // Receives your phone's location from the OwnTracks app (HTTP mode, Basic auth) and runs the
-// live running-late check from there, at most once every 5 minutes.
+// live running-late check from there, at most once per Settings > Comms phoneCheckGapMin.
 
 import { basicAuthPassword, parseOwnTracksLocation } from "@/features/calendar/lib/running-late";
 import {
@@ -9,20 +9,20 @@ import {
 } from "@/features/calendar/lib/running-late.server";
 import { isOwnTracksPassword } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
 
 /** Setting row holding when a location report last ran the check. */
 const LAST_CHECK_KEY = "running-late:last-location-check";
-/** Fewest minutes between checks run by location reports. */
-const CHECK_GAP_MS = 5 * 60_000;
 
 /**
  * Claims the right to run the check now: true when the last location-run check is at least
- * {@link CHECK_GAP_MS} old. The update matches the value read, so a burst of reports runs it once.
+ * `gapMs` old. The update matches the value read, so a burst of reports runs it once.
  * @param now - Current time.
+ * @param gapMs - Fewest ms between checks run by location reports.
  * @returns True when this report should run the check.
  */
-async function claimCheck(now: Date): Promise<boolean> {
+async function claimCheck(now: Date, gapMs: number): Promise<boolean> {
   const row = await prisma.setting.findUnique({ where: { key: LAST_CHECK_KEY } });
   if (!row) {
     try {
@@ -32,7 +32,7 @@ async function claimCheck(now: Date): Promise<boolean> {
       return false; // Another report created it first.
     }
   }
-  if (now.getTime() - new Date(row.value).getTime() < CHECK_GAP_MS) return false;
+  if (now.getTime() - new Date(row.value).getTime() < gapMs) return false;
   const res = await prisma.setting.updateMany({
     where: { key: LAST_CHECK_KEY, value: row.value },
     data: { value: now.toISOString() },
@@ -68,8 +68,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         .create({ data: { key: OWNER_LOCATION_KEY, ...data } })
         .catch(() => null); // Row exists with a newer reading.
     }
-    if (await claimCheck(now)) {
-      const result = await runRunningLateCheck("live", now);
+    const { comms } = await getSettings();
+    if (await claimCheck(now, comms.phoneCheckGapMin * 60_000)) {
+      const result = await runRunningLateCheck("live", now, "location");
       console.log(
         `[owntracks] check: checked=${result.checked} alerted=${result.alerted} failed=${result.failed}`,
       );

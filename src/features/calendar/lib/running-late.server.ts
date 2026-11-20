@@ -1,7 +1,8 @@
 // src/features/calendar/lib/running-late.server.ts
-// The running-late check: prices the drive to each upcoming customer job with live traffic and
-// pushes when it lands you past the start. Run by the check-running-late cron and by OwnTracks
-// location reports.
+// Travel alerts: the live running-late check (prices the drive to each upcoming customer job with
+// live traffic and pushes when it lands you past the start) and the 7am summary of today's jobs.
+// Run by the check-running-late cron, by OwnTracks location reports and from the Travel alerts
+// page.
 
 import { CALENDAR_EVENT_PRESENT_FILTER } from "@/features/booking/lib/booking";
 import {
@@ -10,16 +11,18 @@ import {
 } from "@/features/calendar/lib/google-calendar";
 import {
   chooseDriveStart,
+  dailySummaryText,
   isUsableLocation,
   minutesLate,
   runningLateText,
   shouldAlert,
   type PhoneLocation,
   type RunningLateMode,
+  type SummaryJob,
 } from "@/features/calendar/lib/running-late";
 import { calculateTravelMinutes, type TransportMode } from "@/features/calendar/lib/travel-time";
 import { bookingLocation, buildTimeline } from "@/features/calendar/lib/travel-timeline";
-import { sendOwnerPush } from "@/features/notifications/lib/push";
+import { sendOwnerPush, type OwnerPushResult } from "@/features/notifications/lib/push";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import {
@@ -29,19 +32,24 @@ import {
   nzMidnightUtc,
 } from "@/shared/lib/timezone-utils";
 
-/** How far ahead the live check looks for jobs. */
-const LIVE_HORIZON_MS = 3 * 60 * 60_000;
 /** Alerts for jobs older than this are deleted. */
 const ALERT_RETENTION_MS = 2 * 24 * 60 * 60_000;
 /** Key of the single OperatorLocation row. */
 export const OWNER_LOCATION_KEY = "owner";
+/** Setting row holding the last run of each check, for the Travel alerts page. */
+const LAST_RUN_KEY_PREFIX = "travel-alerts:last-run:";
+
+/** What started a run. */
+export type RunSource = "cron" | "location" | "manual";
 
 /** One customer job the check looks at. */
 interface Target {
   key: string;
   name: string;
   startMs: number;
-  location: string;
+  /** Job address; null for a remote job or an event without one. */
+  location: string | null;
+  remote: boolean;
   url: string;
   /** Calendar event id, for its travel block. */
   eventId: string | null;
@@ -49,39 +57,94 @@ interface Target {
 
 /** What one run did. */
 export interface RunningLateResult {
+  /** Jobs whose drive was priced. */
   checked: number;
+  /** Pushes delivered. */
   alerted: number;
   failed: number;
-  skipped?: "disabled" | "calendar-unavailable";
+  /** Morning only: jobs in the summary. */
+  jobs?: number;
+  skipped?: "disabled" | "calendar-unavailable" | "no-jobs" | "already-sent";
   errors: string[];
+}
+
+/** The last run of a check, as the Travel alerts page shows it. */
+export interface LastRun extends RunningLateResult {
+  at: string;
+  source: RunSource;
 }
 
 /**
  * Your latest phone reading, or null when none is stored.
  * @returns The stored reading.
  */
-async function readPhoneLocation(): Promise<PhoneLocation | null> {
+export async function readPhoneLocation(): Promise<PhoneLocation | null> {
   const row = await prisma.operatorLocation.findUnique({ where: { key: OWNER_LOCATION_KEY } });
   return row ? { lat: row.lat, lng: row.lng, accuracyM: row.accuracyM, at: row.at } : null;
 }
 
 /**
- * Saves the job's alert, guarded so two overlapping runs can't both send: a new job's row is a
- * create on its unique key, and an existing one updates only while `sentAt` still matches.
+ * The last recorded run of each check.
+ * @returns Last live and morning runs, or null for one that hasn't run.
+ */
+export async function readLastRuns(): Promise<Record<RunningLateMode, LastRun | null>> {
+  const rows = await prisma.setting.findMany({
+    where: { key: { in: [`${LAST_RUN_KEY_PREFIX}live`, `${LAST_RUN_KEY_PREFIX}morning`] } },
+  });
+  /**
+   * Parses one stored run.
+   * @param mode - Which check.
+   * @returns The run, or null when missing or unreadable.
+   */
+  const parse = (mode: RunningLateMode): LastRun | null => {
+    const value = rows.find((r) => r.key === `${LAST_RUN_KEY_PREFIX}${mode}`)?.value;
+    if (!value) return null;
+    try {
+      return JSON.parse(value) as LastRun;
+    } catch {
+      return null;
+    }
+  };
+  return { live: parse("live"), morning: parse("morning") };
+}
+
+/**
+ * Records a run for the Travel alerts page. Best-effort: a failed write never fails the check.
+ * @param mode - Which check ran.
+ * @param source - What started it.
+ * @param result - What it did.
+ * @param now - When it ran.
+ */
+async function recordRun(
+  mode: RunningLateMode,
+  source: RunSource,
+  result: RunningLateResult,
+  now: Date,
+): Promise<void> {
+  const value = JSON.stringify({ ...result, at: now.toISOString(), source } satisfies LastRun);
+  const key = `${LAST_RUN_KEY_PREFIX}${mode}`;
+  await prisma.setting
+    .upsert({ where: { key }, create: { key, value }, update: { value } })
+    .catch((err: unknown) => console.error("[travel-alerts] record run failed", err));
+}
+
+/**
+ * Saves an alert, guarded so two overlapping runs can't both send: a new key's row is a create
+ * on its unique key, and an existing one updates only while `sentAt` still matches.
  * @param key - Alert key.
  * @param prior - The row read before deciding, if any.
  * @param prior.sentAt - When that row was last sent.
  * @param data - New alert fields.
- * @param data.mode - Which check is sending.
- * @param data.lateMin - Minutes late this alert reports.
- * @param data.jobStartAt - The job's start at send time.
+ * @param data.mode - "live", or "summary" for the morning push.
+ * @param data.lateMin - Minutes late this alert reports (0 for the summary).
+ * @param data.jobStartAt - The job's start, or the summary's day; old rows are pruned by it.
  * @param data.sentAt - Send time, which the next claim matches on.
  * @returns True when this run claimed the send.
  */
 async function claimAlert(
   key: string,
   prior: { sentAt: Date } | null,
-  data: { mode: RunningLateMode; lateMin: number; jobStartAt: Date; sentAt: Date },
+  data: { mode: string; lateMin: number; jobStartAt: Date; sentAt: Date },
 ): Promise<boolean> {
   if (!prior) {
     try {
@@ -99,35 +162,104 @@ async function claimAlert(
 }
 
 /**
- * Checks every upcoming customer job and pushes for any that traffic makes late.
+ * Hands a claim back after a push that reached no device, so the next run tries again: restores
+ * the prior row, or deletes a new one.
+ * @param key - Alert key.
+ * @param sentAt - The claim's send time.
+ * @param prior - The row before the claim, if any.
+ */
+async function releaseAlert(
+  key: string,
+  sentAt: Date,
+  prior: { mode: string; lateMin: number; jobStartAt: Date; sentAt: Date } | null,
+): Promise<void> {
+  const release = prior
+    ? prisma.runningLateAlert.updateMany({
+        where: { key, sentAt },
+        data: {
+          mode: prior.mode,
+          lateMin: prior.lateMin,
+          jobStartAt: prior.jobStartAt,
+          sentAt: prior.sentAt,
+        },
+      })
+    : prisma.runningLateAlert.deleteMany({ where: { key, sentAt } });
+  await release.catch((err: unknown) =>
+    console.error(`[travel-alerts] release ${key} failed`, err),
+  );
+}
+
+/**
+ * Whether a push needs retrying: it reached no device for a reason that may pass. No devices or
+ * no VAPID keys keep the claim, so it doesn't retry every 10 minutes.
+ * @param push - What the send did.
+ * @returns True when the claim should be handed back.
+ */
+function pushFailed(push: OwnerPushResult): boolean {
+  if (push.sent > 0) return false;
+  return push.skipped !== "no-devices" && push.skipped !== "not-configured";
+}
+
+/**
+ * Runs one check and records it for the Travel alerts page.
  *
- * Live: jobs starting in the next 3 hours, with live traffic, leaving no earlier than now and
- * from your phone's location when it's fresh. Morning: the rest of today, priced from the end
- * of the job before; legs from home are left out.
+ * Live: customer jobs starting within the look-ahead window, priced with live traffic, leaving no earlier
+ * than now and from your phone's location when it's fresh. A push per late job.
  *
- * Customer jobs are confirmed bookings plus timed booking-calendar events with a location;
- * remote bookings are skipped. A failed drive lookup never alerts.
+ * Morning: one push listing the rest of today's customer jobs, when there are any. Gaps that
+ * predicted traffic after the job before makes late are marked on the job (legs from home are
+ * left out, since you choose when to leave home).
+ *
+ * Customer jobs are confirmed bookings plus timed booking-calendar events. A failed drive lookup
+ * never alerts.
  * @param mode - Which check to run.
  * @param now - Current time.
- * @returns Counts for the cron response.
+ * @param source - What started the run.
+ * @returns Counts for the response.
  */
 export async function runRunningLateCheck(
   mode: RunningLateMode,
   now: Date,
+  source: RunSource = "cron",
+): Promise<RunningLateResult> {
+  const result = await runCheck(mode, now, source === "manual");
+  await recordRun(mode, source, result, now);
+  return result;
+}
+
+/**
+ * The check itself; see {@link runRunningLateCheck}.
+ * @param mode - Which check to run.
+ * @param now - Current time.
+ * @param manual - Run from the page: the summary sends even if today's has already gone.
+ * @returns Counts for the response.
+ */
+async function runCheck(
+  mode: RunningLateMode,
+  now: Date,
+  manual: boolean,
 ): Promise<RunningLateResult> {
   const result: RunningLateResult = { checked: 0, alerted: 0, failed: 0, errors: [] };
   const { comms, scheduling, identity } = await getSettings();
-  if (!comms.pushOnRunningLate) return { ...result, skipped: "disabled" };
+  const enabled = mode === "live" ? comms.pushOnRunningLate : comms.pushDailySummary;
+  if (!enabled) return { ...result, skipped: "disabled" };
 
   const nowMs = now.getTime();
+  const todayKey = nzDateKey(now);
+  const summaryKey = `summary:${todayKey}`;
   await prisma.runningLateAlert.deleteMany({
     where: { jobStartAt: { lt: new Date(nowMs - ALERT_RETENTION_MS) } },
   });
+  const summaryPrior =
+    mode === "morning" && !manual
+      ? await prisma.runningLateAlert.findUnique({ where: { key: summaryKey } })
+      : null;
+  if (summaryPrior) return { ...result, skipped: "already-sent" };
 
   const windowEnd =
     mode === "live"
-      ? new Date(nowMs + LIVE_HORIZON_MS)
-      : nzMidnightUtc(...dateKeyParts(addDaysToDateKey(nzDateKey(now), 1)));
+      ? new Date(nowMs + comms.runningLateWindowHours * 60 * 60_000)
+      : nzMidnightUtc(...dateKeyParts(addDaysToDateKey(todayKey, 1)));
   const lookaheadMs = scheduling.smartOriginLookaheadHours * 60 * 60_000;
   // Reach back far enough to find the commitment before the first job.
   const fetchFrom = new Date(nowMs - lookaheadMs - 12 * 60 * 60_000);
@@ -197,39 +329,56 @@ export async function runRunningLateCheck(
   const targets: Target[] = [];
   for (const b of bookings) {
     const startMs = b.startAt.getTime();
-    if (startMs <= nowMs || startMs >= windowEnd.getTime() || b.meetingType === "remote") continue;
-    const location = bookingLocation(b);
-    if (!location) continue;
+    if (startMs <= nowMs || startMs >= windowEnd.getTime()) continue;
+    const remote = b.meetingType === "remote";
     targets.push({
       key: `booking:${b.id}`,
       name: b.name,
       startMs,
-      location,
+      location: remote ? null : bookingLocation(b),
+      remote,
       url: `/admin/bookings/${b.id}`,
       eventId: b.calendarEventId,
     });
   }
   for (const e of events) {
-    if (e.calendarEmail !== bookingCalId || !e.location) continue;
+    if (e.calendarEmail !== bookingCalId) continue;
     const startMs = new Date(e.start).getTime();
     if (startMs <= nowMs || startMs >= windowEnd.getTime()) continue;
     targets.push({
       key: `event:${e.id}`,
       name: e.summary?.trim() || "Job",
       startMs,
-      location: e.location,
+      location: e.location?.trim() || null,
+      remote: false,
       url: `/admin/schedule?day=${nzDateKey(new Date(startMs))}`,
       eventId: e.id,
     });
   }
 
-  const priors = await prisma.runningLateAlert.findMany({
-    where: { key: { in: targets.map((t) => t.key) } },
-  });
+  if (mode === "morning" && targets.length === 0) return { ...result, skipped: "no-jobs" };
+
+  const priors =
+    mode === "live"
+      ? await prisma.runningLateAlert.findMany({
+          where: { key: { in: targets.map((t) => t.key) } },
+        })
+      : [];
   const priorByKey = new Map(priors.map((p) => [p.key, p]));
-  const usablePhone = isUsableLocation(phone, nowMs) ? phone : null;
+  const usablePhone = isUsableLocation(
+    phone,
+    nowMs,
+    comms.phoneLocationFreshHours * 60 * 60_000,
+    comms.phoneLocationMaxAccuracyM,
+  )
+    ? phone
+    : null;
+  // Tight gaps go in the morning summary only while the running-late push is on.
+  const priceDrives = mode === "live" || comms.pushOnRunningLate;
+  const lateByKey = new Map<string, number>();
 
   for (const t of targets) {
+    if (!priceDrives || !t.location) continue;
     const block = t.eventId ? blockByEventId.get(t.eventId) : undefined;
     const start = chooseDriveStart(mode, t.startMs, timeline, {
       nowMs,
@@ -247,55 +396,74 @@ export async function runRunningLateCheck(
       start.origin,
       t.location,
       new Date(start.departMs),
-      {
-        mode: travelMode,
-      },
+      { mode: travelMode },
     );
     if (driveMin == null) continue;
 
     const lateMin = minutesLate(start.departMs, driveMin, t.startMs);
+    if (mode === "morning") {
+      if (lateMin >= comms.runningLateThresholdMin) lateByKey.set(t.key, lateMin);
+      continue;
+    }
+
     const jobStartAt = new Date(t.startMs);
     const prior = priorByKey.get(t.key) ?? null;
-    if (!shouldAlert(mode, lateMin, jobStartAt, comms.runningLateThresholdMin, prior)) continue;
+    if (
+      !shouldAlert(
+        lateMin,
+        jobStartAt,
+        comms.runningLateThresholdMin,
+        prior,
+        comms.runningLateRepeatMin,
+      )
+    ) {
+      continue;
+    }
+    if (!(await claimAlert(t.key, prior, { mode, lateMin, jobStartAt, sentAt: now }))) continue;
 
-    const claimed = await claimAlert(t.key, prior, { mode, lateMin, jobStartAt, sentAt: now });
-    if (!claimed) continue;
-
-    const arriveMs = start.departMs + driveMin * 60_000;
     const push = await sendOwnerPush({
-      ...runningLateText(mode, t.name, t.startMs, lateMin, arriveMs),
+      ...runningLateText(t.name, t.startMs, lateMin, start.departMs + driveMin * 60_000),
       url: t.url,
       tag: `running-late:${t.key}`,
     });
-    if (push.sent > 0) {
-      result.alerted++;
-      continue;
-    }
-    if (push.skipped === "no-devices" || push.skipped === "not-configured") {
-      // Nowhere to send: keep the claim, so it doesn't retry every 10 minutes.
-      continue;
-    }
-    // Hand the claim back so the next run tries again.
-    result.failed++;
-    result.errors.push(`${t.key}: push not delivered`);
-    if (prior) {
-      await prisma.runningLateAlert
-        .updateMany({
-          where: { key: t.key, sentAt: now },
-          data: {
-            mode: prior.mode,
-            lateMin: prior.lateMin,
-            jobStartAt: prior.jobStartAt,
-            sentAt: prior.sentAt,
-          },
-        })
-        .catch((err: unknown) => console.error(`[running-late] release ${t.key} failed`, err));
-    } else {
-      await prisma.runningLateAlert
-        .deleteMany({ where: { key: t.key, sentAt: now } })
-        .catch((err: unknown) => console.error(`[running-late] release ${t.key} failed`, err));
+    if (push.sent > 0) result.alerted++;
+    if (pushFailed(push)) {
+      result.failed++;
+      result.errors.push(`${t.key}: push not delivered`);
+      await releaseAlert(t.key, now, prior);
     }
   }
 
+  if (mode === "live") return result;
+
+  // Morning: one push for the day.
+  result.jobs = targets.length;
+  const jobs: SummaryJob[] = targets.map((t) => ({
+    startMs: t.startMs,
+    name: t.name,
+    remote: t.remote,
+    lateMin: lateByKey.get(t.key) ?? null,
+  }));
+  // A manual send isn't recorded, so it never stops the 7am one.
+  const claimed =
+    manual ||
+    (await claimAlert(summaryKey, null, {
+      mode: "summary",
+      lateMin: 0,
+      jobStartAt: nzMidnightUtc(...dateKeyParts(todayKey)),
+      sentAt: now,
+    }));
+  if (!claimed) return { ...result, skipped: "already-sent" };
+  const push = await sendOwnerPush({
+    ...dailySummaryText(jobs),
+    url: `/admin/schedule?day=${todayKey}`,
+    tag: summaryKey,
+  });
+  if (push.sent > 0) result.alerted++;
+  if (pushFailed(push)) {
+    result.failed++;
+    result.errors.push("summary: push not delivered");
+    if (!manual) await releaseAlert(summaryKey, now, null);
+  }
   return result;
 }

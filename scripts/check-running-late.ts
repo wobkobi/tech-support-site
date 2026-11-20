@@ -6,6 +6,7 @@
 import {
   basicAuthPassword,
   chooseDriveStart,
+  dailySummaryText,
   isUsableLocation,
   minutesLate,
   parseOwnTracksLocation,
@@ -36,16 +37,14 @@ expect("early is negative", minutesLate(nz(13), 10, nz(14)) < 0);
 
 // When to alert
 const start = new Date(nz(14, 30));
-expect("under the threshold never alerts", !shouldAlert("live", 4, start, 5, null));
-expect("first time over alerts", shouldAlert("live", 5, start, 5, null));
-const live12 = { mode: "live", lateMin: 12, jobStartAt: start };
-expect("same lateness doesn't repeat", !shouldAlert("live", 15, start, 5, live12));
-expect("10+ min worse repeats", shouldAlert("live", 22, start, 5, live12));
-expect("a moved job alerts again", shouldAlert("live", 6, new Date(nz(15)), 5, live12));
-const morning = { mode: "morning", lateMin: 20, jobStartAt: start };
-expect("live alerts after a morning one", shouldAlert("live", 8, start, 5, morning));
-expect("morning sends once", !shouldAlert("morning", 30, start, 5, morning));
-expect("morning doesn't follow a live alert", !shouldAlert("morning", 30, start, 5, live12));
+expect("under the threshold never alerts", !shouldAlert(4, start, 5, null));
+expect("first time over alerts", shouldAlert(5, start, 5, null));
+const prior12 = { lateMin: 12, jobStartAt: start };
+expect("same lateness doesn't repeat", !shouldAlert(15, start, 5, prior12));
+expect("10+ min worse repeats", shouldAlert(22, start, 5, prior12));
+expect("a moved job alerts again", shouldAlert(6, new Date(nz(15)), 5, prior12));
+expect("a smaller repeat step repeats sooner", shouldAlert(15, start, 5, prior12, 3));
+expect("a bigger repeat step waits longer", !shouldAlert(22, start, 5, prior12, 15));
 
 // Phone location freshness
 const now = nz(13);
@@ -57,6 +56,14 @@ expect(
 );
 expect("over 1 km accuracy isn't", !isUsableLocation({ ...fresh, accuracyM: 1500 }, now));
 expect("no reading isn't", !isUsableLocation(null, now));
+expect(
+  "a longer trust window keeps a 3-hour-old reading",
+  isUsableLocation({ ...fresh, at: new Date(now - 3 * HOUR) }, now, 4 * HOUR),
+);
+expect(
+  "a tighter accuracy limit drops a rough reading",
+  !isUsableLocation({ ...fresh, accuracyM: 300 }, now, 2 * HOUR, 200),
+);
 
 // Where the drive starts
 const prevJob: LocatedCommitment = {
@@ -134,12 +141,30 @@ expectEqual(
 );
 
 // Push text
-const text = runningLateText("live", "Jane Smith", nz(14, 30), 17, nz(14, 47));
+const text = runningLateText("Jane Smith", nz(14, 30), 17, nz(14, 47));
 expectEqual("live title", text.title, "Running late");
 expectEqual(
   "live body",
   text.body,
   "Jane Smith 2:30pm - traffic has you ~17 min late (arriving ~2:47pm)",
+);
+
+// Morning summary
+const summary = dailySummaryText([
+  { startMs: nz(9), name: "Jane Smith", remote: false, lateMin: null },
+  { startMs: nz(11, 30), name: "Bob Jones", remote: true, lateMin: null },
+  { startMs: nz(13), name: "Ann Lee", remote: false, lateMin: 12 },
+]);
+expectEqual("summary title counts jobs", summary.title, "Today: 3 jobs");
+expectEqual(
+  "summary lists each job with remote and tight gaps marked",
+  summary.body,
+  "9:00am Jane Smith\n11:30am Bob Jones (remote)\n1:00pm Ann Lee - tight gap, ~12 min late",
+);
+expectEqual(
+  "one job is singular",
+  dailySummaryText([{ startMs: nz(9), name: "Jane", remote: false, lateMin: null }]).title,
+  "Today: 1 job",
 );
 
 // OwnTracks body

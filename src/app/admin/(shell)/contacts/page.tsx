@@ -154,7 +154,7 @@ export default async function AdminContactsPage({
   return (
     <ContactsAdminView
       title="Contacts"
-      description="Everyone who has booked, been invoiced, or reviewed."
+      description="Everyone who has booked, been invoiced or reviewed, plus anyone you add."
       summary={summary}
       initialConflicts={initialConflicts}
       contacts={contactRows}

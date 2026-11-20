@@ -418,11 +418,22 @@ function validateComms(c: CommsSettings): FieldError[] {
     "pushOnCancellation",
     "pushOnReview",
     "pushOnRunningLate",
+    "pushDailySummary",
   ] as const) {
     if (typeof c[key] !== "boolean") errors.push({ field: key, message: "Must be on or off." });
   }
   if (!inRange(c.runningLateThresholdMin, 1, 60))
     errors.push({ field: "runningLateThresholdMin", message: "Must be 1-60 minutes." });
+  if (!inRange(c.runningLateWindowHours, 1, 12))
+    errors.push({ field: "runningLateWindowHours", message: "Must be 1-12 hours." });
+  if (!inRange(c.runningLateRepeatMin, 1, 120))
+    errors.push({ field: "runningLateRepeatMin", message: "Must be 1-120 minutes." });
+  if (!inRange(c.phoneLocationFreshHours, 1, 24))
+    errors.push({ field: "phoneLocationFreshHours", message: "Must be 1-24 hours." });
+  if (!inRange(c.phoneLocationMaxAccuracyM, 50, 5000))
+    errors.push({ field: "phoneLocationMaxAccuracyM", message: "Must be 50-5000 metres." });
+  if (!inRange(c.phoneCheckGapMin, 1, 60))
+    errors.push({ field: "phoneCheckGapMin", message: "Must be 1-60 minutes." });
   if (!inRange(c.reminderLeadHours, 1, 168))
     errors.push({ field: "reminderLeadHours", message: "Must be 1-168 hours." });
   if (!inRange(c.priceEstimateRetentionDays, 1, 3650))

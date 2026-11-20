@@ -1,12 +1,15 @@
 // src/features/calendar/lib/running-late.ts
-// Pure rules for the running-late push: how late a drive makes you, whether an alert is due
-// given the last one sent, where the drive starts, and the OwnTracks location body.
+// Pure rules for the running-late push and the morning summary: how late a drive makes you,
+// whether an alert is due given the last one sent, where the drive starts, the push wording,
+// and the OwnTracks location body.
 
 import type { LocatedCommitment } from "@/features/calendar/lib/travel-timeline";
 import { NZ_TZ } from "@/shared/lib/timezone-utils";
 
 export type RunningLateMode = "live" | "morning";
 
+// Fallbacks only: the live values are the comms settings runningLateRepeatMin,
+// phoneLocationFreshHours and phoneLocationMaxAccuracyM.
 /** A live alert repeats only once the job has got at least this much later. */
 export const REALERT_STEP_MIN = 10;
 
@@ -16,9 +19,8 @@ export const LOCATION_FRESH_MS = 2 * 60 * 60_000;
 /** A phone location less precise than this (metres) is ignored. */
 export const LOCATION_MAX_ACCURACY_M = 1000;
 
-/** The last alert sent for a job, as stored. */
+/** The last live alert sent for a job, as stored. */
 export interface PriorAlert {
-  mode: string;
   lateMin: number;
   jobStartAt: Date;
 }
@@ -36,29 +38,26 @@ export function minutesLate(departMs: number, driveMin: number, startMs: number)
 }
 
 /**
- * Whether to push for this job now. Under the threshold never alerts. Otherwise a job with no
- * alert, or one sent before the job moved, always alerts. The morning check sends one per
- * job. The live check sends its first alert even after a morning one, then repeats only when
- * the job has got {@link REALERT_STEP_MIN}+ minutes later than the last live alert said.
- * @param mode - Which check is running.
+ * Whether the live check should push for this job now. Under the threshold never alerts. A job
+ * with no alert, or one sent before the job moved, always alerts; after that it repeats only
+ * when the job has got `repeatStepMin`+ minutes later than the last alert said.
  * @param lateMin - Minutes late now.
  * @param jobStartAt - The job's current start.
  * @param thresholdMin - Minutes late before any alert.
  * @param prior - The last alert sent for this job, if any.
+ * @param repeatStepMin - How much later a job must get before a repeat push.
  * @returns True when a push should go.
  */
 export function shouldAlert(
-  mode: RunningLateMode,
   lateMin: number,
   jobStartAt: Date,
   thresholdMin: number,
   prior: PriorAlert | null,
+  repeatStepMin = REALERT_STEP_MIN,
 ): boolean {
   if (lateMin < thresholdMin) return false;
   if (!prior || prior.jobStartAt.getTime() !== jobStartAt.getTime()) return true;
-  if (mode === "morning") return false;
-  if (prior.mode !== "live") return true;
-  return lateMin >= prior.lateMin + REALERT_STEP_MIN;
+  return lateMin >= prior.lateMin + repeatStepMin;
 }
 
 /** Your phone's latest reading. */
@@ -71,15 +70,22 @@ export interface PhoneLocation {
 
 /**
  * Whether a phone reading is recent and precise enough to drive from. OwnTracks' Significant
- * mode only reports when you move, so a reading under 2 hours old usually still holds.
+ * mode only reports when you move, so a reading a couple of hours old usually still holds.
  * @param loc - The stored reading, if any.
  * @param nowMs - Current time (ms).
+ * @param freshMs - Oldest reading still trusted (ms).
+ * @param maxAccuracyM - Least precise reading still trusted (metres).
  * @returns True when the reading can stand in for where you are.
  */
-export function isUsableLocation(loc: PhoneLocation | null, nowMs: number): loc is PhoneLocation {
+export function isUsableLocation(
+  loc: PhoneLocation | null,
+  nowMs: number,
+  freshMs = LOCATION_FRESH_MS,
+  maxAccuracyM = LOCATION_MAX_ACCURACY_M,
+): loc is PhoneLocation {
   if (!loc) return false;
-  if (nowMs - loc.at.getTime() > LOCATION_FRESH_MS) return false;
-  return loc.accuracyM == null || loc.accuracyM <= LOCATION_MAX_ACCURACY_M;
+  if (nowMs - loc.at.getTime() > freshMs) return false;
+  return loc.accuracyM == null || loc.accuracyM <= maxAccuracyM;
 }
 
 /** Where and when the drive to a job starts. */
@@ -157,8 +163,7 @@ export function nzTimeLabel(ms: number): string {
 }
 
 /**
- * Push title and body. Name and times only, since it shows on a lock screen.
- * @param mode - Which check is sending.
+ * Live push title and body. Name and times only, since it shows on a lock screen.
  * @param name - Customer name or event title.
  * @param startMs - The job's start (ms).
  * @param lateMin - Minutes late.
@@ -166,22 +171,44 @@ export function nzTimeLabel(ms: number): string {
  * @returns Title and body.
  */
 export function runningLateText(
-  mode: RunningLateMode,
   name: string,
   startMs: number,
   lateMin: number,
   arriveMs: number,
 ): { title: string; body: string } {
-  const lead = `${name} ${nzTimeLabel(startMs)}`;
-  if (mode === "morning") {
-    return {
-      title: "Tight gap today",
-      body: `${lead} - traffic after the job before puts you ~${lateMin} min late (arriving ~${nzTimeLabel(arriveMs)})`,
-    };
-  }
   return {
     title: "Running late",
-    body: `${lead} - traffic has you ~${lateMin} min late (arriving ~${nzTimeLabel(arriveMs)})`,
+    body: `${name} ${nzTimeLabel(startMs)} - traffic has you ~${lateMin} min late (arriving ~${nzTimeLabel(arriveMs)})`,
+  };
+}
+
+/** One job in the morning summary. */
+export interface SummaryJob {
+  startMs: number;
+  name: string;
+  remote: boolean;
+  /** Minutes late after the job before, when the gap is tight; null otherwise. */
+  lateMin: number | null;
+}
+
+/**
+ * Morning summary push: a count in the title, then one line per job in time order, with
+ * remote jobs and tight gaps marked.
+ * @param jobs - Today's remaining jobs.
+ * @returns Title and body.
+ */
+export function dailySummaryText(jobs: SummaryJob[]): { title: string; body: string } {
+  const lines = jobs
+    .toSorted((a, b) => a.startMs - b.startMs)
+    .map((j) => {
+      let line = `${nzTimeLabel(j.startMs)} ${j.name}`;
+      if (j.remote) line += " (remote)";
+      if (j.lateMin != null) line += ` - tight gap, ~${j.lateMin} min late`;
+      return line;
+    });
+  return {
+    title: `Today: ${jobs.length} ${jobs.length === 1 ? "job" : "jobs"}`,
+    body: lines.join("\n"),
   };
 }
 

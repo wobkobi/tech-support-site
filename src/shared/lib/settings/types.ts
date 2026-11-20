@@ -270,6 +270,18 @@ export interface CommsSettings {
   pushOnRunningLate: boolean;
   /** Minutes late before the running-late push fires. */
   runningLateThresholdMin: number;
+  /** Hours ahead the live running-late check looks for jobs. */
+  runningLateWindowHours: number;
+  /** A repeat running-late push needs the job this many more minutes late than the last one. */
+  runningLateRepeatMin: number;
+  /** Hours a phone location stays usable as the drive's start. */
+  phoneLocationFreshHours: number;
+  /** Least precise phone location (metres) still used as the drive's start. */
+  phoneLocationMaxAccuracyM: number;
+  /** Minimum minutes between running-late checks started by phone reports. */
+  phoneCheckGapMin: number;
+  /** Push a 7am summary of the day's customer jobs, when there are any. */
+  pushDailySummary: boolean;
   /** Send the booking reminder this many hours before the appointment. */
   reminderLeadHours: number;
   /** How long price-estimate logs are kept before auto-purge (days). */
