@@ -160,9 +160,42 @@ export const COMMS_FIELD_META = {
     description:
       "Notify your own devices when the drive to a customer job puts you past its start, so you can call ahead.",
   },
+  pushDailySummary: {
+    title: "Morning summary of today's jobs",
+    description:
+      "At 7am, push a list of the day's customer jobs, with any tight gaps marked. Nothing is sent on a day without jobs.",
+  },
   runningLateThresholdMin: {
     title: "Running-late threshold",
     description: "Only notify once traffic puts you at least this many minutes late.",
+    unit: "minutes",
+  },
+  runningLateWindowHours: {
+    title: "Look ahead",
+    description: "The live check prices the drive to jobs starting within this many hours.",
+    unit: "hours",
+  },
+  runningLateRepeatMin: {
+    title: "Repeat when later by",
+    description:
+      "After the first push for a job, push again only once it's this many more minutes late.",
+    unit: "minutes",
+  },
+  phoneLocationFreshHours: {
+    title: "Trust a phone location for",
+    description:
+      "A phone location older than this is ignored and the drive starts from the job before, or home. OwnTracks only reports when you move.",
+    unit: "hours",
+  },
+  phoneLocationMaxAccuracyM: {
+    title: "Least precise phone location",
+    description: "A phone location rougher than this is ignored.",
+    unit: "metres",
+  },
+  phoneCheckGapMin: {
+    title: "Check from phone reports at most every",
+    description:
+      "Each phone report runs the live check, no more often than this, to keep Google Maps lookups down.",
     unit: "minutes",
   },
   reminderLeadHours: {

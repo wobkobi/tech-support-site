@@ -63,8 +63,8 @@ All endpoints are **GET**. Create one cron-job.org job per row.
 | Public holidays         | `/api/cron/refresh-public-holidays`         | GET    | monthly                      | Refresh NZ public holidays (current + next year)                                                                                                                                                                                         |
 | Scheduled publishing    | `/api/cron/publish-scheduled`               | GET    | every 5 minutes              | Post due social posts, send due emails, resume stuck runs, finish Resend broadcasts, bust the promo cache when a promo starts or ends, and once an hour line up posts in social schedules' empty time slots                              |
 | Social sync             | `/api/cron/sync-social`                     | GET    | every 30 minutes             | Read new comments, reviews and messages for Social > Inbox, once a day copy the Google account's picture to the Business Profile when it changes, then each app's daily figures and each published post's figures for Social > Analytics |
-| Running late (live)     | `/api/cron/check-running-late`              | GET    | every 10 min, 06:00-20:00 NZ | Push when live traffic puts you 5+ min late for a customer job in the next 3 hours (from your phone location when OwnTracks has reported in the last 2 hours)                                                                            |
-| Running late (morning)  | `/api/cron/check-running-late?mode=morning` | GET    | daily 07:00 NZ               | Push a heads-up for today's back-to-back customer jobs that predicted traffic makes tight                                                                                                                                                |
+| Running late (live)     | `/api/cron/check-running-late`              | GET    | every 10 min, 06:00-20:00 NZ | Push when live traffic puts you late for a customer job in the next few hours (from your phone location when OwnTracks has reported recently); amounts are settings                                                                      |
+| Running late (morning)  | `/api/cron/check-running-late?mode=morning` | GET    | daily 07:00 NZ               | Push a summary of today's customer jobs (none sent on a day without jobs), marking back-to-back ones that predicted traffic makes tight                                                                                                  |
 
 Full URL = the production URL + the path above. cron-job.org lets you pick a timezone per job -
 schedule Record subscriptions, Review asks and both Running late jobs in `Pacific/Auckland` so they
@@ -221,10 +221,19 @@ keep their local time across DST changes.
   a location; remote bookings left out) is priced with live traffic. It starts from a manual travel
   origin, else your phone (live check, nothing on the schedule still running), else the job before,
   else home, and never leaves before now. One push per job; a live alert repeats only once the job
-  is 10+ minutes later than the last one said. Switch and threshold: Settings > Comms.
+  is enough minutes later than the last one said. Switch, threshold, look-ahead, repeat step and the
+  phone-location limits: Settings > Comms or Travel alerts (defaults 5 min, 3 hr, 10 min, 2 hr, 1
+  km, 5 min).
+- Morning summary: one push at 7am listing the day's customer jobs (remote ones marked), with any
+  tight back-to-back gap noted when running-late pushes are on. Nothing is sent on a day without
+  jobs, and only one goes out per day; "Send today's summary" on Travel alerts sends another on
+  demand. Switch: Settings > Comms > Morning summary of today's jobs.
+- Travel alerts (`/admin/travel-alerts`) shows whether the phone is reporting, when each check last
+  ran and what it did, and the last 10 alerts.
 - OwnTracks phone set-up: Mode **HTTP**, URL `<production URL>/api/location/owntracks`, any
   username, password = `OWNTRACKS_SECRET`, monitoring **Significant**. Each report overwrites the
-  one stored location (no history) and runs the live check at most once every 5 minutes.
+  one stored location (no history) and runs the live check at most once per the phone-check gap
+  setting.
 
 ## Adding a new job
 

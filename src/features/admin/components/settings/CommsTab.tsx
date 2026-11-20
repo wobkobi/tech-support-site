@@ -119,6 +119,63 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.runningLateThresholdMin !== defaults.runningLateThresholdMin}
           onChange={(v) => set({ runningLateThresholdMin: v ?? 1 })}
         />
+        <NumberField
+          id="runningLateWindowHours"
+          meta={m.runningLateWindowHours}
+          value={draft.runningLateWindowHours}
+          min={1}
+          max={12}
+          error={fieldErrors.runningLateWindowHours}
+          customised={draft.runningLateWindowHours !== defaults.runningLateWindowHours}
+          onChange={(v) => set({ runningLateWindowHours: v ?? 1 })}
+        />
+        <NumberField
+          id="runningLateRepeatMin"
+          meta={m.runningLateRepeatMin}
+          value={draft.runningLateRepeatMin}
+          min={1}
+          max={120}
+          error={fieldErrors.runningLateRepeatMin}
+          customised={draft.runningLateRepeatMin !== defaults.runningLateRepeatMin}
+          onChange={(v) => set({ runningLateRepeatMin: v ?? 1 })}
+        />
+        <NumberField
+          id="phoneLocationFreshHours"
+          meta={m.phoneLocationFreshHours}
+          value={draft.phoneLocationFreshHours}
+          min={1}
+          max={24}
+          error={fieldErrors.phoneLocationFreshHours}
+          customised={draft.phoneLocationFreshHours !== defaults.phoneLocationFreshHours}
+          onChange={(v) => set({ phoneLocationFreshHours: v ?? 1 })}
+        />
+        <NumberField
+          id="phoneLocationMaxAccuracyM"
+          meta={m.phoneLocationMaxAccuracyM}
+          value={draft.phoneLocationMaxAccuracyM}
+          min={50}
+          max={5000}
+          error={fieldErrors.phoneLocationMaxAccuracyM}
+          customised={draft.phoneLocationMaxAccuracyM !== defaults.phoneLocationMaxAccuracyM}
+          onChange={(v) => set({ phoneLocationMaxAccuracyM: v ?? 1000 })}
+        />
+        <NumberField
+          id="phoneCheckGapMin"
+          meta={m.phoneCheckGapMin}
+          value={draft.phoneCheckGapMin}
+          min={1}
+          max={60}
+          error={fieldErrors.phoneCheckGapMin}
+          customised={draft.phoneCheckGapMin !== defaults.phoneCheckGapMin}
+          onChange={(v) => set({ phoneCheckGapMin: v ?? 5 })}
+        />
+        <ToggleField
+          id="pushDailySummary"
+          meta={m.pushDailySummary}
+          value={draft.pushDailySummary}
+          customised={draft.pushDailySummary !== defaults.pushDailySummary}
+          onChange={(v) => set({ pushDailySummary: v })}
+        />
       </div>
 
       <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Timings</h3>

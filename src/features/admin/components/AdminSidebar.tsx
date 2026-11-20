@@ -33,6 +33,7 @@ import {
   FaGaugeHigh,
   FaGear,
   FaHandHoldingDollar,
+  FaLocationDot,
   FaMagnifyingGlassDollar,
   FaPalette,
   FaReceipt,
@@ -68,6 +69,7 @@ type AdminPage =
   | "social"
   | "post-maker"
   | "notifications"
+  | "travel-alerts"
   | "settings";
 
 interface NavItem {
@@ -226,6 +228,12 @@ const FOOTER_NAV_ITEMS: NavItem[] = [
     label: "Notifications",
     icon: <FaBell className="shrink-0" />,
     path: "/admin/notifications",
+  },
+  {
+    page: "travel-alerts",
+    label: "Travel alerts",
+    icon: <FaLocationDot className="shrink-0" />,
+    path: "/admin/travel-alerts",
   },
   {
     page: "settings",
