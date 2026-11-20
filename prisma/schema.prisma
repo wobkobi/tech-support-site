@@ -1680,3 +1680,31 @@ model PushDevice {
   // subscription iOS dropped silently shows up as a stale timestamp.
   lastSeenAt DateTime?
 }
+
+// Last running-late push per job, so the 10-minute check doesn't repeat itself.
+// A live alert repeats only when the job has got markedly later since.
+model RunningLateAlert {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  // "booking:<id>" or "event:<calendar event id>" for a booking-calendar-only job.
+  key        String   @unique
+  // "morning" or "live": which check sent it.
+  mode       String
+  lateMin    Int
+  // The job's start when the alert went; a moved job is a new alert.
+  jobStartAt DateTime
+  sentAt     DateTime
+
+  @@index([jobStartAt])
+}
+
+// The operator's latest phone location from OwnTracks. One row (key "owner"),
+// overwritten on every report; no history is kept.
+model OperatorLocation {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  lat       Float
+  lng       Float
+  accuracyM Float?
+  // When the phone took the reading (OwnTracks `tst`).
+  at        DateTime
+}

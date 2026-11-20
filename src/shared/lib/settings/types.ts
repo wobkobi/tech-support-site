@@ -266,6 +266,10 @@ export interface CommsSettings {
   pushOnCancellation: boolean;
   /** Push to the operator's devices when a review is submitted. */
   pushOnReview: boolean;
+  /** Push to the operator's devices when traffic means a job can't be reached on time. */
+  pushOnRunningLate: boolean;
+  /** Minutes late before the running-late push fires. */
+  runningLateThresholdMin: number;
   /** Send the booking reminder this many hours before the appointment. */
   reminderLeadHours: number;
   /** How long price-estimate logs are kept before auto-purge (days). */

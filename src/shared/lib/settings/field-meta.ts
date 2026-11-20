@@ -155,6 +155,16 @@ export const COMMS_FIELD_META = {
     title: "Push on new review",
     description: "Notify your own devices when a customer submits a review.",
   },
+  pushOnRunningLate: {
+    title: "Push when traffic makes you late",
+    description:
+      "Notify your own devices when the drive to a customer job puts you past its start, so you can call ahead.",
+  },
+  runningLateThresholdMin: {
+    title: "Running-late threshold",
+    description: "Only notify once traffic puts you at least this many minutes late.",
+    unit: "minutes",
+  },
   reminderLeadHours: {
     title: "Reminder lead time",
     description: "Send the reminder once the appointment is within this many hours.",

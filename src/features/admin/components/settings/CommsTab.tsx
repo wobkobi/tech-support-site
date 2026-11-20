@@ -103,6 +103,22 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.pushOnReview !== defaults.pushOnReview}
           onChange={(v) => set({ pushOnReview: v })}
         />
+        <ToggleField
+          id="pushOnRunningLate"
+          meta={m.pushOnRunningLate}
+          value={draft.pushOnRunningLate}
+          customised={draft.pushOnRunningLate !== defaults.pushOnRunningLate}
+          onChange={(v) => set({ pushOnRunningLate: v })}
+        />
+        <NumberField
+          id="runningLateThresholdMin"
+          meta={m.runningLateThresholdMin}
+          value={draft.runningLateThresholdMin}
+          min={1}
+          error={fieldErrors.runningLateThresholdMin}
+          customised={draft.runningLateThresholdMin !== defaults.runningLateThresholdMin}
+          onChange={(v) => set({ runningLateThresholdMin: v ?? 1 })}
+        />
       </div>
 
       <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Timings</h3>

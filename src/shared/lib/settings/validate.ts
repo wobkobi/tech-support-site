@@ -417,9 +417,12 @@ function validateComms(c: CommsSettings): FieldError[] {
     "pushOnBooking",
     "pushOnCancellation",
     "pushOnReview",
+    "pushOnRunningLate",
   ] as const) {
     if (typeof c[key] !== "boolean") errors.push({ field: key, message: "Must be on or off." });
   }
+  if (!inRange(c.runningLateThresholdMin, 1, 60))
+    errors.push({ field: "runningLateThresholdMin", message: "Must be 1-60 minutes." });
   if (!inRange(c.reminderLeadHours, 1, 168))
     errors.push({ field: "reminderLeadHours", message: "Must be 1-168 hours." });
   if (!inRange(c.priceEstimateRetentionDays, 1, 3650))
