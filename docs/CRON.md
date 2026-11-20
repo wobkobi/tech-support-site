@@ -24,11 +24,14 @@ calls the endpoints over HTTPS on a schedule. Every job is a plain `GET` route u
      and scheduled mailing-list emails.
    - `UNSUBSCRIBE_SECRET` - signs the unsubscribe link in mailing-list emails and the "stop asking
      me" link in review asks; neither goes out without it.
-   - `GOOGLE_MAPS_SERVER_KEY` - public holidays refresh. No fallback to `GOOGLE_MAPS_API_KEY`:
-     next.config.ts publishes that one to the browser, so falling back would spend a publicly
-     readable key on server-side quota. The key's Google Cloud project must have the **Calendar
-     API** enabled and must not be API-restricted to Maps services only - the job reads the public
-     NZ holidays calendar, not a Maps endpoint.
+   - `OWNTRACKS_SECRET` - the password the OwnTracks app sends to `/api/location/owntracks` (see
+     Notes). Without it every location report gets a 401 and the running-late check guesses where
+     you are from the schedule.
+   - `GOOGLE_MAPS_SERVER_KEY` - public holidays refresh and the running-late drive times. No
+     fallback to `GOOGLE_MAPS_API_KEY`: next.config.ts publishes that one to the browser, so falling
+     back would spend a publicly readable key on server-side quota. The key's Google Cloud project
+     must have the **Calendar API** enabled and must not be API-restricted to Maps services only -
+     the job reads the public NZ holidays calendar, not a Maps endpoint.
 
 ## Auth
 
@@ -46,24 +49,26 @@ Authorization: Bearer <CRON_SECRET>
 
 All endpoints are **GET**. Create one cron-job.org job per row.
 
-| Job                     | URL path                            | Method | Schedule         | Purpose                                                                                                                                                                                                                                  |
-| ----------------------- | ----------------------------------- | ------ | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Calendar cache refresh  | `/api/cron/refresh-calendar-cache`  | GET    | every 30 minutes | Fetch Google Calendar events into the DB cache                                                                                                                                                                                           |
-| Reconcile booking times | `/api/cron/reconcile-booking-times` | GET    | every 30 minutes | Pull corrected times back from Calendar, flag deleted events, retry booking-event deletes Google refused                                                                                                                                 |
-| Booking reminders       | `/api/cron/send-booking-reminders`  | GET    | every 30 minutes | Email a 24h-out reminder for confirmed bookings                                                                                                                                                                                          |
-| Invoice reminders       | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each); a Cashbook payment (exact, or same amount and a shared name) holds the nudge and pushes you to mark it paid                                                                             |
-| Review asks             | `/api/cron/send-review-asks`        | GET    | daily 10:00 NZ   | Email the one Google review ask per person N days after the invoice is paid; skips jobs where nothing could be fixed                                                                                                                     |
-| Sheets sync             | `/api/cron/sync-sheets`             | GET    | hourly           | Reconcile Cashbook/Expenses sheets with MongoDB                                                                                                                                                                                          |
-| Contacts sync           | `/api/cron/sync-contacts`           | GET    | every 3 hours    | Two-way incremental Google Contacts sync                                                                                                                                                                                                 |
-| Subscription reminders  | `/api/cron/record-subscriptions`    | GET    | daily 08:00 NZ   | Push reminder for due subscriptions; records nothing (Record button on Expenses does)                                                                                                                                                    |
-| Purge price estimates   | `/api/cron/purge-price-estimates`   | GET    | daily            | Delete price estimate logs past retention                                                                                                                                                                                                |
-| Public holidays         | `/api/cron/refresh-public-holidays` | GET    | monthly          | Refresh NZ public holidays (current + next year)                                                                                                                                                                                         |
-| Scheduled publishing    | `/api/cron/publish-scheduled`       | GET    | every 5 minutes  | Post due social posts, send due emails, resume stuck runs, finish Resend broadcasts, bust the promo cache when a promo starts or ends, and once an hour line up posts in social schedules' empty time slots                              |
-| Social sync             | `/api/cron/sync-social`             | GET    | every 30 minutes | Read new comments, reviews and messages for Social > Inbox, once a day copy the Google account's picture to the Business Profile when it changes, then each app's daily figures and each published post's figures for Social > Analytics |
+| Job                     | URL path                                    | Method | Schedule                     | Purpose                                                                                                                                                                                                                                  |
+| ----------------------- | ------------------------------------------- | ------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Calendar cache refresh  | `/api/cron/refresh-calendar-cache`          | GET    | every 30 minutes             | Fetch Google Calendar events into the DB cache                                                                                                                                                                                           |
+| Reconcile booking times | `/api/cron/reconcile-booking-times`         | GET    | every 30 minutes             | Pull corrected times back from Calendar, flag deleted events, retry booking-event deletes Google refused                                                                                                                                 |
+| Booking reminders       | `/api/cron/send-booking-reminders`          | GET    | every 30 minutes             | Email a 24h-out reminder for confirmed bookings                                                                                                                                                                                          |
+| Invoice reminders       | `/api/cron/send-invoice-reminders`          | GET    | daily                        | Chase overdue SENT invoices (max 2 nudges each); a Cashbook payment (exact, or same amount and a shared name) holds the nudge and pushes you to mark it paid                                                                             |
+| Review asks             | `/api/cron/send-review-asks`                | GET    | daily 10:00 NZ               | Email the one Google review ask per person N days after the invoice is paid; skips jobs where nothing could be fixed                                                                                                                     |
+| Sheets sync             | `/api/cron/sync-sheets`                     | GET    | hourly                       | Reconcile Cashbook/Expenses sheets with MongoDB                                                                                                                                                                                          |
+| Contacts sync           | `/api/cron/sync-contacts`                   | GET    | every 3 hours                | Two-way incremental Google Contacts sync                                                                                                                                                                                                 |
+| Subscription reminders  | `/api/cron/record-subscriptions`            | GET    | daily 08:00 NZ               | Push reminder for due subscriptions; records nothing (Record button on Expenses does)                                                                                                                                                    |
+| Purge price estimates   | `/api/cron/purge-price-estimates`           | GET    | daily                        | Delete price estimate logs past retention                                                                                                                                                                                                |
+| Public holidays         | `/api/cron/refresh-public-holidays`         | GET    | monthly                      | Refresh NZ public holidays (current + next year)                                                                                                                                                                                         |
+| Scheduled publishing    | `/api/cron/publish-scheduled`               | GET    | every 5 minutes              | Post due social posts, send due emails, resume stuck runs, finish Resend broadcasts, bust the promo cache when a promo starts or ends, and once an hour line up posts in social schedules' empty time slots                              |
+| Social sync             | `/api/cron/sync-social`                     | GET    | every 30 minutes             | Read new comments, reviews and messages for Social > Inbox, once a day copy the Google account's picture to the Business Profile when it changes, then each app's daily figures and each published post's figures for Social > Analytics |
+| Running late (live)     | `/api/cron/check-running-late`              | GET    | every 10 min, 06:00-20:00 NZ | Push when live traffic puts you 5+ min late for a customer job in the next 3 hours (from your phone location when OwnTracks has reported in the last 2 hours)                                                                            |
+| Running late (morning)  | `/api/cron/check-running-late?mode=morning` | GET    | daily 07:00 NZ               | Push a heads-up for today's back-to-back customer jobs that predicted traffic makes tight                                                                                                                                                |
 
 Full URL = the production URL + the path above. cron-job.org lets you pick a timezone per job -
-schedule Record subscriptions and Review asks in `Pacific/Auckland` so they keep their local time
-across DST changes.
+schedule Record subscriptions, Review asks and both Running late jobs in `Pacific/Auckland` so they
+keep their local time across DST changes.
 
 ## Notes
 
@@ -211,6 +216,15 @@ across DST changes.
   on both sides until it's resolved.
 - Sheets sync treats the sheet as source of truth, joining rows on the hidden column-Z Sync ID, and
   self-heals site entries whose sheet append failed.
+
+- Running late: the drive to each customer job (confirmed bookings plus booking-calendar events with
+  a location; remote bookings left out) is priced with live traffic. It starts from a manual travel
+  origin, else your phone (live check, nothing on the schedule still running), else the job before,
+  else home, and never leaves before now. One push per job; a live alert repeats only once the job
+  is 10+ minutes later than the last one said. Switch and threshold: Settings > Comms.
+- OwnTracks phone set-up: Mode **HTTP**, URL `<production URL>/api/location/owntracks`, any
+  username, password = `OWNTRACKS_SECRET`, monitoring **Significant**. Each report overwrites the
+  one stored location (no history) and runs the live check at most once every 5 minutes.
 
 ## Adding a new job
 

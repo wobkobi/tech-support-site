@@ -236,6 +236,8 @@ export const DEFAULT_SETTINGS: Settings = {
     pushOnBooking: true,
     pushOnCancellation: true,
     pushOnReview: true,
+    pushOnRunningLate: true,
+    runningLateThresholdMin: 5,
     reminderLeadHours: 24,
     priceEstimateRetentionDays: 30,
     invoiceRemindersEnabled: true,

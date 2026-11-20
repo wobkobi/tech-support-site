@@ -137,3 +137,22 @@ function isValidCronBearer(authHeader: string | null): boolean {
 export function isCronAuthorised(request: NextRequest): boolean {
   return isValidCronBearer(request.headers.get("authorization"));
 }
+
+/**
+ * Checks an OwnTracks request: HTTP Basic, the password matching OWNTRACKS_SECRET in constant
+ * time. The username is ignored; OwnTracks can't log in, so this is its only credential.
+ * @param password - Password from the Basic header, or null when there isn't one.
+ * @returns True if it matches OWNTRACKS_SECRET.
+ */
+export function isOwnTracksPassword(password: string | null): boolean {
+  const secret = process.env.OWNTRACKS_SECRET;
+  if (!secret || !password) return false;
+  try {
+    const a = Buffer.from(password);
+    const b = Buffer.from(secret);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
