@@ -44,11 +44,18 @@ async function claimCheck(now: Date, gapMs: number): Promise<boolean> {
  * POST /api/location/owntracks
  * OwnTracks expects a JSON array back on success; `[]` sends it nothing to act on.
  * @param request - OwnTracks report.
- * @returns `[]`, or 401 on a wrong password.
+ * @returns `[]`, or 401 on a missing or wrong password.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isOwnTracksPassword(basicAuthPassword(request.headers.get("authorization")))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const header = request.headers.get("authorization");
+  if (!isOwnTracksPassword(basicAuthPassword(header))) {
+    console.warn(`[owntracks] 401: ${header ? "wrong password" : "no Authorization header"}`);
+    // The Basic challenge makes iOS URLSession resend with the stored user and password; without
+    // it the iPhone app never sends them.
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: { "WWW-Authenticate": 'Basic realm="OwnTracks", charset="UTF-8"' } },
+    );
   }
 
   const now = new Date();
