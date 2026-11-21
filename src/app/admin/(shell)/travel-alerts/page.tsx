@@ -36,9 +36,16 @@ export default async function TravelAlertsPage(): Promise<React.ReactElement> {
     headers(),
   ]);
 
-  // Name each booking alert; calendar-only events and summaries keep a generic label.
+  // Name each booking alert; calendar-only events, summaries and phone warnings keep a generic label.
+  /**
+   * The job an alert key is for: leave reminders are keyed "leave:<job key>".
+   * @param key - Alert key.
+   * @returns The job key.
+   */
+  const jobKey = (key: string): string => key.replace(/^leave:/, "");
   const bookingIds = alerts
-    .map((a) => (a.key.startsWith("booking:") ? a.key.slice("booking:".length) : null))
+    .map((a) => jobKey(a.key))
+    .map((k) => (k.startsWith("booking:") ? k.slice("booking:".length) : null))
     .filter((id): id is string => id !== null && /^[a-f0-9]{24}$/.test(id));
   const bookings = bookingIds.length
     ? await prisma.booking.findMany({
@@ -49,14 +56,16 @@ export default async function TravelAlertsPage(): Promise<React.ReactElement> {
   const nameById = new Map(bookings.map((b) => [b.id, b.name]));
 
   const alertRows: AlertRow[] = alerts.map((a) => {
-    const [kind, id] = a.key.split(":", 2);
+    const [kind, id] = jobKey(a.key).split(":", 2);
     let label = "Calendar job";
     if (kind === "summary") label = "Morning summary";
+    else if (kind === "phone-quiet") label = "Phone stopped reporting";
     else if (kind === "booking") label = nameById.get(id ?? "") ?? "Booking";
     return {
       id: a.id,
       label,
-      summary: kind === "summary",
+      kind:
+        kind === "summary" || kind === "phone-quiet" ? kind : a.mode === "leave" ? "leave" : "late",
       lateMin: a.lateMin,
       jobStartAt: a.jobStartAt.toISOString(),
       sentAt: a.sentAt.toISOString(),

@@ -8,6 +8,7 @@ import {
   bookingJob,
   calendarOnlyJobs,
   mergeJobs,
+  runningJob,
   type DashboardJob,
 } from "@/features/admin/lib/dashboard-jobs";
 import { balanceDue, formatNZD } from "@/features/business/lib/business";
@@ -27,6 +28,7 @@ import {
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { nzDateKey, nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 import type { Booking, Contact, Invoice, Review } from "@prisma/client";
 
@@ -118,6 +120,8 @@ export interface DashboardData {
   unsyncedCount: number;
   /** Today's jobs (NZ day): confirmed bookings plus calendar-only jobs. */
   todaysJobs: DashboardJob[];
+  /** The job under way now (or just past its end), for the phone's Running over card. */
+  runningJob: DashboardJob | null;
   /** The soonest job still to start, if any. */
   nextJob: DashboardJob | undefined;
   /** The upcoming jobs after {@link DashboardData.nextJob}. */
@@ -411,7 +415,13 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
         ).flatMap((b) => (b.calendarEventId ? [b.calendarEventId] : []))
       : [],
   );
-  const calendarJobs = calendarOnlyJobs(jobEvents, bookingCalendarId, bookedEventIds);
+  const { identity } = await getSettings();
+  const calendarJobs = calendarOnlyJobs(
+    jobEvents,
+    bookingCalendarId,
+    bookedEventIds,
+    identity.baseAddress.line || process.env.HOME_ADDRESS || "",
+  );
   const todaysJobs = mergeJobs(
     [todaysBookings.map(bookingJob), calendarJobs],
     todayStart,
@@ -480,6 +490,7 @@ export async function loadDashboardData(now: Date): Promise<DashboardData> {
     contactCount,
     unsyncedCount,
     todaysJobs,
+    runningJob: runningJob(todaysJobs, now.getTime()),
     nextJob,
     laterJobs,
 

@@ -29,14 +29,14 @@ import { NZ_TZ } from "@/shared/lib/timezone-utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /** One recent alert row. */
 export interface AlertRow {
   id: string;
   label: string;
-  /** True for a morning summary rather than a running-late push. */
-  summary: boolean;
+  /** Which push it was. */
+  kind: "late" | "leave" | "summary" | "phone-quiet";
   lateMin: number;
   jobStartAt: string;
   sentAt: string;
@@ -221,6 +221,15 @@ export function TravelAlertsView({
 
   // Null until hydrated so server and client markup match; ticks so "ago" stays true.
   const nowMs = useNowMinute();
+
+  // Re-fetch the server data every 30 s while the tab is visible, so a new phone report or run
+  // shows without a reload. The settings draft is client state and survives the refresh.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [router]);
 
   /**
    * Merges a comms patch into the draft.
@@ -473,6 +482,13 @@ export function TravelAlertsView({
           </div>
           <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Phone location</h3>
           <div className="mt-2 divide-y divide-admin-border">
+            <ToggleField
+              id="pushPhoneQuiet"
+              meta={m.pushPhoneQuiet}
+              value={draft.pushPhoneQuiet}
+              customised={draft.pushPhoneQuiet !== defaults.pushPhoneQuiet}
+              onChange={(v) => set({ pushPhoneQuiet: v })}
+            />
             <NumberField
               id="phoneLocationFreshHours"
               meta={m.phoneLocationFreshHours}
@@ -504,6 +520,36 @@ export function TravelAlertsView({
               onChange={(v) => set({ phoneCheckGapMin: v ?? 5 })}
             />
           </div>
+          <h3 className={cn("mt-5", ADMIN_EYEBROW_CLS)}>Leave reminders</h3>
+          <div className="mt-2 divide-y divide-admin-border">
+            <ToggleField
+              id="pushLeaveReminder"
+              meta={m.pushLeaveReminder}
+              value={draft.pushLeaveReminder}
+              customised={draft.pushLeaveReminder !== defaults.pushLeaveReminder}
+              onChange={(v) => set({ pushLeaveReminder: v })}
+            />
+            <NumberField
+              id="leaveReminderLeadMin"
+              meta={m.leaveReminderLeadMin}
+              value={draft.leaveReminderLeadMin}
+              min={0}
+              max={60}
+              error={fieldErrors.leaveReminderLeadMin}
+              customised={draft.leaveReminderLeadMin !== defaults.leaveReminderLeadMin}
+              onChange={(v) => set({ leaveReminderLeadMin: v ?? 10 })}
+            />
+            <NumberField
+              id="atHomeRadiusM"
+              meta={m.atHomeRadiusM}
+              value={draft.atHomeRadiusM}
+              min={50}
+              max={2000}
+              error={fieldErrors.atHomeRadiusM}
+              customised={draft.atHomeRadiusM !== defaults.atHomeRadiusM}
+              onChange={(v) => set({ atHomeRadiusM: v ?? 300 })}
+            />
+          </div>
           <SettingsFooter form={form} />
         </SettingsTabBody>
       </Card>
@@ -518,9 +564,11 @@ export function TravelAlertsView({
               <li key={a.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2">
                 <span className="font-semibold text-admin-text">{a.label}</span>
                 <span className="text-base text-admin-text">
-                  {a.summary
-                    ? `for ${nzDateTime(a.jobStartAt).replace(/,.*$/, "")}`
-                    : `${nzDateTime(a.jobStartAt)}, ~${a.lateMin} min late`}
+                  {a.kind === "leave"
+                    ? `${nzDateTime(a.jobStartAt)}, leave reminder`
+                    : a.kind === "summary" || a.kind === "phone-quiet"
+                      ? `for ${nzDateTime(a.jobStartAt).replace(/,.*$/, "")}`
+                      : `${nzDateTime(a.jobStartAt)}, ~${a.lateMin} min late`}
                 </span>
                 <span className="text-sm text-admin-muted">sent {nzDateTime(a.sentAt)}</span>
               </li>

@@ -41,6 +41,27 @@ async function claimCheck(now: Date, gapMs: number): Promise<boolean> {
 }
 
 /**
+ * Short description of a report that held no location, for the logs: its message type(s) and
+ * top-level keys, never coordinates.
+ * @param body - Parsed body, or null when it wasn't JSON.
+ * @returns The description.
+ */
+function describeReport(body: unknown): string {
+  if (body === null) return "not JSON";
+  /**
+   * One message's type and keys.
+   * @param m - A message from the body.
+   * @returns The description.
+   */
+  const one = (m: unknown): string => {
+    if (!m || typeof m !== "object") return typeof m;
+    const r = m as Record<string, unknown>;
+    return `${String(r._type)} {${Object.keys(r).join(",")}}`;
+  };
+  return Array.isArray(body) ? `array of ${body.length}: ${body.map(one).join("; ")}` : one(body);
+}
+
+/**
  * POST /api/location/owntracks
  * OwnTracks expects a JSON array back on success; `[]` sends it nothing to act on.
  * @param request - OwnTracks report.
@@ -60,8 +81,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const now = new Date();
   const body: unknown = await request.json().catch(() => null);
-  const loc = parseOwnTracksLocation(body, now.getTime());
-  if (!loc) return NextResponse.json([]);
+  // A batch arrives as an array; the newest location in it wins.
+  const loc = (Array.isArray(body) ? body : [body])
+    .map((m) => parseOwnTracksLocation(m, now.getTime()))
+    .filter((l) => l !== null)
+    .reduce<ReturnType<typeof parseOwnTracksLocation>>(
+      (best, l) => (best && best.at >= l.at ? best : l),
+      null,
+    );
+  if (!loc) {
+    console.info(`[owntracks] no location in report: ${describeReport(body)}`);
+    return NextResponse.json([]);
+  }
 
   try {
     const data = { lat: loc.lat, lng: loc.lng, accuracyM: loc.accuracyM, at: loc.at };
@@ -73,8 +104,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (updated.count === 0) {
       await prisma.operatorLocation
         .create({ data: { key: OWNER_LOCATION_KEY, ...data } })
-        .catch(() => null); // Row exists with a newer reading.
+        .catch(() => console.info("[owntracks] kept a newer stored location"));
     }
+    console.info(`[owntracks] stored location, accuracy ${loc.accuracyM ?? "?"} m`);
     const { comms } = await getSettings();
     if (await claimCheck(now, comms.phoneCheckGapMin * 60_000)) {
       const result = await runRunningLateCheck("live", now, "location");

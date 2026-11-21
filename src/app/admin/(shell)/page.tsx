@@ -7,10 +7,12 @@ import { incomeExpenseSeries } from "@/features/admin/components/charts/series";
 import { Sparkline } from "@/features/admin/components/charts/Sparkline";
 import { CompleteEventsPanel } from "@/features/admin/components/CompleteEventsPanel";
 import { DashboardAlerts } from "@/features/admin/components/dashboard/DashboardAlerts";
+import { DashboardPanel } from "@/features/admin/components/dashboard/DashboardPanel";
 import { NextJobPanel } from "@/features/admin/components/dashboard/NextJobPanel";
 import { PendingReviewsPanel } from "@/features/admin/components/dashboard/PendingReviewsPanel";
 import { RecentActivityPanel } from "@/features/admin/components/dashboard/RecentActivityPanel";
 import { RetainersDuePanel } from "@/features/admin/components/dashboard/RetainersDuePanel";
+import { RunningJobPanel } from "@/features/admin/components/dashboard/RunningJobPanel";
 import { SystemStatusPanel } from "@/features/admin/components/dashboard/SystemStatusPanel";
 import { UpcomingBookingsPanel } from "@/features/admin/components/dashboard/UpcomingBookingsPanel";
 import { QuickActionTiles } from "@/features/admin/components/QuickActionsSheet";
@@ -55,12 +57,44 @@ interface DashboardStat {
 
 /**
  * Admin dashboard page showing stat cards, alerts, live data panels and the income chart.
+ * @param props - Page props.
+ * @param props.searchParams - `extend=1` from the + menu's Add time to job: show the Running
+ *   now card at every width, or say no job is running.
  * @returns Dashboard page element.
  */
-export default async function AdminPage(): Promise<React.ReactElement> {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ extend?: string }>;
+}): Promise<React.ReactElement> {
   await requireAdminAuth("/admin");
 
-  const data = await loadDashboardData(new Date());
+  const renderedAt = new Date();
+  const [data, query] = await Promise.all([loadDashboardData(renderedAt), searchParams]);
+  const { runningJob } = data;
+  const extendAsked = query.extend === "1";
+  // Phones always get the card while a job runs; desktop only when asked for it.
+  let runningCard: React.ReactElement | null = null;
+  if (runningJob) {
+    runningCard = (
+      <RunningJobPanel
+        source={runningJob.source}
+        jobKey={runningJob.key}
+        name={runningJob.name}
+        endAt={runningJob.endAt.toISOString()}
+        pastEnd={runningJob.endAt.getTime() < renderedAt.getTime()}
+      />
+    );
+  } else if (extendAsked) {
+    runningCard = (
+      <DashboardPanel
+        title="Running now"
+        empty="No job is running right now. Time can be added from a job's start until an hour after its end."
+      >
+        {null}
+      </DashboardPanel>
+    );
+  }
   const {
     todayKey,
     monthRevenue,
@@ -174,8 +208,11 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         }
       />
 
-      {/* Phone: the next job and the shortcuts come before any figures. */}
+      {extendAsked && runningCard && <div className="mb-6 max-lg:hidden">{runningCard}</div>}
+
+      {/* Phone: the job under way, the next job and the shortcuts come before any figures. */}
       <div className="mb-4 flex flex-col gap-4 lg:hidden">
+        {runningCard}
         {nextJobPanel("")}
         <nav aria-label="Quick actions">
           <QuickActionTiles stamp="dashboard" />

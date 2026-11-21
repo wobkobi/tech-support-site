@@ -12,9 +12,11 @@ import { BookingActions } from "@/features/booking/components/admin/BookingActio
 import { BookingInfoCard } from "@/features/booking/components/admin/BookingInfoCard";
 import { BookingTimeline } from "@/features/booking/components/admin/BookingTimeline";
 import { BookingTimesCard } from "@/features/booking/components/admin/BookingTimesCard";
+import { RunningLateText } from "@/features/booking/components/admin/RunningLateText";
 import { combineUnitAndAddress, meetingTypeFromNotes } from "@/features/booking/lib/booking";
 import { formatMins, formatNZD } from "@/features/business/lib/business";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
+import { nzTimeLabel } from "@/features/calendar/lib/running-late";
 import { Notice } from "@/shared/components/Notice";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
@@ -80,6 +82,29 @@ function Fact({
   );
 }
 
+/** Show the running-late text from 6 hours before the job until it ends. */
+const RUNNING_LATE_WINDOW_MS = 6 * 60 * 60_000;
+
+/**
+ * Whether the "Running late?" card belongs on this booking right now: confirmed, in person,
+ * with a phone, and starting within 6 hours or already under way.
+ * @param b - The booking.
+ * @param b.status - Booking status.
+ * @param b.phone - Customer phone.
+ * @param b.startAt - Job start.
+ * @param b.endAt - Job end.
+ * @param meetingType - In person or remote.
+ * @returns True when the card shows.
+ */
+function runningLateCardDue(
+  b: { status: string; phone: string | null; startAt: Date; endAt: Date },
+  meetingType: string | null,
+): boolean {
+  if (b.status !== "confirmed" || !b.phone || meetingType === "remote") return false;
+  const nowMs = Date.now();
+  return b.endAt.getTime() > nowMs && b.startAt.getTime() - nowMs < RUNNING_LATE_WINDOW_MS;
+}
+
 /**
  * Detail page for a single booking.
  * @param props - Page props.
@@ -100,7 +125,7 @@ export default async function BookingDetailPage({
 
   // Batch 2: linked records in parallel. Contact matches primary or alt email, case-insensitive,
   // skipping soft-deleted rows (same rule as the booking>contact sync).
-  const [contact, invoices, review, settings] = await timer.measure("batch2", () =>
+  const [contact, invoices, review, settings, lateAlert] = await timer.measure("batch2", () =>
     Promise.all([
       booking.email
         ? prisma.contact
@@ -131,6 +156,10 @@ export default async function BookingDetailPage({
         .catch(() => null),
       // Only for the times card's and actions' lock, which mirror the PATCH route's gate.
       getSettings(),
+      // The last running-late push for this job sets the minutes the text suggests.
+      prisma.runningLateAlert
+        .findUnique({ where: { key: `booking:${id}` }, select: { lateMin: true } })
+        .catch(() => null),
     ]),
   );
   timer.log("booking-detail");
@@ -197,6 +226,16 @@ export default async function BookingDetailPage({
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-6">
         {/* Left: editable customer info + price snapshot. */}
         <div className="space-y-4">
+          {booking.phone && runningLateCardDue(booking, meetingType) && (
+            <RunningLateText
+              name={booking.name}
+              phone={booking.phone}
+              startLabel={nzTimeLabel(booking.startAt.getTime())}
+              suggestedMin={lateAlert?.lateMin ?? null}
+              senderName={settings.identity.name.split(" ")[0] ?? settings.identity.name}
+              company={settings.identity.company}
+            />
+          )}
           <Card>
             <BookingInfoCard
               id={booking.id}

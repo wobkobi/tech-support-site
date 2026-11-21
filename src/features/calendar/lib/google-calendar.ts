@@ -192,6 +192,28 @@ export async function patchBookingEvent(params: {
 }
 
 /**
+ * Moves only the end of a booking-calendar event, for "running over". Silent: Google emails
+ * nobody.
+ * @param params - Patch parameters.
+ * @param params.eventId - Calendar event ID.
+ * @param params.endAt - New end.
+ * @param params.timeZone - IANA zone for the end.
+ * @returns Promise that resolves when patched.
+ */
+export async function patchBookingEventEnd(params: {
+  eventId: string;
+  endAt: Date;
+  timeZone: string;
+}): Promise<void> {
+  await getCalendarClient().events.patch({
+    calendarId: getBookingCalendarId(),
+    eventId: params.eventId,
+    requestBody: { end: { dateTime: params.endAt.toISOString(), timeZone: params.timeZone } },
+    sendUpdates: "none",
+  });
+}
+
+/**
  * Brings a booking event's title, invite text and location up to date without moving it.
  * Silent: Google emails nobody, so the caller sends its own notice when one is due.
  * @param params - Patch parameters; an omitted field is left as it is.

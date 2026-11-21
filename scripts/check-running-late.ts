@@ -1,17 +1,23 @@
 // scripts/check-running-late.ts
 // Running-late push rules: minutes late, when an alert repeats, where the drive starts (phone,
-// previous job, home), the OwnTracks body and the Basic auth password.
+// previous job, home), leave reminders, the quiet-phone warning, the OwnTracks body and the Basic
+// auth password.
 // Run with: npm test -- running-late
 
 import {
   basicAuthPassword,
   chooseDriveStart,
   dailySummaryText,
+  distanceM,
   isUsableLocation,
+  leaveReminderText,
   minutesLate,
   parseOwnTracksLocation,
+  phoneQuietText,
+  phoneWentQuiet,
   runningLateText,
   shouldAlert,
+  shouldRemindLeave,
 } from "@/features/calendar/lib/running-late";
 import type { LocatedCommitment } from "@/features/calendar/lib/travel-timeline";
 import { expect, expectEqual, finish } from "./lib/harness.js";
@@ -98,7 +104,7 @@ expectEqual(
 expectEqual(
   "nothing running: the phone wins, leaving now",
   chooseDriveStart("live", nz(14, 30), [prevJob], { ...opts, phone: fresh }),
-  { origin: "-36.85,174.76", departMs: now },
+  { origin: "-36.85,174.76", departMs: now, fromPhone: true },
 );
 expectEqual(
   "manual origin beats everything",
@@ -147,6 +153,62 @@ expectEqual(
   "live body",
   text.body,
   "Jane Smith 2:30pm - traffic has you ~17 min late (arriving ~2:47pm)",
+);
+
+// Leave reminders
+const home = { lat: -36.8705, lng: 174.7213 };
+expect("200 m north is within 300 m", distanceM(home, { lat: -36.8687, lng: 174.7213 }) < 300);
+expect("Papakura is far from Pt Chev", distanceM(home, { lat: -37.0657, lng: 174.9439 }) > 20_000);
+expect(
+  "leave-by 15 min out with a 10 min lead waits",
+  !shouldRemindLeave(now + 15 * MIN, now, 10, -15, 5),
+);
+expect("leave-by 8 min out reminds", shouldRemindLeave(now + 8 * MIN, now, 10, -8, 5));
+expect(
+  "a passed leave-by still reminds before the threshold",
+  shouldRemindLeave(now - 2 * MIN, now, 10, 2, 5),
+);
+expect(
+  "already late is the running-late push's job",
+  !shouldRemindLeave(now - 6 * MIN, now, 10, 6, 5),
+);
+expectEqual(
+  "leave reminder body",
+  leaveReminderText("Jane Smith", nz(14, 30), nz(13, 58), 32, nz(13, 50)).body,
+  "Jane Smith 2:30pm - leave by 1:58pm (32 min drive)",
+);
+expectEqual(
+  "a passed leave-by reads leave now",
+  leaveReminderText("Jane Smith", nz(14, 30), nz(13, 58), 32, nz(14, 0)).body,
+  "Jane Smith 2:30pm - leave now (32 min drive)",
+);
+
+// Quiet phone
+const homeLine = "1 Home Street, Point Chevalier";
+/**
+ * A one-hour commitment, as the timeline holds it.
+ * @param startMs - Its start (ms).
+ * @param location - Where it is.
+ * @returns The timeline.
+ */
+const jobAt = (startMs: number, location = "5 Job Road, Albany"): LocatedCommitment[] => [
+  { startMs, endMs: startMs + HOUR, location, leaveFrom: location },
+];
+expect(
+  "a job well after the last report is quiet",
+  phoneWentQuiet(nz(9), nz(13), jobAt(nz(11)), homeLine),
+);
+expect("a job inside the grace isn't", !phoneWentQuiet(nz(9), nz(13), jobAt(nz(9, 20)), homeLine));
+expect("a job not started yet isn't", !phoneWentQuiet(nz(9), nz(13), jobAt(nz(14)), homeLine));
+expect("a job at home isn't", !phoneWentQuiet(nz(9), nz(13), jobAt(nz(11), homeLine), homeLine));
+expectEqual(
+  "quiet text, same day",
+  phoneQuietText(nz(9, 12), nz(13)).body,
+  "OwnTracks hasn't sent your location since 9:12am. Open it so travel alerts know where you are.",
+);
+expect(
+  "quiet text names an earlier day",
+  phoneQuietText(nz(9, 12) - 24 * HOUR, nz(13)).body.includes("Thursday 9:12am"),
 );
 
 // Morning summary

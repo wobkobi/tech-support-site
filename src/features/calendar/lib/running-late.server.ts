@@ -1,6 +1,8 @@
 // src/features/calendar/lib/running-late.server.ts
 // Travel alerts: the live running-late check (prices the drive to each upcoming customer job with
-// live traffic and pushes when it lands you past the start) and the 7am summary of today's jobs.
+// live traffic and pushes when it lands you past the start, or a leave reminder when you're out
+// and it's nearly time to go), a once-a-day warning when the phone missed reporting a trip, and
+// the 7am summary of today's jobs.
 // Run by the check-running-late cron, by OwnTracks location reports and from the Travel alerts
 // page.
 
@@ -12,10 +14,15 @@ import {
 import {
   chooseDriveStart,
   dailySummaryText,
+  distanceM,
   isUsableLocation,
+  leaveReminderText,
   minutesLate,
+  phoneQuietText,
+  phoneWentQuiet,
   runningLateText,
   shouldAlert,
+  shouldRemindLeave,
   type PhoneLocation,
   type RunningLateMode,
   type SummaryJob,
@@ -38,6 +45,96 @@ const ALERT_RETENTION_MS = 2 * 24 * 60 * 60_000;
 export const OWNER_LOCATION_KEY = "owner";
 /** Setting row holding the last run of each check, for the Travel alerts page. */
 const LAST_RUN_KEY_PREFIX = "travel-alerts:last-run:";
+/** Setting row caching the home address's coordinates, keyed by the address it was looked up for. */
+const HOME_GEO_KEY = "travel-alerts:home-geo";
+
+/**
+ * Coordinates of home: the base address's saved coordinates, else a geocode cached until the
+ * address changes.
+ * @param address - The base address line.
+ * @param saved - The base address's saved coordinates, when set.
+ * @param saved.lat - Saved latitude.
+ * @param saved.lng - Saved longitude.
+ * @returns The point, or null when it can't be looked up.
+ */
+async function homePoint(
+  address: string,
+  saved: { lat: number | null; lng: number | null },
+): Promise<{ lat: number; lng: number } | null> {
+  if (saved.lat != null && saved.lng != null) return { lat: saved.lat, lng: saved.lng };
+  if (!address) return null;
+  const row = await prisma.setting.findUnique({ where: { key: HOME_GEO_KEY } });
+  if (row) {
+    try {
+      const cached = JSON.parse(row.value) as { address: string; lat: number; lng: number };
+      if (cached.address === address) return { lat: cached.lat, lng: cached.lng };
+    } catch {
+      // Unreadable cache: look it up again.
+    }
+  }
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
+  if (!apiKey) return null;
+  const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+  url.searchParams.set("address", address);
+  url.searchParams.set("components", "country:NZ");
+  url.searchParams.set("key", apiKey);
+  try {
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
+    const data = (await res.json()) as {
+      status: string;
+      results: Array<{ geometry?: { location?: { lat: number; lng: number } } }>;
+    };
+    const loc = data.results[0]?.geometry?.location;
+    if (data.status !== "OK" || !loc) {
+      console.warn(`[running-late] home geocode failed: ${data.status}`);
+      return null;
+    }
+    const value = JSON.stringify({ address, lat: loc.lat, lng: loc.lng });
+    await prisma.setting.upsert({
+      where: { key: HOME_GEO_KEY },
+      create: { key: HOME_GEO_KEY, value },
+      update: { value },
+    });
+    return loc;
+  } catch (error) {
+    console.warn("[running-late] home geocode failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Pushes the quiet-phone warning unless today's has already gone.
+ * @param todayKey - Today's NZ date key.
+ * @param phoneAtMs - When the phone last reported (ms).
+ * @param now - Run time.
+ * @param result - Run result to count the push in.
+ */
+async function warnPhoneQuiet(
+  todayKey: string,
+  phoneAtMs: number,
+  now: Date,
+  result: RunningLateResult,
+): Promise<void> {
+  const key = `phone-quiet:${todayKey}`;
+  const claimed = await claimAlert(key, null, {
+    mode: "phone-quiet",
+    lateMin: 0,
+    jobStartAt: nzMidnightUtc(...dateKeyParts(todayKey)),
+    sentAt: now,
+  });
+  if (!claimed) return;
+  const push = await sendOwnerPush({
+    ...phoneQuietText(phoneAtMs, now.getTime()),
+    url: "/admin/travel-alerts",
+    tag: key,
+  });
+  if (push.sent > 0) result.alerted++;
+  if (pushFailed(push)) {
+    result.failed++;
+    result.errors.push(`${key}: push not delivered`);
+    await releaseAlert(key, now, null);
+  }
+}
 
 /** What started a run. */
 export type RunSource = "cron" | "location" | "manual";
@@ -241,7 +338,8 @@ async function runCheck(
 ): Promise<RunningLateResult> {
   const result: RunningLateResult = { checked: 0, alerted: 0, failed: 0, errors: [] };
   const { comms, scheduling, identity } = await getSettings();
-  const enabled = mode === "live" ? comms.pushOnRunningLate : comms.pushDailySummary;
+  const enabled =
+    mode === "live" ? comms.pushOnRunningLate || comms.pushLeaveReminder : comms.pushDailySummary;
   if (!enabled) return { ...result, skipped: "disabled" };
 
   const nowMs = now.getTime();
@@ -325,6 +423,15 @@ async function runCheck(
     backMinByEventId,
   );
 
+  // Quiet phone: you've been at a job since OwnTracks last reported. Once per NZ day.
+  if (mode === "live" && comms.pushPhoneQuiet && phone) {
+    const dayStartMs = nzMidnightUtc(...dateKeyParts(todayKey)).getTime();
+    const today = timeline.filter((c) => c.startMs >= dayStartMs);
+    if (phoneWentQuiet(phone.at.getTime(), nowMs, today, homeAddress)) {
+      await warnPhoneQuiet(todayKey, phone.at.getTime(), now, result);
+    }
+  }
+
   // Customer jobs inside the window.
   const targets: Target[] = [];
   for (const b of bookings) {
@@ -361,7 +468,7 @@ async function runCheck(
   const priors =
     mode === "live"
       ? await prisma.runningLateAlert.findMany({
-          where: { key: { in: targets.map((t) => t.key) } },
+          where: { key: { in: targets.flatMap((t) => [t.key, `leave:${t.key}`]) } },
         })
       : [];
   const priorByKey = new Map(priors.map((p) => [p.key, p]));
@@ -373,6 +480,12 @@ async function runCheck(
   )
     ? phone
     : null;
+  // Leave reminders need to know you're out: no reminder without a home point to compare.
+  let awayFromHome = false;
+  if (mode === "live" && usablePhone && comms.pushLeaveReminder) {
+    const home = await homePoint(homeAddress, identity.baseAddress);
+    awayFromHome = home !== null && distanceM(usablePhone, home) > comms.atHomeRadiusM;
+  }
   // Tight gaps go in the morning summary only while the running-late push is on.
   const priceDrives = mode === "live" || comms.pushOnRunningLate;
   const lateByKey = new Map<string, number>();
@@ -409,7 +522,8 @@ async function runCheck(
     const jobStartAt = new Date(t.startMs);
     const prior = priorByKey.get(t.key) ?? null;
     if (
-      !shouldAlert(
+      comms.pushOnRunningLate &&
+      shouldAlert(
         lateMin,
         jobStartAt,
         comms.runningLateThresholdMin,
@@ -417,20 +531,56 @@ async function runCheck(
         comms.runningLateRepeatMin,
       )
     ) {
+      if (await claimAlert(t.key, prior, { mode, lateMin, jobStartAt, sentAt: now })) {
+        const push = await sendOwnerPush({
+          ...runningLateText(t.name, t.startMs, lateMin, start.departMs + driveMin * 60_000),
+          url: t.url,
+          tag: `running-late:${t.key}`,
+        });
+        if (push.sent > 0) result.alerted++;
+        if (pushFailed(push)) {
+          result.failed++;
+          result.errors.push(`${t.key}: push not delivered`);
+          await releaseAlert(t.key, now, prior);
+        }
+      }
       continue;
     }
-    if (!(await claimAlert(t.key, prior, { mode, lateMin, jobStartAt, sentAt: now }))) continue;
 
+    // Leave reminder: only from a fresh phone location away from home, once per job start.
+    const leaveKey = `leave:${t.key}`;
+    const leavePrior = priorByKey.get(leaveKey) ?? null;
+    const leaveByMs = t.startMs - driveMin * 60_000;
+    if (
+      !comms.pushLeaveReminder ||
+      !start.fromPhone ||
+      !awayFromHome ||
+      leavePrior?.jobStartAt.getTime() === t.startMs ||
+      !shouldRemindLeave(
+        leaveByMs,
+        nowMs,
+        comms.leaveReminderLeadMin,
+        lateMin,
+        comms.runningLateThresholdMin,
+      )
+    ) {
+      continue;
+    }
+    if (
+      !(await claimAlert(leaveKey, leavePrior, { mode: "leave", lateMin, jobStartAt, sentAt: now }))
+    ) {
+      continue;
+    }
     const push = await sendOwnerPush({
-      ...runningLateText(t.name, t.startMs, lateMin, start.departMs + driveMin * 60_000),
+      ...leaveReminderText(t.name, t.startMs, leaveByMs, driveMin, nowMs),
       url: t.url,
-      tag: `running-late:${t.key}`,
+      tag: `leave:${t.key}`,
     });
     if (push.sent > 0) result.alerted++;
     if (pushFailed(push)) {
       result.failed++;
-      result.errors.push(`${t.key}: push not delivered`);
-      await releaseAlert(t.key, now, prior);
+      result.errors.push(`${leaveKey}: push not delivered`);
+      await releaseAlert(leaveKey, now, leavePrior);
     }
   }
 

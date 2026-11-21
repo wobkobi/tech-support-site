@@ -19,6 +19,8 @@ import {
 } from "@/features/booking/lib/booking";
 import { bookingEventSummary } from "@/features/booking/lib/booking-event.server";
 import { confirmationCoversReminder } from "@/features/booking/lib/booking-reminder";
+import { travelVerdictMessage } from "@/features/booking/lib/booking-travel";
+import { travelVerdictForSlot } from "@/features/booking/lib/booking-travel.server";
 import {
   loadBlockingBookings,
   loadBlockingEvents,
@@ -236,6 +238,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
       if (!validation.valid) {
         return errorResponse(validation.error, 400);
+      }
+
+      if (meetingType === "in-person" && canonicalAddress) {
+        const verdict = await travelVerdictForSlot(canonicalAddress, startAt, endAt, now, config, {
+          bookingId: booking.id,
+          eventId: booking.calendarEventId,
+        });
+        if (verdict !== "ok") return errorResponse(travelVerdictMessage(verdict), 400);
       }
     }
 

@@ -1,13 +1,15 @@
 // scripts/check-dashboard-jobs.ts
 // The dashboard's job list takes jobs entered straight into the booking calendar alongside
 // website bookings, never counts a booking's own event twice, and skips other calendars and
-// all-day blocks.
+// all-day blocks; the Running now card picks the job under way.
 // Run with: npm test -- dashboard-jobs
 
 import {
   bookingJob,
   calendarOnlyJobs,
+  isHomeLocation,
   mergeJobs,
+  runningJob,
   type JobBooking,
   type JobCalendarEvent,
 } from "@/features/admin/lib/dashboard-jobs";
@@ -16,6 +18,7 @@ import { expectEqual, finish } from "./lib/harness.js";
 const BOOKING_CAL = "booking@group.calendar.google.com";
 const CAR_CAL = "car@group.calendar.google.com";
 const PERSONAL_CAL = "me@gmail.com";
+const HOME_LINE = "92 Walker Road";
 
 /**
  * Builds a timed or all-day calendar event.
@@ -71,7 +74,7 @@ function main(): void {
     event("blocked-day", "2026-11-19T11:00:00Z", BOOKING_CAL, { allDay: true }),
     event("untitled", "2026-11-20T03:00:00Z", BOOKING_CAL, { summary: "  " }),
   ];
-  const calJobs = calendarOnlyJobs(events, BOOKING_CAL, new Set(["booked"]));
+  const calJobs = calendarOnlyJobs(events, BOOKING_CAL, new Set(["booked"]), HOME_LINE);
 
   expectEqual(
     "only unbooked timed booking-calendar events are jobs",
@@ -89,7 +92,7 @@ function main(): void {
         // 22:00Z on the 18th is the 19th in NZ.
         href: "/admin/schedule?day=2026-11-19",
       },
-      { name: "(no title)", address: null, remote: false, href: "/admin/schedule?day=2026-11-20" },
+      { name: "(no title)", address: null, remote: true, href: "/admin/schedule?day=2026-11-20" },
     ],
   );
 
@@ -129,6 +132,55 @@ function main(): void {
     mergeJobs([calJobs], new Date("2026-11-18T22:30:00Z"), null).map((j) => j.key),
     ["untitled"],
   );
+
+  // Running now: started, and not more than an hour past its end; the later start wins.
+  const morning = bookingJob(booking("am", "2026-11-19T21:00:00Z"));
+  const midday = bookingJob(booking("noon", "2026-11-19T23:00:00Z"));
+  const zoom = bookingJob(booking("zoom", "2026-11-19T23:30:00Z", { meetingType: "remote" }));
+  const jobs = [morning, midday, zoom];
+  /**
+   * Epoch ms for an ISO time.
+   * @param iso - ISO time.
+   * @returns Milliseconds.
+   */
+  const at = (iso: string): number => new Date(iso).getTime();
+  expectEqual("before any job, none running", runningJob(jobs, at("2026-11-19T20:00:00Z")), null);
+  expectEqual("during the first job", runningJob(jobs, at("2026-11-19T21:30:00Z"))?.key, "am");
+  expectEqual(
+    "an hour past the end still counts",
+    runningJob(jobs, at("2026-11-19T23:00:00Z") - 1)?.key,
+    "am",
+  );
+  expectEqual(
+    "the later start wins, remote included",
+    runningJob(jobs, at("2026-11-19T23:45:00Z"))?.key,
+    "zoom",
+  );
+  expectEqual(
+    "over an hour past the end, none",
+    runningJob(jobs, at("2026-11-20T01:31:00Z")),
+    null,
+  );
+
+  // Home: number and street name match, whatever the suffix, suburb or label.
+  expectEqual(
+    "home address variants",
+    [
+      "92 Walker Rd, Point Chevalier",
+      "Home\n92 Walker Road\nPoint Chevalier, Auckland 1022",
+      "192 Walker Road",
+      "Home\n12 Main Street",
+      "",
+    ].map((loc) => isHomeLocation(loc, HOME_LINE)),
+    [true, true, false, false, false],
+  );
+  const atHome = calendarOnlyJobs(
+    [event("home-call", "2026-11-19T03:00:00Z", BOOKING_CAL, { location: "92 Walker Rd" })],
+    BOOKING_CAL,
+    new Set(),
+    HOME_LINE,
+  )[0];
+  expectEqual("a job at home is remote", [atHome?.remote, atHome?.address], [true, null]);
 
   finish();
 }

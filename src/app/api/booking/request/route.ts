@@ -17,6 +17,8 @@ import {
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import { lookupBookingSnapshots } from "@/features/booking/lib/booking-snapshots.server";
+import { travelVerdictMessage } from "@/features/booking/lib/booking-travel";
+import { travelVerdictForSlot } from "@/features/booking/lib/booking-travel.server";
 import {
   loadBlockingBookings,
   loadBlockingEvents,
@@ -233,6 +235,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const startAt = nzWallClockUtc(year, month, day, startHour, startMinute);
     const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
+
+    // The grid only hides unreachable times once the address is in; re-check the drives here.
+    if (meetingType === "in-person" && canonicalAddress) {
+      const verdict = await travelVerdictForSlot(canonicalAddress, startAt, endAt, now, config);
+      if (verdict !== "ok") return errorResponse(travelVerdictMessage(verdict), 400);
+    }
 
     const cancelToken = randomUUID();
     const reviewToken = randomUUID();

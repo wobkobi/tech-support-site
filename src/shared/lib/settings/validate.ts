@@ -419,6 +419,8 @@ function validateComms(c: CommsSettings): FieldError[] {
     "pushOnReview",
     "pushOnRunningLate",
     "pushDailySummary",
+    "pushLeaveReminder",
+    "pushPhoneQuiet",
   ] as const) {
     if (typeof c[key] !== "boolean") errors.push({ field: key, message: "Must be on or off." });
   }
@@ -434,6 +436,10 @@ function validateComms(c: CommsSettings): FieldError[] {
     errors.push({ field: "phoneLocationMaxAccuracyM", message: "Must be 50-5000 metres." });
   if (!inRange(c.phoneCheckGapMin, 1, 60))
     errors.push({ field: "phoneCheckGapMin", message: "Must be 1-60 minutes." });
+  if (!inRange(c.leaveReminderLeadMin, 0, 60))
+    errors.push({ field: "leaveReminderLeadMin", message: "Must be 0-60 minutes." });
+  if (!inRange(c.atHomeRadiusM, 50, 2000))
+    errors.push({ field: "atHomeRadiusM", message: "Must be 50-2000 metres." });
   if (!inRange(c.reminderLeadHours, 1, 168))
     errors.push({ field: "reminderLeadHours", message: "Must be 1-168 hours." });
   if (!inRange(c.priceEstimateRetentionDays, 1, 3650))

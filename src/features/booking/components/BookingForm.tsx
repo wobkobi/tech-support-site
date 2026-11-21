@@ -27,6 +27,7 @@ import { useBookingDraft } from "@/features/booking/hooks/use-booking-draft";
 import { useContactLookup } from "@/features/booking/hooks/use-contact-lookup";
 import { useInlineEstimate } from "@/features/booking/hooks/use-inline-estimate";
 import { useSubmitAttention } from "@/features/booking/hooks/use-submit-attention";
+import { useTravelSlots } from "@/features/booking/hooks/use-travel-slots";
 import {
   combineUnitAndAddress,
   isAfterHoursStart,
@@ -40,6 +41,7 @@ import {
 } from "@/features/booking/lib/booking";
 import {
   buildDurationOptions,
+  focusField,
   isSlotAvailable,
   removeBookingDraft,
   shortNoticeCancelNote,
@@ -49,9 +51,11 @@ import {
   type BookingCancelTerms,
   type RestoredBookingDraft,
 } from "@/features/booking/lib/booking-form";
+import { applyTravelBlocks } from "@/features/booking/lib/booking-travel";
 import { PromoCodeField } from "@/features/business/components/PromoCodeField";
 import { normalisePromoCode } from "@/features/business/lib/promos";
 import { parseObjectId } from "@/features/business/lib/validation";
+import { Notice } from "@/shared/components/Notice";
 import { PhoneLink } from "@/shared/components/PhoneLink";
 import { suggestEmailCorrection } from "@/shared/lib/email-typo-suggestion";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
@@ -59,7 +63,8 @@ import type { EstimatorRange } from "@/shared/lib/settings/types";
 import { dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { FaChevronDown, FaCircleInfo } from "react-icons/fa6";
 
 export interface BookingFormInitialValues {
   duration: JobDuration;
@@ -194,13 +199,6 @@ export default function BookingForm({
     initialValues?.startMinute ?? 0,
   );
 
-  // Null when the pick has since disappeared, hiding the time picker. Unticking evenings drops
-  // an evening pick through the unavailable-time check below.
-  const pickedDay = selectedDateKey
-    ? (availableDays.find((d) => d.dateKey === selectedDateKey) ?? null)
-    : null;
-  const selectedDay: BookableDay | null =
-    pickedDay && !showEvenings ? withoutAfterHoursStarts(pickedDay) : pickedDay;
   const [name, setName] = useState(initialValues?.name ?? "");
   const [email, setEmail] = useState(initialValues?.email ?? "");
   const [phone, setPhone] = useState(initialValues?.phone ?? "");
@@ -221,6 +219,37 @@ export default function BookingForm({
     setShowUnit,
     mapsFallback,
   } = addressState;
+
+  // The address comes after the time on this form, so once a picked (verified) address is in,
+  // the grid drops the starts the drive between jobs rules out. Edits skip it: the edit route
+  // re-checks with the booking's own slot left out.
+  const travelBlocked = useTravelSlots(
+    !isEditMode && meetingType === "in-person" && addressVerified && address.trim()
+      ? address.trim()
+      : null,
+  );
+  const days = useMemo(
+    () => (travelBlocked ? applyTravelBlocks(availableDays, travelBlocked) : availableDays),
+    [availableDays, travelBlocked],
+  );
+  // Set when the drive check closed the time already picked, so the form can say why it went.
+  const [travelDropped, setTravelDropped] = useState(false);
+
+  /**
+   * A day as the picker shows it: evening starts left out until Show evening times is ticked.
+   * @param list - The days to look in.
+   * @returns The selected day from that list, or null when it's gone.
+   */
+  function viewOfSelectedDay(list: BookableDay[]): BookableDay | null {
+    const picked = selectedDateKey
+      ? (list.find((d) => d.dateKey === selectedDateKey) ?? null)
+      : null;
+    return picked && !showEvenings ? withoutAfterHoursStarts(picked) : picked;
+  }
+
+  // Null when the pick has since disappeared, hiding the time picker. Unticking evenings drops
+  // an evening pick through the unavailable-time check below.
+  const selectedDay = viewOfSelectedDay(days);
   // Email typo correction (gmial.com > gmail.com) offered at submit.
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
   const [emailSuggestionAcked, setEmailSuggestionAcked] = useState(false);
@@ -359,6 +388,10 @@ export default function BookingForm({
     selectedDay &&
     !isSlotAvailable(selectedDay, selectedTime, selectedMinute, duration)
   ) {
+    const unmasked = viewOfSelectedDay(availableDays);
+    if (unmasked && isSlotAvailable(unmasked, selectedTime, selectedMinute, duration)) {
+      setTravelDropped(true);
+    }
     setSelectedTime(null);
     setSelectedMinute(0);
   }
@@ -476,6 +509,7 @@ export default function BookingForm({
   function handleTimeSelect(time: TimeOfDay, minute: StartMinute): void {
     setSelectedTime(time);
     clearFieldError("time");
+    setTravelDropped(false);
     setSelectedMinute(minute);
   }
 
@@ -686,7 +720,7 @@ export default function BookingForm({
         </section>
       ) : (
         <BookingSchedulePicker
-          availableDays={availableDays}
+          availableDays={days}
           durations={durations}
           duration={duration}
           onDurationChange={handleDurationChange}
@@ -705,9 +739,17 @@ export default function BookingForm({
       )}
 
       {cancelNote && (
-        <p className="border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black">
-          {cancelNote}
-        </p>
+        <details className="group border border-mustard-400 bg-mustard-50 text-base text-rich-black">
+          <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 font-semibold [&::-webkit-details-marker]:hidden">
+            <FaCircleInfo aria-hidden className="shrink-0 text-mustard-700" />
+            <span className="flex-1">Cancelling this time has a fee</span>
+            <FaChevronDown
+              aria-hidden
+              className="shrink-0 transition-[rotate] group-open:rotate-180"
+            />
+          </summary>
+          <p className="px-4 pb-3">{cancelNote}</p>
+        </details>
       )}
 
       {/* Divider */}
@@ -788,6 +830,22 @@ export default function BookingForm({
           onEdited={() => clearFieldError("address")}
           promptRef={addressPromptRef}
         />
+
+        {travelDropped && meetingType === "in-person" && (
+          <Notice tone="warn" role="status" className="px-4 py-3">
+            <p className="text-rich-black">
+              The time you picked doesn&apos;t leave me enough travel time to get to you, so
+              I&apos;ve cleared it. The times shown now all fit your address.
+            </p>
+            <button
+              type="button"
+              onClick={() => focusField("time")}
+              className="mt-2 min-h-11 text-left font-semibold text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
+            >
+              Pick another time
+            </button>
+          </Notice>
+        )}
       </fieldset>
 
       {/* Divider */}
@@ -886,7 +944,7 @@ export default function BookingForm({
       <BookingSubmitBar
         submitting={submitting}
         isEditMode={isEditMode}
-        noSlots={!availableDays.some((d) => d.hasAnySlots)}
+        noSlots={!days.some((d) => d.hasAnySlots)}
         showIssuesLink={attempted}
         fieldErrors={fieldErrors}
         cancelToken={cancelToken}

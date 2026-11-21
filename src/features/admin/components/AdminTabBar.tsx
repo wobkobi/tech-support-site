@@ -93,7 +93,7 @@ export function AdminTabBar({
   return (
     <nav
       aria-label="Main"
-      className="admin-tab-bar fixed inset-x-0 bottom-0 z-25 grid grid-cols-5 border-t border-admin-border bg-admin-surface px-1 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] lg:hidden print:hidden"
+      className="admin-tab-bar fixed inset-x-0 bottom-0 z-25 grid grid-cols-5 border-t border-admin-border bg-admin-surface px-1 pt-1 pb-[calc(max(0.25rem,env(safe-area-inset-bottom))+0.5rem)] lg:hidden print:hidden"
     >
       <TabLink tab={HOME} pathname={pathname} />
       <TabLink tab={SCHEDULE} pathname={pathname} />

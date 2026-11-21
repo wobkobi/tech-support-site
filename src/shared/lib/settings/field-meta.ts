@@ -198,6 +198,28 @@ export const COMMS_FIELD_META = {
       "Each phone report runs the live check, no more often than this, to keep Google Maps lookups down.",
     unit: "minutes",
   },
+  pushPhoneQuiet: {
+    title: "Warn when your phone stops reporting",
+    description:
+      "One push a day when you've been at a job since OwnTracks last sent your location, so you can open it. Travel alerts fall back to the schedule's guess until it reports again.",
+  },
+  pushLeaveReminder: {
+    title: "Leave reminder when you're out",
+    description:
+      "When your phone is away from home, push when it's time to leave for the next customer job, using live traffic. Skipped when you're already running late - that push covers it.",
+  },
+  leaveReminderLeadMin: {
+    title: "Remind this long before leaving",
+    description:
+      "How many minutes before the leave-by time the reminder can arrive. The check runs about every 10 minutes, so it lands somewhere in this window.",
+    unit: "minutes",
+  },
+  atHomeRadiusM: {
+    title: "Counts as home within",
+    description:
+      "A phone location this close to your home address counts as home, so no leave reminder is sent.",
+    unit: "metres",
+  },
   reminderLeadHours: {
     title: "Reminder lead time",
     description: "Send the reminder once the appointment is within this many hours.",
