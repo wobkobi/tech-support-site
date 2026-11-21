@@ -38,15 +38,15 @@ export function QuickActionTiles({
   const lg = size === "lg";
   const count = QUICK_ACTIONS.length;
   return (
-    <ul className={cn("grid gap-2", lg ? "grid-cols-2" : "grid-cols-6 sm:grid-cols-5", className)}>
+    <ul className={cn("grid gap-2", lg ? "grid-cols-2" : "grid-cols-6 sm:grid-cols-4", className)}>
       {QUICK_ACTIONS.map((a, i) => (
         <li
           key={a.label}
           className={cn(
             // Sheet: an odd last tile spans both columns instead of sitting alone.
             lg && i === count - 1 && count % 2 === 1 && "col-span-2",
-            // Dashboard on a phone: six columns lay the five tiles out as 3 + 2, each
-            // wide enough for a two-word label; one row of five from sm.
+            // Dashboard on a phone: six columns lay the seven tiles out as 3 + 2 + 2, each
+            // wide enough for a two-word label; rows of four from sm.
             !lg && (i < 3 ? "col-span-2" : "col-span-3"),
             !lg && "sm:col-span-1",
           )}

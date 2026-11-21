@@ -10,6 +10,8 @@ import {
   FaFileSignature,
   FaHandHoldingDollar,
   FaReceipt,
+  FaStopwatch,
+  FaUserPlus,
 } from "react-icons/fa6";
 
 /** One shortcut in the quick actions menus. */
@@ -27,6 +29,8 @@ export interface QuickAction {
  * nearest the thumb, and the installed app's long-press menu shows only the first 3 on Android.
  */
 export const QUICK_ACTIONS: readonly QuickAction[] = [
+  // The dashboard's Running now card: +15/30/60 on the job you're at.
+  { label: "Add time to job", icon: FaStopwatch, path: "/admin?extend=1" },
   { label: "Quick price", icon: FaHandHoldingDollar, path: "/admin/business/quick" },
   {
     label: "Add income",
@@ -43,6 +47,7 @@ export const QUICK_ACTIONS: readonly QuickAction[] = [
   { label: "New invoice", icon: FaCalculator, path: "/admin/business/calculator" },
   // The calculator in quote mode: "Save quote" leads and the payment boxes are hidden.
   { label: "New quote", icon: FaFileSignature, path: "/admin/business/calculator?quote=1" },
+  { label: "New contact", icon: FaUserPlus, path: "/admin/contacts", opensForm: true },
 ];
 
 /**

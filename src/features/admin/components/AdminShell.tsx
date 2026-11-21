@@ -119,7 +119,7 @@ export function AdminShell({ initialCollapsed, children }: AdminShellProps): Rea
         />
         {/* Skip link targets #main; pb-28 clears the phone bottom bar. Pages run the full
             width beside the sidebar, however wide the screen. */}
-        <main id="main" className="px-4 pt-5 pb-28 sm:px-6 lg:pt-8 lg:pb-10 print:p-0">
+        <main id="main" className="px-4 pt-5 pb-30 sm:px-6 lg:pt-8 lg:pb-10 print:p-0">
           {children}
         </main>
       </div>

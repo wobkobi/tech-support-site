@@ -10,7 +10,7 @@ import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import type { PageQuery } from "@/features/admin/hooks/use-query-sync";
 import type { ConflictEntry } from "@/features/contacts/lib/maintenance";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ContactAdminList } from "./ContactAdminList";
@@ -64,6 +64,13 @@ export function ContactsAdminView({
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [syncConfirmPending, setSyncConfirmPending] = useState(false);
   const [addingContact, setAddingContact] = useState(false);
+  // The + menu's New contact links here with ?new=<stamp>; each fresh stamp opens the form.
+  const newStamp = useSearchParams().get("new");
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
+  if (newStamp && newStamp !== openedFor) {
+    setOpenedFor(newStamp);
+    setAddingContact(true);
+  }
   const [checkingAddresses, setCheckingAddresses] = useState(false);
   const [addressResult, setAddressResult] = useState<string | null>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
