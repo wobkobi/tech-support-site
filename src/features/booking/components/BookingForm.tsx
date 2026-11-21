@@ -64,6 +64,7 @@ import { dateKeyParts, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useMemo, useRef, useState } from "react";
+import { FaChevronDown, FaCircleInfo } from "react-icons/fa6";
 
 export interface BookingFormInitialValues {
   duration: JobDuration;
@@ -738,9 +739,17 @@ export default function BookingForm({
       )}
 
       {cancelNote && (
-        <p className="border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black">
-          {cancelNote}
-        </p>
+        <details className="group border border-mustard-400 bg-mustard-50 text-base text-rich-black">
+          <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 font-semibold [&::-webkit-details-marker]:hidden">
+            <FaCircleInfo aria-hidden className="shrink-0 text-mustard-700" />
+            <span className="flex-1">Cancelling this time has a fee</span>
+            <FaChevronDown
+              aria-hidden
+              className="shrink-0 transition-[rotate] group-open:rotate-180"
+            />
+          </summary>
+          <p className="px-4 pb-3">{cancelNote}</p>
+        </details>
       )}
 
       {/* Divider */}
