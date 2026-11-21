@@ -280,6 +280,14 @@ export interface CommsSettings {
   phoneLocationMaxAccuracyM: number;
   /** Minimum minutes between running-late checks started by phone reports. */
   phoneCheckGapMin: number;
+  /** Push a leave-by reminder before the next customer job while the phone is away from home. */
+  pushLeaveReminder: boolean;
+  /** Minutes before the leave-by time that the leave reminder can arrive. */
+  leaveReminderLeadMin: number;
+  /** A phone location within this many metres of home counts as home (no leave reminder). */
+  atHomeRadiusM: number;
+  /** Push once a day when the phone missed reporting a trip to a job, so OwnTracks gets reopened. */
+  pushPhoneQuiet: boolean;
   /** Push a 7am summary of the day's customer jobs, when there are any. */
   pushDailySummary: boolean;
   /** Send the booking reminder this many hours before the appointment. */

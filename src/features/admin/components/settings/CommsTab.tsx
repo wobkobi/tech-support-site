@@ -169,6 +169,40 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.phoneCheckGapMin !== defaults.phoneCheckGapMin}
           onChange={(v) => set({ phoneCheckGapMin: v ?? 5 })}
         />
+        <NumberField
+          id="leaveReminderLeadMin"
+          meta={m.leaveReminderLeadMin}
+          value={draft.leaveReminderLeadMin}
+          min={0}
+          max={60}
+          error={fieldErrors.leaveReminderLeadMin}
+          customised={draft.leaveReminderLeadMin !== defaults.leaveReminderLeadMin}
+          onChange={(v) => set({ leaveReminderLeadMin: v ?? 10 })}
+        />
+        <NumberField
+          id="atHomeRadiusM"
+          meta={m.atHomeRadiusM}
+          value={draft.atHomeRadiusM}
+          min={50}
+          max={2000}
+          error={fieldErrors.atHomeRadiusM}
+          customised={draft.atHomeRadiusM !== defaults.atHomeRadiusM}
+          onChange={(v) => set({ atHomeRadiusM: v ?? 300 })}
+        />
+        <ToggleField
+          id="pushLeaveReminder"
+          meta={m.pushLeaveReminder}
+          value={draft.pushLeaveReminder}
+          customised={draft.pushLeaveReminder !== defaults.pushLeaveReminder}
+          onChange={(v) => set({ pushLeaveReminder: v })}
+        />
+        <ToggleField
+          id="pushPhoneQuiet"
+          meta={m.pushPhoneQuiet}
+          value={draft.pushPhoneQuiet}
+          customised={draft.pushPhoneQuiet !== defaults.pushPhoneQuiet}
+          onChange={(v) => set({ pushPhoneQuiet: v })}
+        />
         <ToggleField
           id="pushDailySummary"
           meta={m.pushDailySummary}

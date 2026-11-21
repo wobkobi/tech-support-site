@@ -92,6 +92,8 @@ export function isUsableLocation(
 export interface DriveStart {
   origin: string;
   departMs: number;
+  /** True when the drive starts from your phone's location, leaving now. */
+  fromPhone?: boolean;
 }
 
 /**
@@ -138,7 +140,7 @@ export function chooseDriveStart(
   // You're at a commitment that hasn't ended: its end, not the phone, says when you leave.
   const prevRunning = prev && prev.startMs <= opts.nowMs && prev.endMs > opts.nowMs;
   if (mode === "live" && opts.phone && !prevRunning) {
-    return { origin: `${opts.phone.lat},${opts.phone.lng}`, departMs: opts.nowMs };
+    return { origin: `${opts.phone.lat},${opts.phone.lng}`, departMs: opts.nowMs, fromPhone: true };
   }
   if (prev) return { origin: prev.leaveFrom, departMs: prevDepart };
   if (mode === "morning" || !opts.homeAddress) return null;
@@ -179,6 +181,124 @@ export function runningLateText(
   return {
     title: "Running late",
     body: `${name} ${nzTimeLabel(startMs)} - traffic has you ~${lateMin} min late (arriving ~${nzTimeLabel(arriveMs)})`,
+  };
+}
+
+/**
+ * Great-circle distance between two points, in metres (haversine; plenty for "am I home").
+ * @param a - First point.
+ * @param a.lat - Latitude.
+ * @param a.lng - Longitude.
+ * @param b - Second point.
+ * @param b.lat - Latitude.
+ * @param b.lng - Longitude.
+ * @returns Distance in metres.
+ */
+export function distanceM(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Whether a leave reminder is due: not already running late (that push covers it) and the
+ * leave-by time is within `leadMin` of now. A leave-by already passed still reminds, as "leave
+ * now", until lateness crosses the threshold.
+ * @param leaveByMs - Latest departure that arrives on time (ms).
+ * @param nowMs - Current time (ms).
+ * @param leadMin - Minutes before leave-by a reminder may arrive.
+ * @param lateMin - Minutes late leaving now.
+ * @param thresholdMin - Running-late threshold.
+ * @returns True when a reminder should go.
+ */
+export function shouldRemindLeave(
+  leaveByMs: number,
+  nowMs: number,
+  leadMin: number,
+  lateMin: number,
+  thresholdMin: number,
+): boolean {
+  if (lateMin >= thresholdMin) return false;
+  return leaveByMs - nowMs <= leadMin * 60_000;
+}
+
+/**
+ * Leave-reminder title and body. Name and times only, since it shows on a lock screen.
+ * @param name - Customer name or event title.
+ * @param startMs - The job's start (ms).
+ * @param leaveByMs - Latest on-time departure (ms).
+ * @param driveMin - Drive minutes with traffic.
+ * @param nowMs - Current time (ms); a leave-by at or before now reads "leave now".
+ * @returns Title and body.
+ */
+export function leaveReminderText(
+  name: string,
+  startMs: number,
+  leaveByMs: number,
+  driveMin: number,
+  nowMs: number,
+): { title: string; body: string } {
+  const when = leaveByMs <= nowMs ? "leave now" : `leave by ${nzTimeLabel(leaveByMs)}`;
+  return {
+    title: "Time to leave",
+    body: `${name} ${nzTimeLabel(startMs)} - ${when} (${driveMin} min drive)`,
+  };
+}
+
+/** Slack after the phone's last report before a commitment counts as travel it missed. */
+export const PHONE_QUIET_GRACE_MS = 30 * 60_000;
+
+/**
+ * Whether the phone has gone quiet: a located commitment away from home started more than
+ * {@link PHONE_QUIET_GRACE_MS} after the last report and before now. Significant mode only
+ * reports on moves, so a stale location alone is normal; getting to a job without a report isn't.
+ * @param phoneAtMs - When the phone last reported (ms).
+ * @param nowMs - Current time (ms).
+ * @param commitments - Today's located commitments.
+ * @param homeAddress - Base address; commitments there need no travel.
+ * @returns True when a quiet-phone warning is due.
+ */
+export function phoneWentQuiet(
+  phoneAtMs: number,
+  nowMs: number,
+  commitments: Pick<LocatedCommitment, "startMs" | "location">[],
+  homeAddress: string,
+): boolean {
+  const home = homeAddress.trim().toLowerCase();
+  return commitments.some(
+    (c) =>
+      c.startMs > phoneAtMs + PHONE_QUIET_GRACE_MS &&
+      c.startMs <= nowMs &&
+      c.location.trim().toLowerCase() !== home,
+  );
+}
+
+/**
+ * Quiet-phone push title and body.
+ * @param phoneAtMs - When the phone last reported (ms).
+ * @param nowMs - Current time (ms); a report from an earlier day names the day.
+ * @returns Title and body.
+ */
+export function phoneQuietText(phoneAtMs: number, nowMs: number): { title: string; body: string } {
+  /**
+   * NZ weekday name.
+   * @param ms - Instant (ms).
+   * @returns Weekday like "Friday".
+   */
+  const day = (ms: number): string =>
+    new Intl.DateTimeFormat("en-NZ", { timeZone: NZ_TZ, weekday: "long" }).format(new Date(ms));
+  const sameDay = nowMs - phoneAtMs < 24 * 60 * 60_000 && day(phoneAtMs) === day(nowMs);
+  const since = sameDay ? nzTimeLabel(phoneAtMs) : `${day(phoneAtMs)} ${nzTimeLabel(phoneAtMs)}`;
+  return {
+    title: "Phone location stopped",
+    body: `OwnTracks hasn't sent your location since ${since}. Open it so travel alerts know where you are.`,
   };
 }
 
