@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "5.42.0",
+  "version": "5.43.0",
   "private": true,
   "type": "module",
   "scripts": {

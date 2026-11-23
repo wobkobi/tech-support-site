@@ -82,7 +82,7 @@ export default async function AdminPage({
         jobKey={runningJob.key}
         name={runningJob.name}
         endAt={runningJob.endAt.toISOString()}
-        pastEnd={runningJob.endAt.getTime() < renderedAt.getTime()}
+        renderedAt={renderedAt.toISOString()}
       />
     );
   } else if (extendAsked) {
