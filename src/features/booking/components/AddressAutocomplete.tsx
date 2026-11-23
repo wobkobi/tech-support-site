@@ -188,6 +188,24 @@ export default function AddressAutocomplete({
   const loadingLibRef = useRef(false);
 
   const isVisible = useOnVisible(wrapperRef);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // On a phone the keyboard leaves the field near the bottom of what's showing, so the list
+  // opens off screen. When it would, lift the field to the top of its scroll area (a dialog
+  // body or the page) so the suggestions have room under it.
+  const listShowing = open && suggestions.length > 0;
+  useEffect(() => {
+    if (!listShowing) return;
+    const list = listRef.current;
+    const input = inputRef.current;
+    if (!list || !input) return;
+    const vv = window.visualViewport;
+    const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    if (list.getBoundingClientRect().bottom > visibleBottom) {
+      input.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+  }, [listShowing]);
 
   /** Enters the visible-warning fallback state (idempotent). */
   function markFailed(): void {
@@ -423,6 +441,7 @@ export default function AddressAutocomplete({
   return (
     <div ref={wrapperRef} className="relative flex w-full flex-col gap-1">
       <input
+        ref={inputRef}
         type="text"
         id={id}
         value={value}
@@ -448,9 +467,10 @@ export default function AddressAutocomplete({
         )}
       />
 
-      {open && suggestions.length > 0 && (
+      {listShowing && (
         // A solid violet border, not a shadow, separates the list from the page under it.
         <ul
+          ref={listRef}
           id={listboxId}
           role="listbox"
           aria-label="Address suggestions"
