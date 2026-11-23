@@ -146,18 +146,19 @@ export async function PATCH(
         { status: 409 },
       );
     }
-    // Only DRAFT content is editable; notes stay editable on any status for audit annotations.
+    // Only DRAFT money and dates are editable. Notes and client details stay editable once
+    // sent, since a typo there doesn't change what's owed.
     const editsContent =
-      body.clientName !== undefined ||
-      body.clientEmail !== undefined ||
-      body.clientPhone !== undefined ||
       body.issueDate !== undefined ||
       body.dueDate !== undefined ||
       body.lineItems !== undefined ||
       body.alreadyPaid !== undefined;
     if (current.status !== "DRAFT" && editsContent) {
       return NextResponse.json(
-        { error: "Only draft invoices can be edited; void and reissue." },
+        {
+          error:
+            "Only draft invoices can have lines, amounts or dates changed; use Change invoice.",
+        },
         { status: 409 },
       );
     }
@@ -168,6 +169,11 @@ export async function PATCH(
         : undefined;
     if (phone?.result === "invalid") {
       return errorResponse("Enter a valid mobile number", 400);
+    }
+    const nameValue =
+      clientName !== undefined && typeof clientName === "string" ? clientName.trim() : "";
+    if (clientName !== undefined && !nameValue) {
+      return errorResponse("Enter the client's name", 400);
     }
     // Either can be cleared, but not both, or the invoice has nowhere to go. Checked only
     // when one changes, so a notes edit on an imported invoice with neither still saves.
@@ -246,7 +252,7 @@ export async function PATCH(
     const invoice = await prisma.invoice.update({
       where: { id },
       data: {
-        ...(clientName !== undefined && { clientName }),
+        ...(clientName !== undefined && { clientName: nameValue }),
         ...(clientEmail !== undefined && { clientEmail: emailAfter }),
         ...(phone && { clientPhone: phone.e164 || null }),
         ...(issueDateValue && { issueDate: issueDateValue }),

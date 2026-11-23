@@ -11,6 +11,7 @@ import {
   segmentedButtonClass,
 } from "@/features/admin/components/ui/chip-classes";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
+import { BusinessRateToggle } from "@/features/business/components/BusinessRateToggle";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
 import { SurchargeToggle } from "@/features/business/components/SurchargeToggle";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
@@ -68,9 +69,11 @@ import {
 import {
   addDaysISO,
   addHour,
+  businessRateState,
   emptyTask,
   lookupAutoTravel,
   repriceHourlyTasks,
+  setBusinessOnAllTasks,
   setTaskBaseLine,
   toggleTaskModifierLine,
   updateTaskField,
@@ -86,6 +89,7 @@ import {
   type CancellationPolicy,
 } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
+import { isHourlyTask } from "@/features/business/lib/task-timing";
 import type {
   EventPrefill,
   GoogleContact,
@@ -749,8 +753,12 @@ export function CalculatorView({
 
   // Date surcharge on labour, and the business modifier a (home-rate) promo skips - the
   // same predicate getPublicPricing uses.
-  const businessModifierId =
-    rates.find((r) => isBusinessModifier(r) && r.unit === "modifier")?.id ?? null;
+  const businessModifier =
+    rates.find((r) => isBusinessModifier(r) && r.unit === "modifier") ?? null;
+  const businessModifierId = businessModifier?.id ?? null;
+  // Job-wide Business tick; hidden until there's labour to put on it.
+  const businessState = businessModifierId ? businessRateState(tasks, businessModifierId) : "none";
+  const hasHourlyTask = tasks.some(isHourlyTask);
   // The Standard rate a flat promo cuts from, picked as getPublicPricing does.
   const standardRate =
     rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
@@ -1165,21 +1173,44 @@ export function CalculatorView({
                 onToggleTaskModifier={(idx, modifierId) =>
                   setTasks((prev) => toggleTaskModifierLine(prev, idx, modifierId, rates))
                 }
-                onAddTask={() => setTasks((p) => [...p, emptyTask(rates)])}
+                onAddTask={() =>
+                  setTasks((p) => {
+                    // A job ticked as business keeps new tasks on the business rate too.
+                    const added = emptyTask(rates);
+                    return businessModifierId && businessState === "all"
+                      ? [...p, ...setBusinessOnAllTasks([added], businessModifierId, true, rates)]
+                      : [...p, added];
+                  })
+                }
                 onManageTags={() => setShowTaxonomyModal(true)}
                 taskTemplates={taskTemplates}
                 baseRates={baseRates}
                 modifierRates={modifierRates}
                 flatRates={flatRates}
                 unsuccessfulFactor={pricing.unsuccessfulFactor ?? 0.5}
-                surchargeToggle={
-                  surchargeChoice && (
-                    <SurchargeToggle
-                      option={surchargeChoice}
-                      on={surcharge !== null}
-                      fromDate={dateSurcharge !== null}
-                      onChange={(on) => setSurchargeTick({ date: jobDate, on })}
-                    />
+                jobToggles={
+                  (surchargeChoice || (businessModifier && hasHourlyTask)) && (
+                    <>
+                      {surchargeChoice && (
+                        <SurchargeToggle
+                          option={surchargeChoice}
+                          on={surcharge !== null}
+                          fromDate={dateSurcharge !== null}
+                          onChange={(on) => setSurchargeTick({ date: jobDate, on })}
+                        />
+                      )}
+                      {businessModifier && hasHourlyTask && (
+                        <BusinessRateToggle
+                          state={businessState}
+                          perHour={businessModifier.hourlyDelta ?? 0}
+                          onChange={(on) =>
+                            setTasks((prev) =>
+                              setBusinessOnAllTasks(prev, businessModifier.id, on, rates),
+                            )
+                          }
+                        />
+                      )}
+                    </>
                   )
                 }
               />

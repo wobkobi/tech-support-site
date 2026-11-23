@@ -1,10 +1,12 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/InvoiceActions.tsx
 // Action buttons and modals for the invoice detail page (PDF, payment, send, text, void,
-// re-issue, delete). Below lg, unpaid invoices pin Mark as paid, Text and Send to the screen
-// bottom.
+// change, re-issue, delete, edit details). Below lg, unpaid invoices pin Mark as paid, Text
+// and Send to the screen bottom.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { AdminField } from "@/features/admin/components/ui/AdminField";
+import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { adminButtonClass } from "@/features/admin/components/ui/button-classes";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
@@ -30,12 +32,14 @@ interface InvoiceActionsProps {
   invoiceNumber: string;
   clientName: string;
   clientEmail: string;
+  /** Client mobile as displayed (local format), or "". Editable via "Edit details". */
+  clientPhone: string;
   status: string;
   /** What the client still owes (total less any already-paid amount), for {@link PaymentDialog}. */
   balance: number;
   /** Whether a linked income entry records the balance payment (not the already-paid one). */
   hasPaymentIncome: boolean;
-  /** Current notes; edited in place via the "Edit notes" modal (SENT/PAID). */
+  /** Current notes; edited in place via the "Edit details" modal (SENT/PAID). */
   notes: string | null;
   /** First-sent stamp; drives the "Re-send" label. */
   sentAt?: string | null;
@@ -70,10 +74,11 @@ const headers = { "Content-Type": "application/json" };
  * @param props.invoiceNumber - Filename for the downloaded PDF + email subjects.
  * @param props.clientName - Used in the greeting + "add to contacts" hook.
  * @param props.clientEmail - Recipient; "Send" is disabled when empty.
+ * @param props.clientPhone - Client mobile as displayed, edited via the details modal.
  * @param props.status - Current invoice status (drives which actions show).
  * @param props.balance - Balance due, passed to the payment dialog.
  * @param props.hasPaymentIncome - Whether the balance payment already has an income entry.
- * @param props.notes - Current notes, edited via the notes modal (SENT/PAID).
+ * @param props.notes - Current notes, edited via the details modal (SENT/PAID).
  * @param props.sentAt - First-sent stamp; drives the Send/Re-send label.
  * @param props.paidAt - Payment stamp, passed to the payment dialog.
  * @param props.linkedIncome - Linked income count + total for the void warning.
@@ -93,6 +98,7 @@ export function InvoiceActions({
   invoiceNumber,
   clientName,
   clientEmail,
+  clientPhone,
   status,
   balance,
   hasPaymentIncome,
@@ -150,10 +156,23 @@ export function InvoiceActions({
   );
   const [textKey, setTextKey] = useState(0);
 
-  // Edit-notes modal (SENT/PAID quick edit; notes stay editable post-send).
-  const [notesOpen, setNotesOpen] = useState(false);
-  const [notesDraft, setNotesDraft] = useState(notes ?? "");
-  const [notesSaving, setNotesSaving] = useState(false);
+  // Edit-details modal (SENT/PAID): client details and notes stay editable post-send.
+  const savedDetails = {
+    name: clientName,
+    email: clientEmail,
+    phone: clientPhone,
+    notes: notes ?? "",
+  };
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsDraft, setDetailsDraft] = useState(savedDetails);
+  const [detailsSaving, setDetailsSaving] = useState(false);
+  const detailsDirty = (Object.keys(savedDetails) as (keyof typeof savedDetails)[]).some(
+    (k) => detailsDraft[k].trim() !== savedDetails[k].trim(),
+  );
+
+  // "Change invoice": silent void, then the calculator re-issue.
+  const [confirmChangeOpen, setConfirmChangeOpen] = useState(false);
+  const [changing, setChanging] = useState(false);
 
   const alreadySent = currentStatus === "SENT" || sendFlow.sentLocal;
   const isPaid = currentStatus === "PAID";
@@ -264,29 +283,73 @@ export function InvoiceActions({
   }
 
   /**
-   * Saves a notes-only edit (SENT/PAID only) via the sparse PATCH, then refreshes.
+   * Saves the details modal (SENT/PAID) via the sparse PATCH: only changed fields are sent,
+   * so an untouched phone on an imported invoice can't fail validation.
    */
-  async function saveNotes(): Promise<void> {
-    setNotesSaving(true);
+  async function saveDetails(): Promise<void> {
+    const draft = {
+      name: detailsDraft.name.trim(),
+      email: detailsDraft.email.trim(),
+      phone: detailsDraft.phone.trim(),
+      notes: detailsDraft.notes.trim(),
+    };
+    const body: Record<string, string | null> = {};
+    if (draft.name !== savedDetails.name.trim()) body.clientName = draft.name;
+    if (draft.email !== savedDetails.email.trim()) body.clientEmail = draft.email;
+    if (draft.phone !== savedDetails.phone.trim()) body.clientPhone = draft.phone;
+    if (draft.notes !== savedDetails.notes.trim()) body.notes = draft.notes || null;
+    if (Object.keys(body).length === 0) {
+      setDetailsOpen(false);
+      return;
+    }
+    setDetailsSaving(true);
     try {
       const res = await fetch(`/api/business/invoices/${invoiceId}`, {
         method: "PATCH",
         headers,
-        body: JSON.stringify({ notes: notesDraft.trim() || null }),
+        body: JSON.stringify(body),
       });
-      const d = await res.json();
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !d.ok) {
-        toast(d.error ?? "Couldn't save the note.", { tone: "error" });
-        setNotesSaving(false);
+        toast(d.error ?? "Couldn't save the changes.", { tone: "error" });
+        setDetailsSaving(false);
         return;
       }
-      setNotesOpen(false);
-      setNotesSaving(false);
-      toast("Note saved.", { tone: "success" });
+      setDetailsOpen(false);
+      setDetailsSaving(false);
+      toast(
+        isPaid
+          ? "Saved. The PDF is updated."
+          : "Saved. The PDF is updated - Re-send if they need the corrected copy.",
+        { tone: "success" },
+      );
       router.refresh();
     } catch {
-      toast("Couldn't save the note. Check your connection.", { tone: "error" });
-      setNotesSaving(false);
+      toast("Couldn't save the changes. Check your connection.", { tone: "error" });
+      setDetailsSaving(false);
+    }
+  }
+
+  /**
+   * Voids the invoice without emailing the client, then opens the calculator re-issue. The
+   * replacement's email names this invoice as the one it replaces, so one email covers both.
+   */
+  async function changeInvoice(): Promise<void> {
+    setChanging(true);
+    try {
+      const res = await fetch(`/api/business/invoices/${invoiceId}/void`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ sendNotification: false }),
+      });
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !d.ok) throw new Error(d.error ?? "Could not void the invoice");
+      setCurrentStatus("VOIDED");
+      router.push(reissueHref(invoiceId));
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not void the invoice", { tone: "error" });
+      setChanging(false);
+      setConfirmChangeOpen(false);
     }
   }
 
@@ -310,11 +373,20 @@ export function InvoiceActions({
           <AdminButton
             variant="secondary"
             onClick={() => {
-              setNotesDraft(notes ?? "");
-              setNotesOpen(true);
+              setDetailsDraft(savedDetails);
+              setDetailsOpen(true);
             }}
           >
-            Edit notes
+            Edit details
+          </AdminButton>
+        )}
+        {!isDraft && !isPaid && !isVoided && !isQuote && (
+          <AdminButton
+            variant="secondary"
+            onClick={() => setConfirmChangeOpen(true)}
+            busy={changing}
+          >
+            Change invoice
           </AdminButton>
         )}
         {isDraft && (
@@ -452,36 +524,83 @@ export function InvoiceActions({
         onCancel={() => setConfirmReminderOpen(false)}
       />
 
-      {/* Edit-notes modal: SENT/PAID content is locked but notes stay editable. */}
+      {/* Change invoice: silent void, then the calculator re-issue. */}
+      <ConfirmDialog
+        open={confirmChangeOpen}
+        title={`Change ${invoiceNumber}?`}
+        body={`${invoiceNumber} is voided without emailing ${clientName || "the client"}, and the calculator opens with the job filled in. Save and send the new one - it says it replaces ${invoiceNumber}, so they won't pay both. If you leave without saving, come back here and use Re-issue in calculator.`}
+        confirmLabel="Void and change"
+        busy={changing}
+        onConfirm={() => void changeInvoice()}
+        onCancel={() => setConfirmChangeOpen(false)}
+      />
+
+      {/* Edit-details modal: SENT/PAID money and dates are locked, but client details and
+          notes stay editable. */}
       <Modal
-        open={notesOpen}
-        onClose={() => !notesSaving && setNotesOpen(false)}
-        dirty={!notesSaving && notesDraft !== (notes ?? "")}
-        title="Edit notes"
-        description="Shown on the invoice; the Drive PDF re-syncs on save."
+        open={detailsOpen}
+        onClose={() => !detailsSaving && setDetailsOpen(false)}
+        dirty={!detailsSaving && detailsDirty}
+        title="Edit details"
+        description={
+          isPaid || isQuote
+            ? "The Drive PDF updates on save."
+            : "The Drive PDF updates on save. To change lines, amounts or dates, use Change invoice."
+        }
         size="md"
         footer={
           <>
             <AdminButton
               variant="secondary"
-              onClick={() => setNotesOpen(false)}
-              disabled={notesSaving}
+              onClick={() => setDetailsOpen(false)}
+              disabled={detailsSaving}
             >
               Cancel
             </AdminButton>
-            <AdminButton onClick={() => void saveNotes()} busy={notesSaving}>
-              Save note
+            <AdminButton onClick={() => void saveDetails()} busy={detailsSaving}>
+              Save
             </AdminButton>
           </>
         }
       >
-        <AdminTextarea
-          rows={5}
-          value={notesDraft}
-          onChange={(e) => setNotesDraft(e.target.value)}
-          disabled={notesSaving}
-          placeholder="Optional note shown on the invoice."
-        />
+        <div className="flex flex-col gap-4">
+          <AdminField label="Client name" htmlFor="details-name">
+            <AdminInput
+              id="details-name"
+              value={detailsDraft.name}
+              onChange={(e) => setDetailsDraft((d) => ({ ...d, name: e.target.value }))}
+              disabled={detailsSaving}
+            />
+          </AdminField>
+          <AdminField label="Email" htmlFor="details-email">
+            <AdminInput
+              id="details-email"
+              type="email"
+              value={detailsDraft.email}
+              onChange={(e) => setDetailsDraft((d) => ({ ...d, email: e.target.value }))}
+              disabled={detailsSaving}
+            />
+          </AdminField>
+          <AdminField label="Mobile" htmlFor="details-phone">
+            <AdminInput
+              id="details-phone"
+              type="tel"
+              value={detailsDraft.phone}
+              onChange={(e) => setDetailsDraft((d) => ({ ...d, phone: e.target.value }))}
+              disabled={detailsSaving}
+            />
+          </AdminField>
+          <AdminField label="Notes" htmlFor="details-notes">
+            <AdminTextarea
+              id="details-notes"
+              rows={4}
+              value={detailsDraft.notes}
+              onChange={(e) => setDetailsDraft((d) => ({ ...d, notes: e.target.value }))}
+              disabled={detailsSaving}
+              placeholder="Optional note shown on the invoice."
+            />
+          </AdminField>
+        </div>
       </Modal>
 
       {/* Record payment - the real /pay flow (stamps + income + PDF re-sync). */}

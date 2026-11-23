@@ -168,6 +168,48 @@ export function toggleTaskModifierLine(
 }
 
 /**
+ * Where the job-wide Business tick stands: "all" when every hourly task carries the modifier,
+ * "some" when only part of them do, "none" otherwise (including a job with no hourly tasks).
+ * @param tasks - Current task lines.
+ * @param businessId - RateConfig id of the Business modifier.
+ * @returns How much of the labour is on the business rate.
+ */
+export function businessRateState(
+  tasks: readonly TaskLine[],
+  businessId: string,
+): "all" | "some" | "none" {
+  const hourly = tasks.filter(isHourlyTask);
+  const on = hourly.filter((t) => (t.modifierIds ?? []).includes(businessId)).length;
+  if (on === 0) return "none";
+  return on === hourly.length ? "all" : "some";
+}
+
+/**
+ * Puts every hourly task on or off the Business modifier, re-pricing each one that changes
+ * through {@link toggleTaskModifierLine}. Flat rows are left alone.
+ * @param prev - Current task lines.
+ * @param businessId - RateConfig id of the Business modifier.
+ * @param on - True to add it everywhere, false to take it off everywhere.
+ * @param rates - Rate configs the effective rate is computed from.
+ * @returns The next task lines.
+ */
+export function setBusinessOnAllTasks(
+  prev: TaskLine[],
+  businessId: string,
+  on: boolean,
+  rates: RateConfig[],
+): TaskLine[] {
+  let next = prev;
+  prev.forEach((task, idx) => {
+    if (!isHourlyTask(task)) return;
+    if ((task.modifierIds ?? []).includes(businessId) !== on) {
+      next = toggleTaskModifierLine(next, idx, businessId, rates);
+    }
+  });
+  return next;
+}
+
+/**
  * Sets a task's base hourly rate and recomputes its unit price + line total.
  * @param prev - Current task lines.
  * @param idx - Task index.
