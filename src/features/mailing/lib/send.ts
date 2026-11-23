@@ -2,8 +2,7 @@
 // Sends mailing-list emails: an atomic claim, one CampaignSend row per recipient (the record
 // of truth for resume and retry, re-checked against the list before each delivery), then one
 // Resend broadcast when the marketing key is set, else batches of 100 with idempotency keys
-// (which count toward the daily send limit). Quiet hours hold every list send unless the
-// operator chose to send anyway.
+// (which count toward the daily send limit). Nothing goes out inside quiet hours.
 
 import { audienceOf } from "@/features/mailing/lib/audience";
 import {
@@ -333,23 +332,18 @@ async function finishRun(campaign: Campaign): Promise<{ sent: number; failed: nu
  * cron from sending it twice.
  * @param id - Campaign id.
  * @param excludedIds - Contacts unticked in the send dialog; omitted to keep the stored list.
- * @param sendDuringQuietHours - The operator chose "Send now anyway" inside quiet hours.
  * @returns Counts, or the reason it didn't send.
  */
-export async function startCampaignSend(
-  id: string,
-  excludedIds?: string[],
-  sendDuringQuietHours = false,
-): Promise<SendResult> {
+export async function startCampaignSend(id: string, excludedIds?: string[]): Promise<SendResult> {
   const missing = missingSendEnv();
   if (missing.length > 0) {
     return { ok: false, error: `Sending is off until ${missing.join(", ")} is set.`, status: 503 };
   }
-  const hold = sendDuringQuietHours ? null : await quietHoldUntil();
+  const hold = await quietHoldUntil();
   if (hold) {
     return {
       ok: false,
-      error: `It's quiet hours until ${formatDateTimeShort(hold)}. Schedule it for then, or send now anyway.`,
+      error: `It's quiet hours until ${formatDateTimeShort(hold)}. Schedule it for then.`,
       status: 409,
     };
   }

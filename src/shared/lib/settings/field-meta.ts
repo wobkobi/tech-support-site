@@ -261,7 +261,7 @@ export const COMMS_FIELD_META = {
   quietHoursEnabled: {
     title: "Quiet hours",
     description:
-      "Hold customer emails triggered inside the window until it closes, so a job finished late at night doesn't land in an inbox at 11pm. Anything the customer asked for themselves (manage-booking links, enquiry replies) still goes out at once.",
+      "Hold every email to a customer that is triggered inside the window until it closes, so nothing lands in their inbox at 11pm. This includes booking confirmations and anything they asked for themselves, like manage-booking links. Emails to you still go out at once.",
     off: "When off, every email sends the moment it is triggered.",
   },
   quietHoursStart: {

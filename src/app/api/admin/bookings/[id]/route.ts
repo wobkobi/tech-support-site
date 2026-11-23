@@ -505,11 +505,9 @@ export async function PATCH(
           meetingType: updated.meetingType,
           rescheduleCount: updated.rescheduleCount,
         },
-        // Operator-driven, so it waits for the quiet window.
         {
           kind: "rescheduled",
           previousStartAt: booking.startAt,
-          quietHours: true,
           lapsedPromoTitle: movedPromo?.lapsedTitle ?? null,
         },
       ),

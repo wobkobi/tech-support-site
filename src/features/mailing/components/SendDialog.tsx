@@ -1,7 +1,7 @@
 "use client";
 // src/features/mailing/components/SendDialog.tsx
 // Pick recipients (all ticked to start), then send now or schedule. Mirrors the server's
-// quiet-hours rules: a send inside them moves to their end unless sent "anyway".
+// quiet-hours rule: a send inside them moves to their end, with no override.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
@@ -21,8 +21,8 @@ import React, { useEffect, useId, useMemo, useState } from "react";
 /** Send straight away, or hand to the scheduled-send cron. */
 export type SendMode = "now" | "schedule";
 
-/** What a footer button does: schedule, send now, or send now inside quiet hours. */
-type SubmitKind = "schedule" | "now" | "nowAnyway";
+/** What a footer button does: schedule, or send now. */
+type SubmitKind = "schedule" | "now";
 
 /**
  * Formats an hour of the day as "9pm" / "7am".
@@ -162,7 +162,7 @@ export function SendDialog({
 
   /**
    * Sends or schedules with the current selection.
-   * @param kind - Schedule, send now, or send now anyway inside quiet hours.
+   * @param kind - Schedule, or send now.
    */
   async function submit(kind: SubmitKind): Promise<void> {
     // Only ids still on the list count; anyone who unsubscribed since is skipped anyway.
@@ -192,7 +192,7 @@ export function SendDialog({
       const res = await callApi<{ sent: number; failed: number; waiting?: boolean }>(
         `/api/admin/mailing/${campaign.id}/send`,
         "POST",
-        { mode: "now", excludedContactIds, sendDuringQuietHours: kind === "nowAnyway" },
+        { mode: "now", excludedContactIds },
       );
       setBusy(null);
       if (!res.ok) {
@@ -233,16 +233,7 @@ export function SendDialog({
           <AdminButton variant="secondary" onClick={onClose} disabled={busy !== null}>
             Cancel
           </AdminButton>
-          {heldUntil && (
-            <AdminButton
-              variant="secondary"
-              onClick={() => void submit("nowAnyway")}
-              busy={busy === "nowAnyway"}
-              disabled={noOne || busy !== null}
-            >
-              {busy === "nowAnyway" ? "Sending..." : "Send now anyway"}
-            </AdminButton>
-          )}
+
           <AdminButton
             onClick={() => void submit(primaryKind)}
             busy={busy === primaryKind}
@@ -280,8 +271,7 @@ export function SendDialog({
         {heldUntil && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             It&apos;s quiet hours ({hourLabel(quiet.startHour)} to {hourLabel(quiet.endHour)}), so
-            it goes to {people} at {formatDateTimeShort(heldUntil)}. Only send now anyway if it
-            can&apos;t wait until morning.
+            it goes to {people} at {formatDateTimeShort(heldUntil)}.
           </div>
         )}
 

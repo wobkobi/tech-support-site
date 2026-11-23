@@ -11,7 +11,7 @@ import {
   htmlToText,
   missingEmailEnv,
   renderNotificationEmail,
-  sendNow,
+  sendOutreach,
 } from "@/features/reviews/lib/email-core";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
@@ -84,7 +84,8 @@ export async function askToResubscribe(contactId: string): Promise<ResubscribeAs
 `);
 
   try {
-    const { error } = await sendNow({
+    // Held for quiet hours like every customer email.
+    const { error } = await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: contact.email,
