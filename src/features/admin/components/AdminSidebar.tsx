@@ -41,6 +41,7 @@ import {
   FaSackDollar,
   FaScaleBalanced,
   FaShareNodes,
+  FaShieldHalved,
   FaStar,
   FaTags,
   FaXmark,
@@ -70,6 +71,7 @@ type AdminPage =
   | "post-maker"
   | "notifications"
   | "travel-alerts"
+  | "sign-ins"
   | "settings";
 
 interface NavItem {
@@ -234,6 +236,12 @@ const FOOTER_NAV_ITEMS: NavItem[] = [
     label: "Travel alerts",
     icon: <FaLocationDot className="shrink-0" />,
     path: "/admin/travel-alerts",
+  },
+  {
+    page: "sign-ins",
+    label: "Sign-ins",
+    icon: <FaShieldHalved className="shrink-0" />,
+    path: "/admin/sign-ins",
   },
   {
     page: "settings",

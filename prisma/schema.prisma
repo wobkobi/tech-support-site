@@ -1708,3 +1708,27 @@ model OperatorLocation {
   // When the phone took the reading (OwnTracks `tst`).
   at        DateTime
 }
+
+// One row per admin sign-in form attempt, kept 180 days. A successful row is also the session
+// it started: `sessionId` is the cookie's nonce, `lastSeenAt` is bumped (at most every 5 min)
+// as pages load, and `signedOutAt` is stamped by Sign out or the Sign-ins page buttons. A
+// stamped row's cookie is refused by isAdminRequest / requireAdminAuth (session-revocation.server.ts).
+model AdminSignIn {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  at          DateTime  @default(now())
+  // "ok", "wrong" (bad secret) or "bad-request" (no usable body).
+  outcome     String
+  ip          String
+  userAgent   String?
+  // From Vercel's geo headers; null locally.
+  city        String?
+  region      String?
+  country     String?
+  sessionId   String?
+  expiresAt   DateTime?
+  lastSeenAt  DateTime?
+  signedOutAt DateTime?
+
+  @@index([at])
+  @@index([sessionId])
+}
