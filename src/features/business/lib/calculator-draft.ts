@@ -76,6 +76,39 @@ export interface CalculatorDraft {
   walkedChoice?: boolean | null;
   /** The trip a Walked pick took off the bill, put back if Drove is picked again. */
   walkedOffTrip?: TravelEntry[];
+  /** The calculator URL (path + query) the draft was typed on, so a job draft can be reopened. */
+  returnPath?: string;
+}
+
+/** A job's unfinished calculator draft, for the plain calculator's "Unfinished" list. */
+export interface JobDraftSummary {
+  /** Storage key, unique per job. */
+  key: string;
+  /** Client name, or "" when none. */
+  clientName: string;
+  /** When the draft was last edited. */
+  savedAt: number;
+  /** Calculator URL that reopens the job with its draft. */
+  returnPath: string;
+}
+
+/**
+ * True when the draft holds work only the operator could have added. A calendar job seeds
+ * client, address and travel by itself, so those alone don't make it unfinished.
+ * @param d - Parsed draft.
+ * @returns Whether the operator has started on the job.
+ */
+function hasOperatorWork(d: CalculatorDraft): boolean {
+  return (
+    (d.aiInput?.trim().length ?? 0) > 0 ||
+    d.tasks.length > 0 ||
+    d.parts.length > 0 ||
+    d.notes.trim().length > 0 ||
+    (d.alreadyPaid?.amount.trim().length ?? 0) > 0 ||
+    d.followUpMins > 0 ||
+    // Only an edit marks times real; placeholder and event-prefilled times stay false.
+    d.timesSet === true
+  );
 }
 
 /**
@@ -98,7 +131,7 @@ export function isMeaningfulDraft(d: CalculatorDraft): boolean {
     d.jobAddress.trim().length > 0 ||
     d.pickedContactName !== null ||
     d.pickedContactCompany !== null ||
-    d.followUpMins > 0
+    hasOperatorWork(d)
   );
 }
 
@@ -214,4 +247,34 @@ export function timeAgo(savedAt: number, now: number): string {
   if (hours < 24) return `${hours} hr ago`;
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+/**
+ * Job drafts (calendar jobs and re-issues) with real work in them, newest first.
+ * @returns One summary per job draft that can be reopened.
+ */
+export function listJobDrafts(): JobDraftSummary[] {
+  if (typeof window === "undefined") return [];
+  const out: JobDraftSummary[] = [];
+  try {
+    pruneJobDrafts();
+    for (const key of Object.keys(window.localStorage)) {
+      if (!key.startsWith(`${DRAFT_KEY}:`)) continue;
+      try {
+        const d = JSON.parse(window.localStorage.getItem(key) ?? "") as CalculatorDraft;
+        if (d?.v !== 2 || !d.returnPath || !hasOperatorWork(d)) continue;
+        out.push({
+          key,
+          clientName: d.clientName.trim(),
+          savedAt: d.savedAt,
+          returnPath: d.returnPath,
+        });
+      } catch {
+        /* unreadable draft; pruneJobDrafts drops it next load */
+      }
+    }
+  } catch {
+    return [];
+  }
+  return out.sort((a, b) => b.savedAt - a.savedAt);
 }

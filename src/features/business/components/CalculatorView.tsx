@@ -25,6 +25,7 @@ import { NotesSection } from "@/features/business/components/calculator/NotesSec
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
 import { PhoneTotalBar } from "@/features/business/components/calculator/PhoneTotalBar";
 import { ReissueBanner } from "@/features/business/components/calculator/ReissueBanner";
+import { UnfinishedJobsBanner } from "@/features/business/components/calculator/UnfinishedJobsBanner";
 
 import { SaveActions } from "@/features/business/components/calculator/SaveActions";
 import { SaveButtons } from "@/features/business/components/calculator/SaveButtons";
@@ -58,8 +59,10 @@ import {
   draftScopeFor,
   isMeaningfulDraft,
   isPlaceholderHour,
+  listJobDrafts,
   loadDraft,
   saveDraft,
+  type JobDraftSummary,
   type SurchargeTick,
 } from "@/features/business/lib/calculator-draft";
 import {
@@ -180,6 +183,8 @@ export function CalculatorView({
   // Captured once to keep timeAgo() pure for the toast label.
   const [mountedAt] = useState(() => Date.now());
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
+  // Jobs left part-way, listed on the plain calculator so a return through the menu finds them.
+  const [unfinishedJobs, setUnfinishedJobs] = useState<JobDraftSummary[]>([]);
 
   // Server-resolved; rates are edited on the Settings > Rates tab, so a reload picks up changes.
   const rates = initialRates;
@@ -595,6 +600,8 @@ export function CalculatorView({
       const now = nzNowTime();
       setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     }
+
+    if (draftScope === null) setUnfinishedJobs(listJobDrafts());
     // The description survives a prefill: prefer the picker's sessionStorage stash (fresher
     // than the debounced draft), else this job's restored text, else the plain draft's.
     // Read before the writer's first tick.
@@ -668,6 +675,7 @@ export function CalculatorView({
           eventTimes,
           walkedChoice,
           walkedOffTrip,
+          returnPath: `${window.location.pathname}${window.location.search}`,
         },
         draftScope,
       );
@@ -1024,6 +1032,8 @@ export function CalculatorView({
       )}
 
       {reissue && <ReissueBanner reissue={reissue} fromEvent={eventPrefill !== null} />}
+
+      {unfinishedJobs.length > 0 && <UnfinishedJobsBanner jobs={unfinishedJobs} now={mountedAt} />}
 
       {draftRestoredAt !== null && (
         <DraftRestoredBanner

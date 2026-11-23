@@ -1,14 +1,17 @@
 // src/app/admin/(shell)/layout.tsx
-// Admin shell layout: AdminShell, toasts and the phone + button for every (shell) page.
+// Admin shell layout: AdminShell, toasts, the phone + button and installed-app resume for every
+// (shell) page.
 // Auth stays per-page: layouts don't re-run on client navigation (src/proxy.ts gates requests).
 
 import { AdminShell } from "@/features/admin/components/AdminShell";
 import { MobileQuickActions } from "@/features/admin/components/MobileQuickActions";
+import { ResumeLastPage } from "@/features/admin/components/ResumeLastPage";
 import { AdminToastProvider } from "@/features/admin/components/ui/Toast";
 import { SIDEBAR_COLLAPSED, SIDEBAR_COOKIE } from "@/features/admin/lib/sidebar-cookie";
 import { PushRegistrar } from "@/features/notifications/components/PushRegistrar";
 import { cookies } from "next/headers";
 import type React from "react";
+import { Suspense } from "react";
 
 /**
  * Renders the admin chrome around every page; the {@link SIDEBAR_COOKIE} cookie (set by
@@ -26,6 +29,10 @@ export default async function AdminShellLayout({
   return (
     <AdminToastProvider>
       <PushRegistrar />
+      {/* useSearchParams needs a Suspense boundary. */}
+      <Suspense>
+        <ResumeLastPage />
+      </Suspense>
       <AdminShell initialCollapsed={initialCollapsed}>{children}</AdminShell>
       <MobileQuickActions />
     </AdminToastProvider>
