@@ -317,6 +317,7 @@ export function IncomeView(): React.ReactElement {
             <AdminInput
               id="inc-amount"
               type="number"
+              inputMode="decimal"
               required
               min="0"
               step="0.01"

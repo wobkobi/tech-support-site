@@ -29,7 +29,7 @@ export interface QuickAction {
  * nearest the thumb, and the installed app's long-press menu shows only the first 3 on Android.
  */
 export const QUICK_ACTIONS: readonly QuickAction[] = [
-  // The dashboard's Running now card: +15/30/60 on the job you're at.
+  // The dashboard's Running now card: a later end time for the job you're at.
   { label: "Add time to job", icon: FaStopwatch, path: "/admin?extend=1" },
   { label: "Quick price", icon: FaHandHoldingDollar, path: "/admin/business/quick" },
   {

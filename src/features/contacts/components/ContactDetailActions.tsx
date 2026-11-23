@@ -344,6 +344,7 @@ export function ContactDetailActions({
                       <AdminInput
                         id="contact-edit-retainer-price"
                         type="number"
+                        inputMode="numeric"
                         min="0"
                         step="1"
                         value={form.retainerPrice}
@@ -354,6 +355,7 @@ export function ContactDetailActions({
                       <AdminInput
                         id="contact-edit-retainer-hours"
                         type="number"
+                        inputMode="decimal"
                         min="0"
                         step="0.5"
                         value={form.retainerHours}

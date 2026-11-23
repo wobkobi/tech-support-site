@@ -8,7 +8,9 @@ import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminTimeSelect } from "@/features/admin/components/ui/AdminTimeSelect";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
+import { TimeCheckNote } from "@/features/admin/components/ui/TimeCheckNote";
 import { ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
+import { checkRange } from "@/features/admin/lib/time-check";
 import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { REMOVE_ROW_CLS } from "@/features/business/components/calculator/calculator-classes";
 import { minsToHoursLabel, timeDiffMins } from "@/features/business/lib/business";
@@ -25,7 +27,7 @@ interface SlotIssue {
 
 /**
  * Classifies a complete slot for inline flagging: zero-length is an error, End before
- * Start rolls past midnight and gets an info note in case of an AM/PM slip.
+ * Start rolls past midnight and gets an info note (an am/pm swap that explains it shows instead).
  * @param range - Slot to check.
  * @returns Issue to display, or null when the slot reads fine.
  */
@@ -124,6 +126,8 @@ export function JobDetailsSection({
       <div className="space-y-2">
         {timeRanges.map((range, index) => {
           const issue = slotIssue(range);
+          // An am/pm swap that explains the times beats the plain note.
+          const slip = checkRange(range.startTime, range.endTime);
           return (
             <div key={index} className="space-y-1">
               <div className="flex items-end gap-2">
@@ -139,7 +143,6 @@ export function JobDetailsSection({
                     onChange={(startTime) => patchRange(index, { startTime })}
                     stepMins={5}
                     aria-invalid={issue?.tone === "warn"}
-                    className={cn(issue?.tone === "warn" && "border-amber-400")}
                   />
                 </div>
                 <div className="flex-1">
@@ -154,7 +157,6 @@ export function JobDetailsSection({
                     onChange={(endTime) => patchRange(index, { endTime })}
                     stepMins={5}
                     aria-invalid={issue?.tone === "warn"}
-                    className={cn(issue?.tone === "warn" && "border-amber-400")}
                   />
                 </div>
                 <button
@@ -167,15 +169,26 @@ export function JobDetailsSection({
                   ×
                 </button>
               </div>
-              {issue && (
-                <p
-                  className={cn(
-                    "text-sm",
-                    issue.tone === "warn" ? "text-amber-700" : "text-admin-muted italic",
-                  )}
-                >
-                  {issue.text}
-                </p>
+              {slip?.fix ? (
+                <TimeCheckNote
+                  // A plain swap keeps the "crosses midnight" wording, since that is how it bills now.
+                  text={slip.fixLabel ? (issue?.text ?? slip.text) : slip.text}
+                  fixLabel={slip.fixLabel}
+                  onFix={() =>
+                    patchRange(index, { startTime: slip.fix!.start, endTime: slip.fix!.end })
+                  }
+                />
+              ) : (
+                issue && (
+                  <p
+                    className={cn(
+                      "text-sm",
+                      issue.tone === "warn" ? "text-amber-700" : "text-admin-muted italic",
+                    )}
+                  >
+                    {issue.text}
+                  </p>
+                )
               )}
             </div>
           );

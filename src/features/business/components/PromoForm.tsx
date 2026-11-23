@@ -158,6 +158,7 @@ export function PromoForm({
             <AdminInput
               id={`${id}-amount`}
               type="number"
+              inputMode="decimal"
               required
               min="0"
               step="0.01"

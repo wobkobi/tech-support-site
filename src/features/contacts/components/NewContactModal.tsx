@@ -93,6 +93,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }): React.Rea
       open
       onClose={onClose}
       title="New contact"
+      placement="top"
       footer={
         <>
           <AdminButton variant="secondary" onClick={onClose} disabled={saving}>
@@ -153,7 +154,8 @@ export function NewContactModal({ onClose }: { onClose: () => void }): React.Rea
             />
           </AdminField>
         </div>
-        {/* Stack below sm: unit + autocomplete can't fit three tracks on a phone. */}
+        {/* Stack below sm, address first: unit + autocomplete can't fit three tracks on a phone,
+            and the unit is typed after the address is picked. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <AdminField label="Apt / Unit" htmlFor="nc-unit" optional>
             <AdminInput
@@ -166,7 +168,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }): React.Rea
               disabled={saving}
             />
           </AdminField>
-          <div className="sm:col-span-2">
+          <div className="max-sm:order-first sm:col-span-2">
             <AdminField label="Address" htmlFor="nc-address" optional>
               <AddressAutocomplete
                 id="nc-address"

@@ -158,21 +158,23 @@ function findSmartOrigin(
 
 /**
  * Forward-looking counterpart to {@link findSmartOrigin}. Returns the soonest
- * upcoming located event within {@link RETURN_CHAINING_LOOKAHEAD_MS} of
- * departure, skipping any calendar in `excludeCalendarEmails`.
+ * upcoming located event starting within {@link RETURN_CHAINING_LOOKAHEAD_MS} of the
+ * current event's end, skipping any calendar in `excludeCalendarEmails`. Measured from the
+ * real end, not the wind-down buffer: a job starting inside that buffer (or right at the
+ * end) is the clearest chain of all, and missing it left a trip home between back-to-back jobs.
  * @param allEvents - All calendar events in the current window.
  * @param currentEvent - The event being left.
- * @param effectiveDeparture - Earliest time the traveller can leave.
+ * @param eventEnd - The current event's end.
  * @param excludeCalendarEmails - Calendars that must never be chained into.
  * @returns The candidate next event with its location and start, or null.
  */
 function findNextChainedEvent(
   allEvents: CalendarEvent[],
   currentEvent: CalendarEvent,
-  effectiveDeparture: Date,
+  eventEnd: Date,
   excludeCalendarEmails?: Set<string>,
 ): { event: CalendarEvent; location: string; startAt: Date } | null {
-  const departMs = effectiveDeparture.getTime();
+  const departMs = eventEnd.getTime();
 
   let best: CalendarEvent | null = null;
   let bestLoc: string | null = null;
@@ -186,7 +188,7 @@ function findNextChainedEvent(
     if (!loc) continue;
     const startAt = new Date(e.start);
     const gap = startAt.getTime() - departMs;
-    if (gap > 0 && gap <= RETURN_CHAINING_LOOKAHEAD_MS && gap < bestGap) {
+    if (gap >= 0 && gap <= RETURN_CHAINING_LOOKAHEAD_MS && gap < bestGap) {
       best = e;
       bestLoc = loc;
       bestStart = startAt;
@@ -421,7 +423,7 @@ export async function refreshCalendarCache(options?: {
     // custom back destination.
     const nextEvent = hasCustomBackDestination
       ? null
-      : findNextChainedEvent(timedEvents, event, departureForBack, new Set<string>());
+      : findNextChainedEvent(timedEvents, event, eventEnd, new Set<string>());
     // A personal event never chains into a job: the trip home always stands.
     const chained =
       isPersonalEvent && nextEvent?.event.calendarEmail === bookingCalId ? null : nextEvent;

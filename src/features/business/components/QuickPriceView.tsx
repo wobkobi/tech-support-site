@@ -10,12 +10,14 @@ import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminTimeSelect } from "@/features/admin/components/ui/AdminTimeSelect";
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { StickyRail } from "@/features/admin/components/ui/StickyRail";
+import { TimeCheckNote } from "@/features/admin/components/ui/TimeCheckNote";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {
   SEGMENTED_GROUP_CLS,
   segmentedButtonClass,
 } from "@/features/admin/components/ui/chip-classes";
 import { ADMIN_INPUT_CLS, ADMIN_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
+import { checkRange } from "@/features/admin/lib/time-check";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { QuickTodaysJobs, QuickTotalCard } from "@/features/business/components/QuickPriceCards";
 import { SurchargeToggle } from "@/features/business/components/SurchargeToggle";
@@ -165,6 +167,7 @@ export function QuickPriceView({
   const [address, setAddress] = useState(prefill?.address ?? "");
   const [start, setStart] = useState(prefill?.start ?? "");
   const [end, setEnd] = useState(prefill?.end ?? initialEnd);
+  const timeCheck = checkRange(start, end);
   const [business, setBusiness] = useState(false);
   // Couldn't fix the problem: the labour bills at the unsuccessful-visit share.
   const [unfixed, setUnfixed] = useState(false);
@@ -418,7 +421,19 @@ export function QuickPriceView({
           </AdminField>
 
           <div className="grid grid-cols-2 gap-3">
-            <AdminField label="Start" htmlFor="quick-start">
+            <div>
+              <div className="mb-1 flex items-baseline justify-between gap-2">
+                <label htmlFor="quick-start" className={cn(ADMIN_LABEL_CLS, "mb-0")}>
+                  Start
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setStart(nzNowTime())}
+                  className="text-sm font-medium text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
+                >
+                  Now
+                </button>
+              </div>
               <AdminTimeSelect
                 id="quick-start"
                 value={start}
@@ -426,7 +441,7 @@ export function QuickPriceView({
                 stepMins={5}
                 className="min-w-0"
               />
-            </AdminField>
+            </div>
             <div>
               <div className="mb-1 flex items-baseline justify-between gap-2">
                 <label htmlFor="quick-end" className={cn(ADMIN_LABEL_CLS, "mb-0")}>
@@ -454,6 +469,20 @@ export function QuickPriceView({
               )}
             </div>
           </div>
+          {timeCheck && (
+            <TimeCheckNote
+              text={timeCheck.text}
+              fixLabel={timeCheck.fixLabel}
+              onFix={
+                timeCheck.fix
+                  ? () => {
+                      setStart(timeCheck.fix!.start);
+                      setEnd(timeCheck.fix!.end);
+                    }
+                  : undefined
+              }
+            />
+          )}
 
           {businessModifier && (
             <AdminCheckbox

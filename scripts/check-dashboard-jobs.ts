@@ -7,6 +7,7 @@
 import {
   bookingJob,
   calendarOnlyJobs,
+  extendChoices,
   isHomeLocation,
   mergeJobs,
   runningJob,
@@ -181,6 +182,37 @@ function main(): void {
     HOME_LINE,
   )[0];
   expectEqual("a job at home is remote", [atHome?.remote, atHome?.address], [true, null]);
+
+  // Running over: quarter-hour end times from the later of the end and now.
+  /**
+   * Formats the extend choices as UTC HH:MM.
+   * @param endIso - The job's current end.
+   * @param nowIso - The moment the choices are offered.
+   * @returns The choices as UTC HH:MM strings.
+   */
+  const times = (endIso: string, nowIso: string): string[] =>
+    extendChoices(at(endIso), at(nowIso)).map((ms) => new Date(ms).toISOString().slice(11, 16));
+  expectEqual("before an on-the-hour end", times("2026-11-20T02:00:00Z", "2026-11-20T01:50:00Z"), [
+    "02:15",
+    "02:30",
+    "02:45",
+    "03:15",
+  ]);
+  expectEqual(
+    "an odd end rounds up to a quarter mark",
+    times("2026-11-20T02:07:00Z", "2026-11-20T01:50:00Z"),
+    ["02:15", "02:30", "02:45", "03:15"],
+  );
+  expectEqual(
+    "under 5 minutes to the next mark skips it",
+    times("2026-11-20T02:12:00Z", "2026-11-20T01:50:00Z"),
+    ["02:30", "02:45", "03:00", "03:30"],
+  );
+  expectEqual(
+    "past the end, counts from now",
+    times("2026-11-20T02:00:00Z", "2026-11-20T02:38:00Z"),
+    ["02:45", "03:00", "03:15", "03:45"],
+  );
 
   finish();
 }

@@ -1,12 +1,14 @@
 // src/shared/lib/auth.ts
 // Admin auth: browser sessions via a signed cookie (admin-session.ts); scripts and cron pass the header.
 
+import { isSessionRevoked } from "@/features/admin/lib/session-revocation.server";
+import { touchSession } from "@/features/admin/lib/sign-in-log.server";
 import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/shared/lib/admin-session";
 import { getClientIp } from "@/shared/lib/rate-limit";
 import { timingSafeEqual } from "crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 
 /**
  * Validates a token against ADMIN_SECRET using constant-time comparison.
@@ -65,8 +67,8 @@ function recordAuthFail(ip: string): void {
 }
 
 /**
- * Checks for valid admin credentials: signed cookie or X-Admin-Secret header. After 30 failures
- * a minute an IP fast-fails; successes never count.
+ * Checks for valid admin credentials: a signed, not signed-out cookie or the X-Admin-Secret
+ * header. After 30 failures a minute an IP fast-fails; successes never count.
  * @param req - The incoming request.
  * @returns True if the request has valid admin credentials.
  */
@@ -76,7 +78,11 @@ export async function isAdminRequest(req: NextRequest): Promise<boolean> {
   // Session cookie is the primary browser-driven path; check it first so the
   // header path is only consulted for explicit script / cron callers.
   const cookieValue = req.cookies.get(ADMIN_SESSION_COOKIE)?.value ?? null;
-  if (cookieValue && (await verifySessionCookieValue(cookieValue))) return true;
+  if (cookieValue && (await verifySessionCookieValue(cookieValue))) {
+    // A signed-out device's open tab isn't an attack; refuse it without filling the IP's
+    // failure budget, which a signed-in device on the same wifi shares.
+    return !(await isSessionRevoked(cookieValue));
+  }
   const ok = isValidAdminToken(req.headers.get("x-admin-secret"));
   if (!ok) recordAuthFail(ip);
   return ok;
@@ -84,14 +90,20 @@ export async function isAdminRequest(req: NextRequest): Promise<boolean> {
 
 /**
  * Server component/action gate matching {@link isAdminRequest}; redirects to
- * `/admin/login?next=...`. Defence in depth behind the proxy.
+ * `/admin/login?next=...`. Defence in depth behind the proxy, which can't see server-side
+ * sign-outs. A cookie session also gets its last-seen time bumped in the sign-in log.
  * @param redirectPath - Path to land back on after login (defaults to `/admin`).
  */
 export async function requireAdminAuth(redirectPath = "/admin"): Promise<void> {
   const store = await cookies();
   const value = store.get(ADMIN_SESSION_COOKIE)?.value ?? null;
-  const ok = await verifySessionCookieValue(value);
-  if (ok) return;
+  if (value && (await verifySessionCookieValue(value))) {
+    if (await isSessionRevoked(value)) {
+      redirect(`/admin/login?next=${encodeURIComponent(redirectPath)}`);
+    }
+    after(() => touchSession(value));
+    return;
+  }
 
   // Accept X-Admin-Secret too, so scripts get the page instead of a login redirect (browsers can't
   // set it on navigation). Rate-limited per IP as on the API side.

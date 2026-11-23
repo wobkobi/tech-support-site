@@ -283,6 +283,7 @@ export function SubscriptionsView({
                   id="sub-amount"
                   required
                   type="number"
+                  inputMode="decimal"
                   min="0.01"
                   step="0.01"
                   value={form.amountIncl}

@@ -78,6 +78,7 @@ export function PromoAdvancedOptions({
           <AdminInput
             id={`${id}-priority`}
             type="number"
+            inputMode="numeric"
             step={1}
             value={form.priority}
             onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
@@ -91,6 +92,7 @@ export function PromoAdvancedOptions({
             <AdminInput
               id={`${id}-min-spend`}
               type="number"
+              inputMode="decimal"
               min="0"
               step="0.01"
               value={form.minSpend}
@@ -108,6 +110,7 @@ export function PromoAdvancedOptions({
                     <AdminInput
                       id={`${id}-tier-${i}-spend`}
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="0.01"
                       value={tier.minSpend}
@@ -126,6 +129,7 @@ export function PromoAdvancedOptions({
                     <AdminInput
                       id={`${id}-tier-${i}-amount`}
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="0.01"
                       value={tier.amount}
@@ -180,6 +184,7 @@ export function PromoAdvancedOptions({
               <AdminInput
                 id={`${id}-max-redemptions`}
                 type="number"
+                inputMode="numeric"
                 min="1"
                 step={1}
                 value={form.maxRedemptions}
@@ -192,6 +197,7 @@ export function PromoAdvancedOptions({
               <AdminInput
                 id={`${id}-per-customer`}
                 type="number"
+                inputMode="numeric"
                 min="1"
                 step={1}
                 value={form.perCustomerLimit}
@@ -247,7 +253,6 @@ export function PromoAdvancedOptions({
                 id={`${id}-from`}
                 value={form.activeFrom}
                 onChange={(activeFrom) => setForm((p) => ({ ...p, activeFrom }))}
-                className="w-32"
               />
             </AdminField>
             <AdminField label="To" htmlFor={`${id}-to`}>
@@ -255,7 +260,6 @@ export function PromoAdvancedOptions({
                 id={`${id}-to`}
                 value={form.activeTo}
                 onChange={(activeTo) => setForm((p) => ({ ...p, activeTo }))}
-                className="w-32"
               />
             </AdminField>
             {(form.activeFrom || form.activeTo) && (

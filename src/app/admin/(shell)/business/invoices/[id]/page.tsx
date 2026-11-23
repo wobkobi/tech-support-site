@@ -397,6 +397,7 @@ export default async function InvoiceViewPage({
             invoiceNumber={invoice.number}
             clientName={invoice.clientName}
             clientEmail={invoice.clientEmail}
+            clientPhone={displayNZPhone(invoice.clientPhone)}
             status={invoice.status}
             balance={balanceDue(invoice)}
             hasPaymentIncome={incomeEntries.some((e) => e.id !== invoice.alreadyPaidIncomeId)}

@@ -154,6 +154,27 @@ export function runningJob(jobs: readonly DashboardJob[], nowMs: number): Dashbo
   return best;
 }
 
+const QUARTER_MS = 15 * 60_000;
+/** The first choice is at least this far past the base, so it's never a near no-op. */
+const MIN_FIRST_STEP_MS = 5 * 60_000;
+/** Each choice's distance past the first, in minutes. */
+const EXTEND_STEPS = [0, 15, 30, 60];
+
+/**
+ * New end times to offer for a job running over: quarter-hour marks counted from whichever is
+ * later, the current end or now, so an overdue job never offers a time already gone. NZ offsets
+ * are whole hours, so UTC quarter marks are NZ quarter marks too.
+ * @param endMs - The job's current end (ms).
+ * @param nowMs - Current time (ms).
+ * @returns Four ascending end times (ms): the first quarter mark 5+ minutes past the base,
+ *   then 15, 30 and 60 minutes after it.
+ */
+export function extendChoices(endMs: number, nowMs: number): number[] {
+  const base = Math.max(endMs, nowMs) + MIN_FIRST_STEP_MS;
+  const first = Math.ceil(base / QUARTER_MS) * QUARTER_MS;
+  return EXTEND_STEPS.map((m) => first + m * 60_000);
+}
+
 /**
  * Merges job lists into one, soonest first, keeping those starting in [from, to).
  * @param lists - Job lists to merge.

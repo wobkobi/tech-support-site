@@ -46,8 +46,11 @@ interface Props {
   flatRates: RateConfig[];
   /** Share of the labour still charged on an unfinished task (0.5 = half price). */
   unsuccessfulFactor: number;
-  /** The after-hours, weekend or holiday tick, shown above the tasks; null hides it. */
-  surchargeToggle: React.ReactNode;
+  /**
+   * Job-wide labour ticks (after-hours/weekend/holiday surcharge, Business rate) shown
+   * above the tasks; null hides the row.
+   */
+  jobToggles: React.ReactNode;
 }
 
 /**
@@ -91,7 +94,7 @@ function modifierLabel(m: RateConfig): string {
  * @param props.modifierRates - Modifiers: At home and Remote fill the Where dropdown, the rest show as chips.
  * @param props.flatRates - Flat-rate options used for flat-rate rows.
  * @param props.unsuccessfulFactor - Labour share charged on an unfinished task, for the chip's tooltip.
- * @param props.surchargeToggle - The job-wide labour surcharge tick, or null to hide it.
+ * @param props.jobToggles - The job-wide labour ticks, or null to hide the row.
  * @returns Tasks section element.
  */
 export function TasksSection({
@@ -107,7 +110,7 @@ export function TasksSection({
   modifierRates,
   flatRates,
   unsuccessfulFactor,
-  surchargeToggle,
+  jobToggles,
 }: Props): React.ReactElement {
   // The invoice's cents, not each row rounded alone: timed rows at one rate share them.
   const lineTotals = taskLineTotals(tasks);
@@ -131,7 +134,7 @@ export function TasksSection({
         }
       />
       {/* Job-wide, so it sits once above the per-task rate chips rather than on each row. */}
-      {surchargeToggle && <div className="flex flex-wrap items-center">{surchargeToggle}</div>}
+      {jobToggles && <div className="flex flex-wrap items-center gap-2">{jobToggles}</div>}
       {tasks.map((task, idx) => {
         // Flat-rate rows are single-line; task rows use the combobox layout.
         const isFlatRate = task.rateConfigId != null;

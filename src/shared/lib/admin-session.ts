@@ -131,3 +131,35 @@ export async function verifySessionCookieValue(
     return false;
   }
 }
+
+/**
+ * The session's id (its nonce, as stored in the sign-in log) and issued-at time. Does not verify
+ * the signature, so only trust it on a value that already passed {@link verifySessionCookieValue}.
+ * @param cookieValue - Raw cookie value (`<payload>.<sig>`), or null/undefined.
+ * @returns Id and issued-at unix seconds, or null when the value can't be decoded.
+ */
+export function readSessionPayload(
+  cookieValue: string | null | undefined,
+): { id: string; iat: number } | null {
+  if (!cookieValue) return null;
+  const dot = cookieValue.indexOf(".");
+  if (dot <= 0) return null;
+  try {
+    const payload = JSON.parse(
+      new TextDecoder().decode(b64UrlToBytes(cookieValue.slice(0, dot))),
+    ) as Partial<SessionPayload>;
+    if (typeof payload.n !== "string" || typeof payload.iat !== "number") return null;
+    return { id: payload.n, iat: payload.iat };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The session's id from {@link readSessionPayload}.
+ * @param cookieValue - Raw cookie value, or null/undefined.
+ * @returns The id, or null when the value can't be decoded.
+ */
+export function readSessionId(cookieValue: string | null | undefined): string | null {
+  return readSessionPayload(cookieValue)?.id ?? null;
+}
