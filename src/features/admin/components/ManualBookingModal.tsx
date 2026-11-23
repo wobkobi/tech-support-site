@@ -12,6 +12,7 @@ import { AdminTextarea } from "@/features/admin/components/ui/AdminTextarea";
 import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { FieldError } from "@/features/admin/components/ui/FieldError";
 import { Modal } from "@/features/admin/components/ui/Modal";
+import { TimeCheckNote } from "@/features/admin/components/ui/TimeCheckNote";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import {
   type ContactField,
@@ -19,6 +20,7 @@ import {
   checkContactFields,
   focusFirstInvalid,
 } from "@/features/admin/lib/contact-fields";
+import { checkTime } from "@/features/admin/lib/time-check";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { combineUnitAndAddress, splitUnitFromAddress } from "@/features/booking/lib/booking";
 import { EmailInput } from "@/shared/components/EmailInput";
@@ -82,6 +84,7 @@ export function ManualBookingModal({
   const lastEstimatedNotes = useRef("");
   const [sendConfirmation, setSendConfirmation] = useState(true);
   const [startAtLocal, setStartAtLocal] = useState(() => toNzInputValue(startAtIso));
+  const startCheck = checkTime(startAtLocal.split("T")[1] ?? "");
   const [submitting, setSubmitting] = useState(false);
   // Server and network failures; field problems show under their field.
   const [error, setError] = useState<string | null>(null);
@@ -239,6 +242,12 @@ export function ManualBookingModal({
               onChange={setStartAtLocal}
               required
             />
+            {startCheck && (
+              <TimeCheckNote
+                text={startCheck.text}
+                onFix={() => setStartAtLocal(`${startAtLocal.split("T")[0]}T${startCheck.fix}`)}
+              />
+            )}
           </AdminField>
           <AdminField label="Duration" htmlFor="mb-duration">
             <AdminSelect

@@ -8,7 +8,9 @@ import { AdminCheckbox } from "@/features/admin/components/ui/AdminCheckbox";
 import { AdminDateTimeInput } from "@/features/admin/components/ui/AdminDateTimeInput";
 import { AdminField } from "@/features/admin/components/ui/AdminField";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { TimeCheckNote } from "@/features/admin/components/ui/TimeCheckNote";
 import { ADMIN_META_LABEL_CLS } from "@/features/admin/components/ui/field-classes";
+import { checkRange } from "@/features/admin/lib/time-check";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { formatMins } from "@/features/business/lib/business";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -62,6 +64,10 @@ export function BookingTimesCard({
   const [notifyCustomer, setNotifyCustomer] = useState(true);
   // Stable "now" for react-hooks/purity; the PATCH route re-checks the lock.
   const [renderedAt] = useState(() => Date.now());
+  // Only same-day times are compared; a finish on another day is a deliberate choice.
+  const [startDate = "", startTime = ""] = form.start.split("T");
+  const [endDate = "", endTime = ""] = form.end.split("T");
+  const timeCheck = startDate && startDate === endDate ? checkRange(startTime, endTime) : null;
   const locked = isPastEditWindow(new Date(endAt).getTime(), renderedAt, lockHours);
 
   // Mirrors the server: silence needs both the stored and typed starts in the past.
@@ -185,6 +191,21 @@ export function BookingTimesCard({
             disabled={saving}
           />
         </AdminField>
+        {timeCheck && (
+          <TimeCheckNote
+            text={timeCheck.text}
+            fixLabel={timeCheck.fixLabel}
+            onFix={
+              timeCheck.fix
+                ? () =>
+                    setForm({
+                      start: `${startDate}T${timeCheck.fix!.start}`,
+                      end: `${startDate}T${timeCheck.fix!.end}`,
+                    })
+                : undefined
+            }
+          />
+        )}
         <div className="flex flex-wrap gap-2">
           <AdminButton
             onClick={() => void save()}

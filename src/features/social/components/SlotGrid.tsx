@@ -1,14 +1,16 @@
 "use client";
 // src/features/social/components/SlotGrid.tsx
-// A schedule's weekly times: Monday to Sunday, each with its own times in 15-minute steps, plus
+// A schedule's weekly times: Monday to Sunday, each with its own times in 15-minute steps (hour, minutes and am/pm boxes), plus
 // quick picks that set the same time on a group of days.
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
-import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { AdminTimeSelect } from "@/features/admin/components/ui/AdminTimeSelect";
 import {
   MAX_SLOTS,
   WEEK_ORDER,
+  clockSlot,
   minuteLabel,
+  slotClock,
   slotMinutes,
   sortSlots,
   type QueueSlot,
@@ -107,27 +109,23 @@ export function SlotGrid({
               <div className="flex flex-wrap items-center gap-2">
                 {times.map((minute) => (
                   <span key={minute} className="flex items-center gap-1">
-                    <AdminSelect
+                    <AdminTimeSelect
                       aria-label={`${DAY_NAMES[weekday]} time`}
-                      value={minute}
+                      value={slotClock(minute)}
                       disabled={disabled}
-                      onChange={(e) =>
+                      onChange={(hhmm) => {
+                        const next = clockSlot(hhmm);
+                        // A time this day already has would make two identical slots; keep it.
+                        if (next !== minute && times.includes(next)) return;
                         set(
                           slots.map((s) =>
                             s.weekday === weekday && s.minute === minute
-                              ? { weekday, minute: Number(e.target.value) }
+                              ? { weekday, minute: next }
                               : s,
                           ),
-                        )
-                      }
-                      className="h-9 w-auto py-1"
-                    >
-                      {MINUTES.map((m) => (
-                        <option key={m} value={m} disabled={m !== minute && times.includes(m)}>
-                          {minuteLabel(m)}
-                        </option>
-                      ))}
-                    </AdminSelect>
+                        );
+                      }}
+                    />
                     <button
                       type="button"
                       aria-label={`Take off ${DAY_NAMES[weekday]} at ${minuteLabel(minute)}`}

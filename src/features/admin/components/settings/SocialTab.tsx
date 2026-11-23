@@ -9,7 +9,6 @@ import {
   NumberField,
   SettingsTabBody,
   TextField,
-  TIME_SELECT_CLS,
   ToggleField,
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
@@ -20,8 +19,9 @@ import { useSettingsForm } from "@/features/admin/components/settings/useSetting
 import { WatermarkPreview } from "@/features/admin/components/settings/WatermarkPreview";
 import { AdminInput } from "@/features/admin/components/ui/AdminInput";
 import { AdminSelect } from "@/features/admin/components/ui/AdminSelect";
+import { AdminTimeSelect } from "@/features/admin/components/ui/AdminTimeSelect";
 import { ADMIN_EYEBROW_CLS } from "@/features/admin/components/ui/field-classes";
-import { minuteLabel, slotMinutes } from "@/features/social/lib/queue-slots";
+import { clockSlot, slotClock } from "@/features/social/lib/queue-slots";
 import { cn } from "@/shared/lib/cn";
 import { formatHashtags, parseHashtags } from "@/shared/lib/hashtags";
 import {
@@ -260,18 +260,11 @@ export function SocialTab({ initial, defaults }: Props): React.ReactElement {
             error={fieldErrors["schedules.defaultMinute"]}
             customised={sched.defaultMinute !== baseSched.defaultMinute}
           >
-            <AdminSelect
+            <AdminTimeSelect
               id="schedules.defaultMinute"
-              value={sched.defaultMinute}
-              onChange={(e) => setSched({ defaultMinute: Number(e.target.value) })}
-              className={TIME_SELECT_CLS}
-            >
-              {slotMinutes().map((min) => (
-                <option key={min} value={min}>
-                  {minuteLabel(min)}
-                </option>
-              ))}
-            </AdminSelect>
+              value={slotClock(sched.defaultMinute)}
+              onChange={(hhmm) => setSched({ defaultMinute: clockSlot(hhmm) })}
+            />
           </FieldShell>
         </div>
       </SettingsWithPreview>

@@ -79,6 +79,28 @@ export function slotMinutes(): number[] {
 }
 
 /**
+ * Slot minutes as the time picker's zero-padded "HH:mm".
+ * @param minute - Minutes after midnight.
+ * @returns The clock string.
+ */
+export function slotClock(minute: number): string {
+  const h = String(Math.floor(minute / 60)).padStart(2, "0");
+  return `${h}:${String(minute % 60).padStart(2, "0")}`;
+}
+
+/**
+ * The time picker's "HH:mm" as slot minutes, held inside the allowed range, so picking 2 am
+ * lands on the earliest slot rather than a time the settings check would refuse.
+ * @param hhmm - Zero-padded 24-hour clock string.
+ * @returns Minutes after midnight, on the slot step and inside the range.
+ */
+export function clockSlot(hhmm: string): number {
+  const [h = 0, m = 0] = hhmm.split(":").map(Number);
+  const snapped = Math.round((h * 60 + m) / SLOT_MINUTE_STEP) * SLOT_MINUTE_STEP;
+  return Math.min(SLOT_MINUTE_RANGE.max, Math.max(SLOT_MINUTE_RANGE.min, snapped));
+}
+
+/**
  * Whether a value is a usable slot.
  * @param slot - Raw value.
  * @returns True for a weekday 0-6 and an allowed time.
