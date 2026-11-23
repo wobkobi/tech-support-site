@@ -458,8 +458,6 @@ export async function sendOwnerBookingCancellation(
  * @param options.kind - "new" (default) for a fresh booking, "rescheduled" for a moved time,
  * "updated" for an edit that kept the time (no calendar file: the invite hasn't changed).
  * @param options.previousStartAt - Original start time, shown crossed-out when rescheduled.
- * @param options.quietHours - Hold for the quiet window. Set only by operator-driven
- * moves; customer self-service confirmations stay immediate.
  * @param options.lapsedPromoTitle - The offer a reschedule lost because the new time falls
  * outside its days or times, so the email says it no longer applies.
  */
@@ -468,13 +466,17 @@ export async function sendCustomerBookingConfirmation(
   options?: {
     kind?: BookingEmailKind;
     previousStartAt?: Date;
-    quietHours?: boolean;
     lapsedPromoTitle?: string | null;
   },
 ): Promise<void> {
-  const send = options?.quietHours
-    ? (payload: MailPayload) => sendOutreach(payload, booking.id)
-    : sendNow;
+  // Held for quiet hours like every customer email; tied to the booking so a cancel recalls it.
+  /**
+   * Queues one customer email against this booking.
+   * @param payload - The email to send.
+   * @returns Resolves once it's sent or held.
+   */
+  const send = (payload: MailPayload): ReturnType<typeof sendOutreach> =>
+    sendOutreach(payload, booking.id);
   const from = process.env.EMAIL_FROM;
   const siteUrl = getSiteUrl();
 
@@ -701,8 +703,8 @@ export interface ManageLinksBooking {
 }
 
 /**
- * Emails manage links after a find-my-booking lookup. Safe to carry tokens: only
- * sent to the address that owns the bookings.
+ * Emails manage links after a find-my-booking lookup, held for quiet hours like every
+ * customer email. Safe to carry tokens: only sent to the address that owns the bookings.
  * @param to - Recipient address (the booking email).
  * @param bookings - Their upcoming bookings, soonest first.
  * @returns True if Resend accepted the message, false on misconfig / failure.
@@ -745,7 +747,7 @@ ${await buildEmailSignature(siteUrl)}
 `);
 
   try {
-    await sendNow({
+    await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to,

@@ -9,6 +9,7 @@ import {
   missingEmailEnv,
   renderNotificationEmail,
   sendNow,
+  sendOutreach,
 } from "@/features/reviews/lib/email-core";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -103,7 +104,7 @@ export async function sendBusinessEnquiryNotification(
 }
 
 /**
- * Sends the enquirer a short acknowledgement of their business enquiry.
+ * Sends the enquirer a short acknowledgement of their business enquiry, held for quiet hours.
  * Failures are caught and logged - never throws.
  * @param enquiry - The enquiry details.
  * @returns Promise that resolves when the email is sent (or silently fails).
@@ -140,7 +141,7 @@ export async function sendBusinessEnquiryAck(enquiry: BusinessEnquiryData): Prom
 `);
 
   try {
-    await sendNow({
+    await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: enquiry.email,
