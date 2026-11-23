@@ -9,14 +9,29 @@ import { useRouter } from "next/navigation";
 import type React from "react";
 import { useRef, useState } from "react";
 
+/**
+ * The message for a failed sign-in response.
+ * @param res - The login response (not ok).
+ * @returns What went wrong and what to do.
+ */
+function failureMessage(res: Response): string {
+  if (res.status === 401) return "Wrong secret.";
+  if (res.status === 429) {
+    const secs = Number(res.headers.get("Retry-After")) || 60;
+    return `Too many attempts. Locked for ${secs}s.`;
+  }
+  if (res.status === 503) return "Not configured.";
+  return `Error ${res.status}.`;
+}
+
 interface LoginFormProps {
   /** Validated relative path to land on after a successful sign-in. */
   nextPath: string;
 }
 
 /**
- * Single-field login form. One generic error for every failure, so a wrong password
- * can't be told apart from a rate limit.
+ * Single-field login form. Each failure gets its own short message: wrong secret, locked out
+ * (with the wait), not configured, network or server error. Only the operator signs in here.
  * @param props - Component props.
  * @param props.nextPath - Where to send the operator after a successful login.
  * @returns Login form element.
@@ -47,15 +62,21 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
         body: JSON.stringify({ secret: value }),
       });
       if (!res.ok) {
-        setError("Sign-in failed. Try again.");
+        setError(failureMessage(res));
         setBusy(false);
+        // A wrong secret: clear it and put the cursor back for another go.
+        if (res.status === 401) {
+          setSecret("");
+          if (secretRef.current) secretRef.current.value = "";
+          requestAnimationFrame(() => secretRef.current?.focus());
+        }
         return;
       }
       // Refresh so server components see the new cookie.
       router.push(nextPath);
       router.refresh();
     } catch {
-      setError("Sign-in failed. Try again.");
+      setError("Network error.");
       setBusy(false);
     }
   }
@@ -84,12 +105,21 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
           autoFocus
           required
           value={secret}
-          onChange={(e) => setSecret(e.target.value)}
+          onChange={(e) => {
+            setSecret(e.target.value);
+            setError(null);
+          }}
           disabled={busy}
+          aria-invalid={error !== null}
+          aria-describedby={error ? "admin-secret-error" : undefined}
         />
       </AdminField>
       {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+        <p
+          id="admin-secret-error"
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
+        >
           {error}
         </p>
       )}
