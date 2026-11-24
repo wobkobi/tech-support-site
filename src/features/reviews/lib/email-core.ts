@@ -233,8 +233,8 @@ type MailResult = Awaited<ReturnType<Resend["emails"]["send"]>>;
 export type MailOptions = Parameters<Resend["emails"]["send"]>[1];
 
 /**
- * Sends immediately: operator mail and replies a customer is waiting on (confirmations,
- * manage links, enquiry acks).
+ * Sends immediately: mail to the operator, and the manage-links email a customer has just asked
+ * for and is waiting on. Every other customer email goes through {@link sendOutreach}.
  * @param payload - The Resend send payload.
  * @param options - Optional request options (idempotency key).
  * @returns Resend's send response.

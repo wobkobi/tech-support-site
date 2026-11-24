@@ -774,8 +774,9 @@ export interface ManageLinksBooking {
 }
 
 /**
- * Emails manage links after a find-my-booking lookup, held for quiet hours like every
- * customer email. Safe to carry tokens: only sent to the address that owns the bookings.
+ * Emails manage links after a find-my-booking lookup. Sent straight away, even in quiet hours:
+ * the customer asked for it and is waiting. Safe to carry tokens: only sent to the address that
+ * owns the bookings.
  * @param to - Recipient address (the booking email).
  * @param bookings - Their upcoming bookings, soonest first.
  * @returns True if Resend accepted the message, false on misconfig / failure.
@@ -818,7 +819,7 @@ ${await buildEmailSignature(siteUrl)}
 `);
 
   try {
-    const result = await sendOutreach({
+    const result = await sendNow({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to,
