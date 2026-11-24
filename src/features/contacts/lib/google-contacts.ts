@@ -689,13 +689,44 @@ async function createGoogleContact(
 }
 
 /**
+ * The Google person holding a phone number, paging the connections until it turns up.
+ * @param people - People API client.
+ * @param key - The number as {@link normaliseContactPhone} keys it.
+ * @returns The person, or null when no one in Google has it.
+ */
+async function findGooglePersonByPhone(
+  people: people_v1.People,
+  key: string,
+): Promise<people_v1.Schema$Person | null> {
+  let pageToken: string | undefined;
+  do {
+    const response = await peopleCall(() =>
+      people.people.connections.list({
+        resourceName: "people/me",
+        personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
+        pageSize: 1000,
+        ...(pageToken ? { pageToken } : {}),
+      }),
+    );
+    const person = (response.data.connections ?? []).find((p) =>
+      (p.phoneNumbers ?? []).some((n) => normaliseContactPhone(n.value) === key),
+    );
+    if (person) return person;
+    pageToken = response.data.nextPageToken ?? undefined;
+  } while (pageToken);
+  return null;
+}
+
+/**
  * Puts a phone-only contact the operator has just added into Google Contacts, so it shows in
  * the invoice calculator's picker and on their phone. {@link syncContactToGoogle} leaves
  * phone-only contacts to the import, so this is their one push; Google owns them after it.
- * The caller has already ruled out a contact with this mobile in the site's table, which the
- * import fills from Google.
+ * The caller has already ruled out a contact with this mobile in the site's table, but Google
+ * can have it from the phone since the last import, so a match there is linked, not copied.
  * @param contactId - The new contact.
- * @returns "created", "skipped" when it has an email or a Google link already, or the failure.
+ * @returns "created", "synced" when linked to the Google person who already has the number,
+ * "skipped" when it has an email or a Google link already (or that person is another
+ * contact's), or the failure.
  */
 export async function pushPhoneOnlyContactToGoogle(contactId: string): Promise<ContactSyncOutcome> {
   try {
@@ -703,7 +734,29 @@ export async function pushPhoneOnlyContactToGoogle(contactId: string): Promise<C
     if (!contact?.phone || contact.deletedAt || contact.email || contact.googleContactId) {
       return "skipped";
     }
-    return await createGoogleContact(getPeopleClient(), contact);
+    const people = getPeopleClient();
+    const key = normaliseContactPhone(contact.phone);
+    const match = key ? await findGooglePersonByPhone(people, key) : null;
+    if (match?.resourceName) {
+      const taken = await prisma.contact.findFirst({
+        where: { googleContactId: match.resourceName, id: { not: contact.id } },
+        select: { id: true },
+      });
+      if (taken) return "skipped";
+      // Same-instant stamp: see the pushOk stamp in syncContactToGoogle for why.
+      const stampedAt = new Date();
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          googleContactId: match.resourceName,
+          lastSyncedAt: stampedAt,
+          updatedAt: stampedAt,
+          lastGoogleEtag: match.etag ?? null,
+        },
+      });
+      return "synced";
+    }
+    return await createGoogleContact(people, contact);
   } catch (err) {
     console.error(`[google-contacts] pushPhoneOnlyContactToGoogle failed for ${contactId}:`, err);
     return failureOutcome(err);
