@@ -144,6 +144,10 @@ function validateAvailability(a: AvailabilitySettings): FieldError[] {
     errors.push({ field: "maxAdvanceDays", message: "Must be between 1 and 365 days." });
   if (!nonNeg(a.minHoursNotice))
     errors.push({ field: "minHoursNotice", message: "Must be 0 or more hours (0 = off)." });
+  if (!inRange(a.gapAfterJobMin, 0, 240))
+    errors.push({ field: "gapAfterJobMin", message: "Must be 0-240 minutes." });
+  if (!inRange(a.noticeWhileOutHours, 0, 24))
+    errors.push({ field: "noticeWhileOutHours", message: "Must be 0-24 hours." });
   if (a.sameDayCutoffHour !== null && !inRange(a.sameDayCutoffHour, 0, 23))
     errors.push({
       field: "sameDayCutoffHour",

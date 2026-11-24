@@ -1,7 +1,8 @@
 // src/features/booking/lib/booking-travel.ts
 // Drive-time rule for a new in-person booking: the drive from the previous job (or, for a slot
-// today, from where your phone is now) and on to the next one must fit around the slot. Pure, so
-// the booking form can mask its grid with it.
+// today, from the ring around home your phone is in) and on to the next one must fit around the
+// slot. Also the notice rule, which depends on whether you're on a job, out or home. Pure, so the
+// booking form can mask its grid with it.
 
 import type { BookableDay } from "@/features/booking/lib/booking";
 import { buildTimeline, type LocatedCommitment } from "@/features/calendar/lib/travel-timeline";
@@ -45,21 +46,101 @@ export interface TravelLeg {
   departMs: number;
 }
 
-/** Where you are right now, from a fresh phone location. */
+/**
+ * Rings around home the phone position is reduced to, nearest first, each with the drive assumed
+ * from anywhere inside it. Only the ring is used, so the real point is never sent to Google and
+ * the "from where you are" drive costs no lookup. Beyond the last ring, {@link FAR_RING_DRIVE_MIN}.
+ */
+export const LOCATION_RINGS: ReadonlyArray<{ withinKm: number; driveMin: number }> = [
+  { withinKm: 5, driveMin: 15 },
+  { withinKm: 10, driveMin: 25 },
+  { withinKm: 20, driveMin: 40 },
+];
+
+/** Drive assumed from further out than the last of {@link LOCATION_RINGS}. */
+export const FAR_RING_DRIVE_MIN = 60;
+
+/** Where you are right now, reduced to a ring around home (never at home: that's no spot). */
 export interface CurrentSpot {
-  /** "lat,lng" for Distance Matrix. */
-  origin: string;
+  /** Ring label for logs and the leg key, e.g. "within 10 km" or "further". */
+  ring: string;
+  /** Drive assumed from this ring to any customer. */
+  driveMin: number;
   /** Now (ms). */
   atMs: number;
+}
+
+/**
+ * The ring a phone position falls in, from its straight-line distance to home.
+ * @param distanceM - Metres from home.
+ * @param atHomeRadiusM - Within this, you count as home.
+ * @returns "home", or the ring label and its drive minutes.
+ */
+export function locationRing(
+  distanceM: number,
+  atHomeRadiusM: number,
+): "home" | { ring: string; driveMin: number } {
+  if (distanceM <= atHomeRadiusM) return "home";
+  for (const r of LOCATION_RINGS) {
+    if (distanceM <= r.withinKm * 1000) {
+      return { ring: `within ${r.withinKm} km`, driveMin: r.driveMin };
+    }
+  }
+  return { ring: "further", driveMin: FAR_RING_DRIVE_MIN };
+}
+
+/** Where you are for the notice rule: on a job, out, or home (also used when unknown). */
+export type NoticeState =
+  { kind: "on-job"; jobEndMs: number } | { kind: "out"; driveMin: number } | { kind: "home" };
+
+/**
+ * Minimum notice for a customer booking right now, in minutes from now:
+ * - on a job: until its end (now when it has overrun) plus the gap after a job. The drive to the
+ *   new customer is added by the drive check, which treats the job as the previous commitment.
+ * - out, not on a job: the ring's drive plus the notice while out.
+ * - at home, or no usable phone location: the minimum notice.
+ * @param state - Where you are.
+ * @param nowMs - Current instant.
+ * @param config - Live availability settings.
+ * @param config.minHoursNotice - Notice at home, hours.
+ * @param config.gapAfterJobMin - Gap after the current job, minutes.
+ * @param config.noticeWhileOutHours - Notice while out, hours.
+ * @returns Minutes of notice, never negative.
+ */
+export function noticeMinutes(
+  state: NoticeState,
+  nowMs: number,
+  config: { minHoursNotice: number; gapAfterJobMin: number; noticeWhileOutHours: number },
+): number {
+  if (state.kind === "on-job") {
+    return Math.max(0, state.jobEndMs - nowMs) / MIN + config.gapAfterJobMin;
+  }
+  if (state.kind === "out") return state.driveMin + config.noticeWhileOutHours * 60;
+  return config.minHoursNotice * 60;
+}
+
+/**
+ * A notice length as the customer reads it: "2 hours", "1 hour 15 minutes", "45 minutes".
+ * Rounded up to whole minutes.
+ * @param minutes - Notice in minutes.
+ * @returns The label.
+ */
+export function noticeLabel(minutes: number): string {
+  const total = Math.ceil(minutes);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  const hours = h ? `${h} hour${h === 1 ? "" : "s"}` : "";
+  const mins = m ? `${m} minute${m === 1 ? "" : "s"}` : "";
+  return [hours, mins].filter(Boolean).join(" ") || "0 minutes";
 }
 
 /** The drives a slot depends on; null where there's no commitment that side of it that day. */
 export interface SlotTravelLegs {
   /**
    * Drive in from the previous commitment, or from where you are now; `readyMs` is when you can
-   * set off, `fromHere` marks the phone-location drive.
+   * set off, `fromHere` marks the drive from your ring, whose fixed minutes are `fixedMin`.
    */
-  from: (TravelLeg & { readyMs: number; fromHere?: boolean }) | null;
+  from: (TravelLeg & { readyMs: number; fromHere?: boolean; fixedMin?: number }) | null;
   /** Drive on to the next commitment; `arriveByMs` is its start. */
   to: (TravelLeg & { arriveByMs: number }) | null;
 }
@@ -90,6 +171,11 @@ export interface TravelBlockedSlot {
  * @param input.backMinByEventId - Travel-home minutes per event, from its TravelBlock.
  * @param input.bookingBufferMin - Gap kept after a booking.
  * @param input.eventBufferMin - Gap kept after a calendar event.
+ * @param input.currentJob - When set, a job (booking, or booking-calendar event) running now
+ *   keeps at least the gap after a job, so a slot after it waits for end + gap + drive.
+ * @param input.currentJob.nowMs - Current instant.
+ * @param input.currentJob.gapAfterJobMin - The "Gap after a job" setting.
+ * @param input.currentJob.bookingCalId - The booking calendar's id.
  * @returns Commitments ordered by start.
  */
 export function buildTravelTimeline(input: {
@@ -106,13 +192,47 @@ export function buildTravelTimeline(input: {
   backMinByEventId: Map<string, number>;
   bookingBufferMin: number;
   eventBufferMin: number;
+  currentJob?: { nowMs: number; gapAfterJobMin: number; bookingCalId: string };
 }): TravelCommitment[] {
-  const { personalCalId, homeAddress, backMinByEventId } = input;
+  const { personalCalId, homeAddress, backMinByEventId, currentJob } = input;
+  /**
+   * Whether a calendar event is a job: it's on the booking calendar.
+   * @param e - The event.
+   * @param e.calendarEmail - Its calendar's id.
+   * @returns True for a job.
+   */
+  const isJobEvent = (e: { calendarEmail: string }): boolean =>
+    currentJob !== undefined && e.calendarEmail === currentJob.bookingCalId;
+  /**
+   * The gap kept after a commitment: its usual buffer, raised to the gap after a job while it's
+   * a job running now.
+   * @param c - The commitment.
+   * @param bufferMin - Its usual buffer.
+   * @param isJob - Whether it's a job.
+   * @returns The commitment with its gap.
+   */
+  const withGap = (c: LocatedCommitment, bufferMin: number, isJob: boolean): TravelCommitment => {
+    const runningJob =
+      isJob &&
+      currentJob !== undefined &&
+      c.startMs <= currentJob.nowMs &&
+      currentJob.nowMs < c.endMs;
+    return {
+      ...c,
+      bufferAfterMin: runningJob ? Math.max(bufferMin, currentJob?.gapAfterJobMin ?? 0) : bufferMin,
+    };
+  };
   const fromBookings = buildTimeline(input.bookings, [], personalCalId, homeAddress, new Map());
-  const fromEvents = buildTimeline([], input.events, personalCalId, homeAddress, backMinByEventId);
+  const jobEvents = input.events.filter(isJobEvent);
+  const otherEvents = input.events.filter((e) => !isJobEvent(e));
   return [
-    ...fromBookings.map((c) => ({ ...c, bufferAfterMin: input.bookingBufferMin })),
-    ...fromEvents.map((c) => ({ ...c, bufferAfterMin: input.eventBufferMin })),
+    ...fromBookings.map((c) => withGap(c, input.bookingBufferMin, true)),
+    ...buildTimeline([], jobEvents, personalCalId, homeAddress, backMinByEventId).map((c) =>
+      withGap(c, input.eventBufferMin, true),
+    ),
+    ...buildTimeline([], otherEvents, personalCalId, homeAddress, backMinByEventId).map((c) =>
+      withGap(c, input.eventBufferMin, false),
+    ),
   ].sort((a, b) => a.startMs - b.startMs);
 }
 
@@ -154,12 +274,13 @@ export function slotTravelLegs(
   return {
     from: fromHere
       ? {
-          origin: here.origin,
+          origin: `ring:${here.ring}`,
           destination: address,
           departMs: here.atMs,
           // Still inside the last job's buffer: you set off once it's over.
           readyMs: Math.max(here.atMs, prev ? prev.endMs + prev.bufferAfterMin * MIN : 0),
           fromHere: true,
+          fixedMin: here.driveMin,
         }
       : prev
         ? {
@@ -178,6 +299,20 @@ export function slotTravelLegs(
         }
       : null,
   };
+}
+
+/**
+ * Drive minutes for a slot's leg: the ring's fixed drive, else its Distance Matrix price.
+ * @param leg - The leg, or null when that side has nothing.
+ * @param prices - Priced legs by {@link travelLegKey}.
+ * @returns Minutes, or null when there's no leg or it couldn't be priced.
+ */
+export function legMinutes(
+  leg: (TravelLeg & { fixedMin?: number }) | null,
+  prices: Map<string, number | null>,
+): number | null {
+  if (!leg) return null;
+  return leg.fixedMin ?? prices.get(travelLegKey(leg)) ?? null;
 }
 
 /**

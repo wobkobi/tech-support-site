@@ -40,6 +40,8 @@ export const DEFAULT_SETTINGS: Settings = {
     schedule: defaultSchedule(),
     maxAdvanceDays: 14,
     minHoursNotice: 2,
+    gapAfterJobMin: 30,
+    noticeWhileOutHours: 2,
     sameDayCutoffHour: 18,
     bufferMin: 15,
     bookingBufferAfterMin: 30,

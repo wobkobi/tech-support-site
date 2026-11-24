@@ -11,6 +11,7 @@ import {
   type BookableDay,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
+import { withCustomerNotice } from "@/features/booking/lib/booking-travel.server";
 import { withDateSurcharges } from "@/features/business/lib/pricing-policy.server";
 import { hasActivePromoCode } from "@/features/business/lib/promos";
 import {
@@ -28,6 +29,7 @@ import { cn } from "@/shared/lib/cn";
 import { pageOpenGraph } from "@/shared/lib/open-graph";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { nzMinuteOfDay } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
@@ -159,8 +161,9 @@ async function getAvailableDays(): Promise<{
   acceptingBookings: boolean;
   closedMessage: string;
   durations: { short: number; long: number };
-  minHoursNotice: number;
   sameDayCutoffHour: number | null;
+  /** Today's same-day cut-off has passed, so that's why today is closed. */
+  cutoffPassed: boolean;
 }> {
   const now = new Date();
   const { config, acceptingBookings, closedMessage } = await getAvailabilityConfig();
@@ -174,15 +177,15 @@ async function getAvailableDays(): Promise<{
       acceptingBookings: false,
       closedMessage,
       durations: config.durations,
-      minHoursNotice: config.minHoursNotice,
       sameDayCutoffHour: config.sameDayCutoffHour,
+      cutoffPassed: false,
     };
   }
 
   const maxDate = bookingWindowEnd(now, config);
 
   // Load blocking bookings and calendar events
-  const [existingBookings, calendar] = await Promise.all([
+  const [existingBookings, calendar, noticeConfig] = await Promise.all([
     prisma.booking.findMany({
       where: {
         status: "confirmed",
@@ -197,6 +200,7 @@ async function getAvailableDays(): Promise<{
       },
     }),
     getCalendarEvents(now, maxDate),
+    withCustomerNotice(now, config),
   ]);
 
   // Build the bookable-day grid
@@ -208,7 +212,7 @@ async function getAvailableDays(): Promise<{
     bufferAfterMin: b.bufferAfterMin,
   }));
 
-  const built = buildAvailableDays(existingForSlots, calendar.events, now, config);
+  const built = buildAvailableDays(existingForSlots, calendar.events, now, noticeConfig);
   return {
     days: built.days,
     degraded: calendar.degraded,
@@ -216,8 +220,9 @@ async function getAvailableDays(): Promise<{
     acceptingBookings: true,
     closedMessage,
     durations: config.durations,
-    minHoursNotice: config.minHoursNotice,
     sameDayCutoffHour: config.sameDayCutoffHour,
+    cutoffPassed:
+      config.sameDayCutoffHour !== null && nzMinuteOfDay(now) >= config.sameDayCutoffHour * 60,
   };
 }
 
@@ -239,8 +244,8 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     acceptingBookings,
     closedMessage,
     durations,
-    minHoursNotice,
     sameDayCutoffHour,
+    cutoffPassed,
   } = await getAvailableDays();
   // A failed promo lookup shows the code box rather than hiding a code that works.
   const [settings, showPromoCode, pricedDays] = await Promise.all([
@@ -248,15 +253,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     hasActivePromoCode().catch(() => true),
     withDateSurcharges(days),
   ]);
-  // Explain the same-day closure from live settings.
-  const sameDayReasons: string[] = [];
-  if (minHoursNotice > 0) {
-    sameDayReasons.push(`${minHoursNotice} hour${minHoursNotice === 1 ? "" : "s"} notice required`);
-  }
-  if (sameDayCutoffHour !== null) {
-    sameDayReasons.push(`${hourLabel(sameDayCutoffHour)} cut-off`);
-  }
-  const sameDayDetail = sameDayReasons.length ? ` (${sameDayReasons.join(", ")})` : "";
+
   if (!acceptingBookings) {
     return (
       <div
@@ -291,9 +288,12 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     <div className="flex flex-col gap-5">
       {sameDayClosed && (
         <div className="border border-moonstone-500/40 bg-moonstone-400/10 p-4 text-rich-black">
+          {/* The notice changes with where I am, so only the fixed cut-off is named as a reason. */}
           <p className="text-base">
-            Same-day bookings are closed for today{sameDayDetail}. The earliest available time is
-            tomorrow.
+            {cutoffPassed && sameDayCutoffHour !== null
+              ? `Same-day bookings are closed for today (${hourLabel(sameDayCutoffHour)} cut-off).`
+              : "Same-day times depend on where I am, and there's no time left today that I can get to you."}{" "}
+            The earliest available time is tomorrow.
           </p>
         </div>
       )}

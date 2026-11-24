@@ -1,12 +1,14 @@
 // src/app/api/booking/travel-slots/route.ts
 // Public drive check for the booking grid: once the customer's address is known, the starts the
-// drive from the previous job (or, today, from where your phone is) or on to the next one rules
-// out. Only the blocked starts go back; never the location. Each call can cost Distance Matrix
-// lookups (at most two per located commitment in the window), hence the rate limit.
+// drive from the previous job (or, today, from the ring around home your phone is in) or on to
+// the next one rules out. Only the blocked starts go back; never the location. Each new address
+// can cost Distance Matrix lookups (at most two per located commitment in the window), hence the
+// per-minute and per-day limits and the daily cap on new addresses.
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { BOOKING_FIELD_LIMITS, bookingWindowEnd } from "@/features/booking/lib/booking";
 import {
+  claimTravelCheck,
   findTravelBlockedSlots,
   loadCurrentSpot,
   loadTravelTimeline,
@@ -22,7 +24,9 @@ import { NextRequest, NextResponse } from "next/server";
  *   missing.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const limited = rateLimitOrReject(request, "booking-travel-slots", 10, 60_000);
+  const limited =
+    rateLimitOrReject(request, "booking-travel-slots", 10, 60_000) ??
+    rateLimitOrReject(request, "booking-travel-slots-day", 30, 24 * 60 * 60_000);
   if (limited) return limited;
 
   const body = (await request.json().catch(() => null)) as { address?: unknown } | null;
@@ -35,6 +39,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const now = new Date();
     const { config, acceptingBookings } = await getAvailabilityConfig();
     if (!acceptingBookings) return okResponse({ blocked: [] });
+    if (!claimTravelCheck(raw, now)) {
+      console.warn("[booking/travel-slots] Daily address cap reached; leaving the grid open");
+      return okResponse({ blocked: [] });
+    }
     const [timeline, here] = await Promise.all([
       loadTravelTimeline(now, bookingWindowEnd(now, config), config),
       loadCurrentSpot(now),

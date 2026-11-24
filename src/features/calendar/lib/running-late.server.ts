@@ -57,7 +57,7 @@ const HOME_GEO_KEY = "travel-alerts:home-geo";
  * @param saved.lng - Saved longitude.
  * @returns The point, or null when it can't be looked up.
  */
-async function homePoint(
+export async function homePoint(
   address: string,
   saved: { lat: number | null; lng: number | null },
 ): Promise<{ lat: number; lng: number } | null> {
