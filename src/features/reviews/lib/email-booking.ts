@@ -451,6 +451,77 @@ export async function sendOwnerBookingCancellation(
 }
 
 /**
+ * Tells the customer their appointment is cancelled, with a link to book again. Held for quiet
+ * hours but not tied to the booking, so the cancel's own recall of held emails can't drop it.
+ * Google's own "event cancelled" email still goes out too: it is what takes the event off a
+ * non-Google calendar, since the invite came from Google under its own event id.
+ * Failures are caught and logged - never throws.
+ * @param booking - The cancelled booking's details.
+ * @param options - Optional flags.
+ * @param options.lateCancellation - True when a late-cancellation fee applies; the invoice for
+ * it is sent separately.
+ * @param options.cancelledBy - "customer" when they cancelled (themselves or through the
+ * operator), "operator" when the operator called it off.
+ */
+export async function sendCustomerBookingCancellation(
+  booking: BookingNotificationData,
+  options: { lateCancellation: boolean; cancelledBy: "customer" | "operator" },
+): Promise<void> {
+  const from = process.env.EMAIL_FROM;
+  const siteUrl = getSiteUrl();
+
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping customer cancellation email.`,
+    );
+    return;
+  }
+
+  const firstName = booking.name.split(" ")[0] ?? "";
+  const start = formatDateTimeLong(booking.startAt);
+  const intro =
+    options.cancelledBy === "operator"
+      ? "I've had to cancel your appointment. Sorry for the change of plans."
+      : "Your appointment has been cancelled, as you asked.";
+  const feeLine = options.lateCancellation
+    ? `<p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">Because this was close to the appointment time, a cancellation fee applies under the cancellation policy. The invoice for it comes in a separate email.</p>`
+    : "";
+
+  const html = renderNotificationEmail(`
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Appointment cancelled, ${escapeHtml(firstName)}</h2>
+    <p style="margin:0 0 20px;color:#444;line-height:1.6">${intro}</p>
+
+    <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancelled appointment</p>
+    <p style="margin:0 0 20px;font-size:16px;font-weight:600;color:#0c0a3e"><s>${escapeHtml(start)}</s></p>
+
+    ${feeLine}
+
+    <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">
+      Still need a hand? You can book a new time whenever suits, or just reply to this email.
+    </p>
+
+    <a href="${siteUrl}/booking" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 0 10px">📅 Book a new time</a>
+${await buildEmailSignature(siteUrl)}
+`);
+
+  try {
+    const result = await sendOutreach({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to: booking.email,
+      subject: `Appointment cancelled - ${start}`,
+      html,
+      text: htmlToText(html),
+    });
+    if (result.error) {
+      console.error(`[email] Resend rejected cancellation for ${booking.id}:`, result.error);
+    }
+  } catch (error) {
+    console.error(`[email] Failed to send cancellation email for booking ${booking.id}:`, error);
+  }
+}
+
+/**
  * Sends the customer a booking confirmation, reschedule or edit notice.
  * Failures are caught and logged - never throws.
  * @param booking - The booking details.
