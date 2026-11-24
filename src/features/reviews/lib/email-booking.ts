@@ -458,8 +458,8 @@ export async function sendOwnerBookingCancellation(
  * Failures are caught and logged - never throws.
  * @param booking - The cancelled booking's details.
  * @param options - Optional flags.
- * @param options.lateCancellation - True when a late-cancellation fee applies; the invoice for
- * it is sent separately.
+ * @param options.lateCancellation - True when the cancel landed inside the fee window. The
+ * invoice may stay a draft the operator waives, so the email only says it would follow.
  * @param options.cancelledBy - "customer" when they cancelled (themselves or through the
  * operator), "operator" when the operator called it off.
  */
@@ -484,7 +484,7 @@ export async function sendCustomerBookingCancellation(
       ? "I've had to cancel your appointment. Sorry for the change of plans."
       : "Your appointment has been cancelled, as you asked.";
   const feeLine = options.lateCancellation
-    ? `<p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">Because this was close to the appointment time, a cancellation fee applies under the cancellation policy. The invoice for it comes in a separate email.</p>`
+    ? `<p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">Because this was close to the appointment time, a cancellation fee may apply under the cancellation policy. If it does, the invoice comes in a separate email.</p>`
     : "";
 
   const html = renderNotificationEmail(`
