@@ -47,10 +47,11 @@ function rateLimit(
 
 /**
  * Client IP from the first `x-forwarded-for` entry, then `x-real-ip`, else "unknown".
- * @param request - Incoming request.
+ * @param request - Incoming request, or anything with its headers (a page's `headers()`).
+ * @param request.headers - The request headers.
  * @returns Client IP string.
  */
-export function getClientIp(request: NextRequest): string {
+export function getClientIp(request: { headers: Pick<Headers, "get"> }): string {
   const fwd = request.headers.get("x-forwarded-for");
   if (fwd) {
     const first = fwd.split(",")[0]?.trim();
