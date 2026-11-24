@@ -278,6 +278,15 @@ export default async function QuickPricePage({
           // A blank form prices at now, which says nothing about when the job started.
           matched || slot ? nzMinuteOfDay(jobStart) : null,
         )}
+        surchargeDay={{
+          holidayName: holiday?.name ?? null,
+          weekday: nzWeekday(jobStart),
+          rules: {
+            publicHolidayPerHour: policy.PUBLIC_HOLIDAY_PER_HOUR,
+            weekendPerHour: policy.WEEKEND_PER_HOUR,
+            afterHoursFromHour: policy.AFTER_HOURS_FROM_HOUR,
+          },
+        }}
         bankAccount={identity.bankAccount}
         initialEnd={nzNowTime()}
         events={events}
