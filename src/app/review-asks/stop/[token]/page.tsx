@@ -42,15 +42,15 @@ export default async function ReviewAskStopPage({
         </h1>
         {isPreview && (
           <p className="text-base text-rich-black/80">
-            This is the link from a preview email, so there&apos;s nothing to change. In a real
-            email, this page has a button that stops review requests for that person.
+            This is the link from a preview email, so there's nothing to change. In a real email,
+            this page has a button that stops review requests for that person.
           </p>
         )}
         {!isPreview && !contactId && (
           <p className="text-base text-rich-black/80">
-            This link doesn&apos;t look right - it may have been cut short when it was copied. Try
-            clicking it straight from the email, or just reply to the email and say you&apos;d like
-            me to stop asking.
+            This link doesn't look right - it may have been cut short when it was copied. Try
+            clicking it straight from the email, or just reply to the email and say you'd like me to
+            stop asking.
           </p>
         )}
         {contactId && <ReviewAskStopForm token={token} initiallyStopped={alreadyStopped} />}

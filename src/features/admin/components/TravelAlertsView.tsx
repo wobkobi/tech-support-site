@@ -367,7 +367,7 @@ export function TravelAlertsView({
                 disabled={running !== null}
                 onClick={() => void runNow("morning")}
               >
-                Send today&apos;s summary
+                Send today's summary
               </AdminButton>
             </div>
           }
@@ -390,14 +390,14 @@ export function TravelAlertsView({
               </p>
             ) : (
               <p>
-                OwnTracks hasn&apos;t sent a location. Open it and tap the publish button (the
-                arrow, top right) to send one now.
+                OwnTracks hasn't sent a location. Open it and tap the publish button (the arrow, top
+                right) to send one now.
               </p>
             )}
             {location && (
               <p className="text-admin-muted">
                 OwnTracks on Significant only reports when you move, so a few hours with no report
-                while you&apos;re at home is normal. Older than {baseline.phoneLocationFreshHours}{" "}
+                while you're at home is normal. Older than {baseline.phoneLocationFreshHours}{" "}
                 {baseline.phoneLocationFreshHours === 1 ? "hour" : "hours"}, checks fall back to the
                 job before or home.
               </p>
@@ -589,7 +589,7 @@ export function TravelAlertsView({
             {secretSet ? (
               "OWNTRACKS_SECRET from the server's environment"
             ) : (
-              <StatusPill tone="critical">OWNTRACKS_SECRET isn&apos;t set</StatusPill>
+              <StatusPill tone="critical">OWNTRACKS_SECRET isn't set</StatusPill>
             )}
           </dd>
           <dt className={ADMIN_META_LABEL_CLS}>Monitoring</dt>

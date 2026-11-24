@@ -188,7 +188,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }): React.Rea
           </div>
         </div>
         <p className="text-sm text-admin-muted">
-          Needs an email or a mobile number. It&apos;s added to Google Contacts too.
+          Needs an email or a mobile number. It's added to Google Contacts too.
         </p>
         {error && (
           <p role="alert" className="text-sm text-coquelicot-500">

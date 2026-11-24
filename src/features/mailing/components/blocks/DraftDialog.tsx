@@ -388,7 +388,7 @@ export function DraftDialog({
             onChange={(e) => setWithSubject(e.target.checked)}
           />
           <span>
-            Also write the subject and preview text (Undo doesn&apos;t bring the old ones back)
+            Also write the subject and preview text (Undo doesn't bring the old ones back)
           </span>
         </label>
         {canPicture && (

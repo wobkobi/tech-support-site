@@ -168,7 +168,7 @@ export function TextInvoiceModal({
           />
           {!alreadySent && (
             <p className="text-sm text-admin-muted">
-              Once it&apos;s gone, press Mark as sent so the {noun} shows as sent.
+              Once it's gone, press Mark as sent so the {noun} shows as sent.
             </p>
           )}
         </div>

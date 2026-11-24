@@ -444,8 +444,8 @@ export function ContentLibraryView({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-prose text-admin-muted">
-          Content items are posts you&apos;ll use again. Give one a few captions and it takes the
-          next each time it goes out. Use Save to content on any post to add it here.
+          Content items are posts you'll use again. Give one a few captions and it takes the next
+          each time it goes out. Use Save to content on any post to add it here.
         </p>
         <div className="flex flex-wrap gap-2">
           <AdminButton

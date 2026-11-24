@@ -494,9 +494,7 @@ export function CampaignEditor({
               <AdminField
                 label="Template"
                 htmlFor={`${fieldId}-template`}
-                hint={
-                  <>Fields you&apos;ve changed stay as they are; the rest follow the template.</>
-                }
+                hint={<>Fields you've changed stay as they are; the rest follow the template.</>}
               >
                 <AdminSelect
                   id={`${fieldId}-template`}
@@ -580,8 +578,8 @@ export function CampaignEditor({
             {promoId && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm">
                 <span>
-                  Promo wording comes from <strong>{promoTitle ?? "a promo"}</strong>. It won&apos;t
-                  send once that promo has ended.
+                  Promo wording comes from <strong>{promoTitle ?? "a promo"}</strong>. It won't send
+                  once that promo has ended.
                 </span>
                 {editable && (
                   <AdminButton
@@ -719,7 +717,7 @@ export function CampaignEditor({
                           headline, then smaller lines, an optional{" "}
                           <code>{">> [Text](https://...)"}</code> button and an optional{" "}
                           <code>{">> ![](photo)"}</code> behind it (add the photo from the Blocks
-                          tab so it&apos;s darkened)
+                          tab so it's darkened)
                         </li>
                         <li>
                           <code>---</code> - a dividing line; <code>::space</code> - an empty gap
@@ -732,8 +730,8 @@ export function CampaignEditor({
                           picture in <code>{"[...](https://...)"}</code> to make it a link
                         </li>
                         <li>
-                          <code>{"![What goes here]()"}</code> - a picture still to choose;
-                          it&apos;s left out until you add one
+                          <code>{"![What goes here]()"}</code> - a picture still to choose; it's
+                          left out until you add one
                         </li>
                       </ul>
                     </details>

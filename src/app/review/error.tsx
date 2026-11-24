@@ -26,7 +26,7 @@ export default function ReviewError({
       title="Something went wrong with the review page"
       body={
         <>
-          Your review wasn&apos;t submitted. Please try again - and thank you for taking the time to
+          Your review wasn't submitted. Please try again - and thank you for taking the time to
           leave one.
         </>
       }

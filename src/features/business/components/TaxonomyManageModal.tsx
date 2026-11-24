@@ -182,7 +182,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
         <>
           <strong>Rename</strong> to fix a spelling - every task using the tag follows, and
           duplicates merge. <strong>Clear</strong> only when that work is gone for good: it removes
-          the tag from the AI&apos;s vocabulary, so those tasks are not retagged later.
+          the tag from the AI's vocabulary, so those tasks are not retagged later.
         </>
       }
     >

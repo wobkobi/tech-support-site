@@ -94,7 +94,7 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
               <TickItem variant="dot">
                 To send you the occasional email about offers, holiday hours or scam warnings. You
                 can untick these when you book, every one has an unsubscribe link, and unsubscribing
-                doesn&apos;t stop emails about your own bookings and invoices.
+                doesn't stop emails about your own bookings and invoices.
               </TickItem>
               <TickItem variant="dot">
                 To improve the website and measure how well my advertising works
@@ -119,10 +119,10 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
               <TickItem variant="dot">My replies to you</TickItem>
             </TickList>
             <p className="mt-3">
-              I use it only to read and answer you. I don&apos;t add you to my mailing list from it
-              or use it for advertising. When I ask for help writing a reply, the words go to an AI
+              I use it only to read and answer you. I don't add you to my mailing list from it or
+              use it for advertising. When I ask for help writing a reply, the words go to an AI
               writing service (OpenAI or Anthropic) to suggest one, and I read every reply before
-              it&apos;s sent.
+              it's sent.
             </p>
           </div>
 
@@ -144,7 +144,7 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
                 <strong>Meta advanced matching:</strong> when you submit your booking or contact
                 details, a scrambled (hashed, one-way) version of information like your email or
                 phone number may be shared with Meta to match up ad results. This is not shared as
-                readable text and can&apos;t be reversed by me.
+                readable text and can't be reversed by me.
               </TickItem>
               <TickItem variant="dot">
                 <strong>Thryv</strong> - my marketing service. Its tag measures how visitors find
@@ -223,11 +223,11 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
               <a href={`mailto:${identity.email}`} className={TEXT_LINK}>
                 {identity.email}
               </a>{" "}
-              with your name and, for social media, the name you use on Facebook or Instagram.
-              I&apos;ll delete it within 30 days and let you know when it&apos;s done. I keep
-              invoices and other business records for the seven years New Zealand tax law requires.
-              Deleting my copy doesn&apos;t remove anything from Facebook, Instagram or Google: you
-              can delete your own messages, comments and reviews there.
+              with your name and, for social media, the name you use on Facebook or Instagram. I'll
+              delete it within 30 days and let you know when it's done. I keep invoices and other
+              business records for the seven years New Zealand tax law requires. Deleting my copy
+              doesn't remove anything from Facebook, Instagram or Google: you can delete your own
+              messages, comments and reviews there.
             </p>
           </div>
 
@@ -239,7 +239,7 @@ export default async function PrivacyPage(): Promise<React.ReactElement> {
               <a href={`mailto:${identity.email}`} className={TEXT_LINK}>
                 {identity.email}
               </a>{" "}
-              and I&apos;ll help. If you&apos;re not satisfied, you can contact the{" "}
+              and I'll help. If you're not satisfied, you can contact the{" "}
               <a
                 href="https://www.privacy.org.nz"
                 target="_blank"

@@ -55,10 +55,10 @@ export function ReviewAskStopForm({
       {stopped ? (
         <>
           <p className="text-lg font-semibold text-rich-black" role="status">
-            Done. I won&apos;t ask you for a review again.
+            Done. I won't ask you for a review again.
           </p>
           <p className="text-base text-rich-black/80">
-            You&apos;ll still get your invoices and booking emails. Changed your mind?
+            You'll still get your invoices and booking emails. Changed your mind?
           </p>
           <div>
             <Button variant="outline" disabled={busy} onClick={() => void change("allow")}>
@@ -69,8 +69,8 @@ export function ReviewAskStopForm({
       ) : (
         <>
           <p className="text-base text-rich-black/80">
-            Press the button and I&apos;ll stop sending you emails asking for a review. You&apos;ll
-            still get your invoices and booking emails.
+            Press the button and I'll stop sending you emails asking for a review. You'll still get
+            your invoices and booking emails.
           </p>
           <div>
             <Button disabled={busy} onClick={() => void change("stop")}>

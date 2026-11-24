@@ -352,7 +352,7 @@ export function TasksSection({
                       "border-amber-300 bg-amber-50 text-amber-700",
                     )}
                   >
-                    Didn&apos;t finish
+                    Didn't finish
                   </button>
                   <span className="ml-auto text-sm font-semibold text-admin-text">
                     = {formatNZD(task.unitPrice)}/hr

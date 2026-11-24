@@ -27,8 +27,8 @@ export default function BookingError({
       title="Something went wrong with the booking page"
       body={
         <>
-          Nothing has been booked yet, so you haven&apos;t lost anything. Give it another go, or get
-          in touch and I&apos;ll sort it out.
+          Nothing has been booked yet, so you haven't lost anything. Give it another go, or get in
+          touch and I'll sort it out.
         </>
       }
       error={error}

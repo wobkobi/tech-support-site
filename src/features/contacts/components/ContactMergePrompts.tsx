@@ -73,7 +73,7 @@ export function ContactMergeDialog({
           {source?.googleContactId && source.googleContactId !== target?.googleContactId
             ? " here and from Google Contacts"
             : ""}
-          . This can&apos;t be undone.
+          . This can't be undone.
         </p>
       }
       confirmLabel="Merge"

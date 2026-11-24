@@ -43,9 +43,9 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
     <SettingsTabBody changed={form.changedPaths}>
       <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
         <p className="text-sm text-amber-800">
-          Advanced. These tune the calendar travel-block engine and the schedule&apos;s suggested
-          times. The defaults work well - only change them if you know you need to, and use
-          &quot;Reset to defaults&quot; if unsure.
+          Advanced. These tune the calendar travel-block engine and the schedule's suggested times.
+          The defaults work well - only change them if you know you need to, and use &quot;Reset to
+          defaults&quot; if unsure.
         </p>
       </div>
       <div className="divide-y divide-admin-border">

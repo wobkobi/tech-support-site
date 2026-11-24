@@ -430,7 +430,7 @@ export function InboxThread({
           </label>
           {looksLikeSpam && direct && (
             <Notice tone="warn" onGrey>
-              This reads like spam. You don&apos;t have to answer it: Archive puts it away.
+              This reads like spam. You don't have to answer it: Archive puts it away.
             </Notice>
           )}
           {looksLikeSpam && !direct && (

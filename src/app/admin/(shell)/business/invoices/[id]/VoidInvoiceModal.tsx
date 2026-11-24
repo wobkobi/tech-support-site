@@ -294,7 +294,7 @@ export function VoidInvoiceModal({
           ) : (
             <>
               This invoice was sent to <span className="font-medium">{clientEmail}</span>. Notify
-              them so they don&apos;t pay the original.
+              them so they don't pay the original.
             </>
           )
         ) : (
@@ -338,8 +338,8 @@ export function VoidInvoiceModal({
         <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           This invoice has {linkedIncome.count} linked income entr
           {linkedIncome.count === 1 ? "y" : "ies"} totalling {formatNZD(linkedIncome.total)}.
-          Voiding won&apos;t reverse {linkedIncome.count === 1 ? "it" : "them"} - reverse manually
-          in the ledger.
+          Voiding won't reverse {linkedIncome.count === 1 ? "it" : "them"} - reverse manually in the
+          ledger.
         </p>
       )}
 

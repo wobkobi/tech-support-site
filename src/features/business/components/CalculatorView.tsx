@@ -1034,8 +1034,8 @@ export function CalculatorView({
 
       {dateCheckFailed && (
         <Notice tone="warn" onGrey className="mb-4" role="alert">
-          Couldn&apos;t check this date&apos;s weekend or holiday rates and promo. Check the rates
-          tick and the promo before saving.
+          Couldn't check this date's weekend or holiday rates and promo. Check the rates tick and
+          the promo before saving.
         </Notice>
       )}
 

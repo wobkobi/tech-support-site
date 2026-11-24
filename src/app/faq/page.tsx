@@ -462,7 +462,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
         title="Frequently asked questions"
         intro={
           <p>
-            Quick answers to common questions. Don&apos;t see yours?{" "}
+            Quick answers to common questions. Don't see yours?{" "}
             <Link href="/contact" className={TEXT_LINK}>
               Get in touch
             </Link>

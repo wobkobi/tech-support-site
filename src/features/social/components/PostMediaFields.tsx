@@ -208,7 +208,7 @@ export function MorePictures({
       {pictures.length > 0 && (
         <p className="text-sm text-admin-muted">
           Facebook shows the pictures as a grid and Instagram as a set to swipe through, each cut to
-          picture 1&apos;s shape. Google shows picture 1 only.
+          picture 1's shape. Google shows picture 1 only.
         </p>
       )}
     </div>

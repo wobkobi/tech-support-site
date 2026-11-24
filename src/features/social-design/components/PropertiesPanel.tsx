@@ -841,7 +841,7 @@ function TypeFields({
       return (
         <Section title="Promo">
           <p className="text-sm text-admin-text-secondary">
-            Shows the running promo&apos;s wording, so it changes when the promo does.
+            Shows the running promo's wording, so it changes when the promo does.
           </p>
           <label className="flex flex-col gap-0.5 text-sm text-admin-text-secondary">
             Shows

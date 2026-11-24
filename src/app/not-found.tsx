@@ -44,8 +44,7 @@ export default async function NotFound(): Promise<React.ReactElement> {
               Page not found
             </h1>
             <p className="mt-3 text-lg sm:text-[1.1875rem]">
-              There&apos;s no page at <RequestedPath />. It may have moved, or the link may have a
-              typo.
+              There's no page at <RequestedPath />. It may have moved, or the link may have a typo.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button href="/" variant="primary">

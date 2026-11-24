@@ -248,8 +248,8 @@ export function NotificationsView(): React.ReactElement {
       <Card className="space-y-3">
         <CardHeader title="Not supported here" className="mb-3" />
         <p className="text-admin-muted">
-          This browser can&apos;t receive push notifications. Booking and review emails still arrive
-          as normal.
+          This browser can't receive push notifications. Booking and review emails still arrive as
+          normal.
         </p>
       </Card>
     );
@@ -261,10 +261,10 @@ export function NotificationsView(): React.ReactElement {
         <CardHeader title="Add this to your Home Screen first" className="mb-3" />
         <p className="text-admin-muted">
           On iPhone, notifications only work once the admin is installed to the Home Screen. Safari
-          tabs can&apos;t receive them.
+          tabs can't receive them.
         </p>
         <ol className="list-decimal space-y-1 pl-5 text-admin-text">
-          <li>Tap the Share button in Safari (on newer iPhones it&apos;s in the ••• menu)</li>
+          <li>Tap the Share button in Safari (on newer iPhones it's in the ••• menu)</li>
           <li>
             Choose &quot;Add to Home Screen&quot;. If you see &quot;Open as Web App&quot;, leave it
             on
@@ -282,9 +282,9 @@ export function NotificationsView(): React.ReactElement {
       <Card className="space-y-3">
         <CardHeader title="Notifications are blocked" className="mb-3" />
         <p className="text-admin-muted">
-          This device declined the prompt, and it can&apos;t be asked again from the page. On
-          iPhone, turn it back on in Settings &gt; Notifications &gt; TTP Admin (or whatever you
-          named the Home Screen icon), then reload this page.
+          This device declined the prompt, and it can't be asked again from the page. On iPhone,
+          turn it back on in Settings &gt; Notifications &gt; TTP Admin (or whatever you named the
+          Home Screen icon), then reload this page.
         </p>
       </Card>
     );

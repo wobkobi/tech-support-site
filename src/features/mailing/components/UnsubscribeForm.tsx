@@ -54,10 +54,10 @@ export function UnsubscribeForm({
       {unsubscribed ? (
         <>
           <p className="text-lg font-semibold text-rich-black" role="status">
-            You&apos;re unsubscribed. You won&apos;t get any more of these emails.
+            You're unsubscribed. You won't get any more of these emails.
           </p>
           <p className="text-base text-rich-black/80">
-            You&apos;ll still get emails about your own bookings and invoices. Changed your mind?
+            You'll still get emails about your own bookings and invoices. Changed your mind?
           </p>
           <div>
             <Button variant="outline" disabled={busy} onClick={() => void change("resubscribe")}>
@@ -68,8 +68,8 @@ export function UnsubscribeForm({
       ) : (
         <>
           <p className="text-base text-rich-black/80">
-            Press the button to stop getting emails like promos and updates. You&apos;ll still get
-            emails about your own bookings and invoices.
+            Press the button to stop getting emails like promos and updates. You'll still get emails
+            about your own bookings and invoices.
           </p>
           <div>
             <Button disabled={busy} onClick={() => void change("unsubscribe")}>

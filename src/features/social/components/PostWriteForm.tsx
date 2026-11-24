@@ -217,8 +217,8 @@ export function PostWriteForm({
         {promoId && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-admin-border bg-admin-bg px-3 py-2 text-sm">
             <span>
-              Promo wording comes from <strong>{promoTitle ?? "a promo"}</strong>. It won&apos;t
-              post once that promo has ended.
+              Promo wording comes from <strong>{promoTitle ?? "a promo"}</strong>. It won't post
+              once that promo has ended.
             </span>
             {editable && (
               <AdminButton size="xs" variant="ghost" busy={unlinking} onClick={onUnlink}>
@@ -263,9 +263,8 @@ export function PostWriteForm({
 
         {!words && (
           <p className="rounded-lg border border-admin-border px-3 py-2.5 text-sm text-admin-muted">
-            {format === "story" ? "A story" : "A cover photo"} shows no words or link, so
-            they&apos;re hidden. Put any words on the picture. They come back if you switch to a
-            post.
+            {format === "story" ? "A story" : "A cover photo"} shows no words or link, so they're
+            hidden. Put any words on the picture. They come back if you switch to a post.
           </p>
         )}
 
@@ -343,15 +342,15 @@ export function PostWriteForm({
           </div>
           {format === "story" && (
             <p className="text-sm text-admin-muted">
-              A story fills a phone screen: 1080 x 1920 fits exactly. The app&apos;s own bars cover
-              the top 14% and the bottom 20%, so keep words and faces out of those strips. Add a
-              video below instead of a picture if you like.
+              A story fills a phone screen: 1080 x 1920 fits exactly. The app's own bars cover the
+              top 14% and the bottom 20%, so keep words and faces out of those strips. Add a video
+              below instead of a picture if you like.
             </p>
           )}
           {format === "cover" && (
             <p className="text-sm text-admin-muted">
               Facebook shows the cover at 1640 x 624, and phones show only its middle. The Post
-              maker&apos;s Facebook cover size fits exactly.
+              maker's Facebook cover size fits exactly.
             </p>
           )}
           {editable && design?.stale && (
@@ -359,7 +358,7 @@ export function PostWriteForm({
               role="status"
               className="flex flex-wrap items-center gap-2 rounded-lg border border-mustard-400 bg-mustard-50 px-3 py-2 text-sm text-admin-text"
             >
-              Pictures are out of date: this post doesn&apos;t show the design as it is now.
+              Pictures are out of date: this post doesn't show the design as it is now.
               <AdminButton size="xs" variant="outline" onClick={onDesign}>
                 Update pictures
               </AdminButton>
@@ -626,7 +625,7 @@ export function PostWriteForm({
                   />
                 </AdminField>
                 <p className="text-sm text-admin-muted">
-                  The Link above becomes the offer&apos;s &quot;Redeem online&quot; link.
+                  The Link above becomes the offer's &quot;Redeem online&quot; link.
                 </p>
               </>
             )}
@@ -863,12 +862,10 @@ function AppPicture({
         <>
           <p className="text-sm text-admin-text">
             {platform === "instagram" ? (
-              <>
-                Instagram only takes pictures {FIT_WORDS.instagram}, so it won&apos;t take this one.
-              </>
+              <>Instagram only takes pictures {FIT_WORDS.instagram}, so it won't take this one.</>
             ) : approved ? (
               <>
-                You&apos;ve OK&apos;d {label} cutting off the {cut} of this picture.
+                You've OK'd {label} cutting off the {cut} of this picture.
               </>
             ) : (
               <>

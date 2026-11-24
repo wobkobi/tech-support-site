@@ -196,13 +196,12 @@ export default async function Home(): Promise<React.ReactElement> {
             className="mb-4"
           />
           <p>
-            I&apos;m a computer science graduate based in Auckland. I started To the Point Tech
-            because when something breaks, people want someone who turns up and sorts it out
-            properly.
+            I'm a computer science graduate based in Auckland. I started To the Point Tech because
+            when something breaks, people want someone who turns up and sorts it out properly.
           </p>
           <p className="mt-3.5">
-            That&apos;s what I do. I&apos;ll explain what went wrong, what I did about it, and
-            whether it&apos;s worth spending money on - including when it isn&apos;t.
+            That's what I do. I'll explain what went wrong, what I did about it, and whether it's
+            worth spending money on - including when it isn't.
           </p>
           <p className="mt-5">
             <Link href="/about" className={cn(TEXT_LINK, TAP_LINK)}>
@@ -240,7 +239,7 @@ export default async function Home(): Promise<React.ReactElement> {
         </ul>
         <p className="mt-7">
           <Link href="/services" className={cn(TEXT_LINK, TAP_LINK)}>
-            See all services and what&apos;s included
+            See all services and what's included
           </Link>
         </p>
       </Section>
@@ -275,7 +274,7 @@ export default async function Home(): Promise<React.ReactElement> {
             className="mb-3"
           />
           <p className="text-seasalt-700">
-            Call me out when something breaks, or put me on a monthly retainer so it&apos;s covered
+            Call me out when something breaks, or put me on a monthly retainer so it's covered
             either way. No lock-in, and you can switch between the two whenever it suits.
           </p>
         </div>

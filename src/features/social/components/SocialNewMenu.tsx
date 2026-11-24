@@ -184,7 +184,7 @@ export function SocialNewMenu(): React.ReactElement {
                 {making === "content" ? "Starting an item..." : "Content item"}
               </span>
               <span className="block text-sm text-admin-muted">
-                A post you&apos;ll use again, with captions that take turns.
+                A post you'll use again, with captions that take turns.
               </span>
             </span>
           </button>

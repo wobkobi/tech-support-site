@@ -62,8 +62,8 @@ export function BookingEstimatePanel({
       <div className="flex flex-col gap-0.5">
         <h3 className="text-base font-semibold text-rich-black">Want a rough price first?</h3>
         <p className="text-base text-rich-black/70">
-          Press the button for a ballpark worked out from your description. It&apos;s free, takes a
-          few seconds and doesn&apos;t book anything.
+          Press the button for a ballpark worked out from your description. It's free, takes a few
+          seconds and doesn't book anything.
         </p>
         <p className="text-base text-rich-black/70">
           Rates and travel charges are on the{" "}
@@ -74,7 +74,7 @@ export function BookingEstimatePanel({
           >
             pricing page
           </Link>{" "}
-          (opens in a new tab, so you won&apos;t lose what you&apos;ve typed).
+          (opens in a new tab, so you won't lose what you've typed).
         </p>
       </div>
       <Button
@@ -107,8 +107,8 @@ export function BookingEstimatePanel({
         >
           {quoteStale && (
             <p className="mb-2 text-base font-medium text-rich-black">
-              You&apos;ve changed some details since this estimate. Press &quot;Update the
-              estimate&quot; to see a new one.
+              You've changed some details since this estimate. Press &quot;Update the estimate&quot;
+              to see a new one.
             </p>
           )}
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -129,8 +129,8 @@ export function BookingEstimatePanel({
             <p className="mt-1 text-base font-medium text-rich-black/80">{quote.surchargeNote}</p>
           )}
           <p className="mt-2 text-base text-rich-black/70">
-            This is a guide only, based on what you&apos;ve written. The final cost is confirmed
-            with you before any work starts.
+            This is a guide only, based on what you've written. The final cost is confirmed with you
+            before any work starts.
           </p>
           {/* Gate on the MIDDLE of the range, not its high end: a wide
               band like 25m-1h10m has a typical case well under an hour,

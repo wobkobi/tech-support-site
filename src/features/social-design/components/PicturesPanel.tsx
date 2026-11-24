@@ -205,7 +205,7 @@ export function PicturesPanel({
               key={f.format}
               className="flex flex-wrap items-center gap-2 text-sm text-coquelicot-700"
             >
-              {FORMATS[f.format].label} wasn&apos;t stored: {f.error}
+              {FORMATS[f.format].label} wasn't stored: {f.error}
               <AdminButton
                 size="xs"
                 variant="outline"
@@ -305,7 +305,7 @@ export function PicturesPanel({
             }}
           />
           <p className="text-sm text-admin-text-secondary">
-            Leaves contact details off the pictures (the ad&apos;s own button does that job) and
+            Leaves contact details off the pictures (the ad's own button does that job) and
             downloads at 2x.
           </p>
         </section>

@@ -284,7 +284,7 @@ async function InvoiceRail({
                 {invoice.shareToken} ↗
               </a>
             ) : (
-              <span className="text-admin-faint">Made when it&apos;s first sent</span>
+              <span className="text-admin-faint">Made when it's first sent</span>
             )}
           </InfoRow>
           <InfoRow label="Drive PDF">
@@ -371,10 +371,10 @@ export default async function InvoiceViewPage({
                 ? "An income entry matches this invoice's customer and total, but nothing is recorded against the invoice."
                 : `An income entry from "${recordedPayment.customer}" matches the amount owing and shares a name with this client. Check it's their payment.`}{" "}
             {formatNZD(recordedPayment.amount)} on {formatDateShort(recordedPayment.date)} via{" "}
-            {recordedPayment.method}. Reminders are paused until it&apos;s recorded - use Record
-            payment above
+            {recordedPayment.method}. Reminders are paused until it's recorded - use Record payment
+            above
             {recordedPayment.strength !== "linked" && " (it links that entry, no second one)"}, or
-            ignore this if it&apos;s a different job.
+            ignore this if it's a different job.
           </p>
         </div>
       )}

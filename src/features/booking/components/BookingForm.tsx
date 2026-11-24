@@ -713,9 +713,9 @@ export default function BookingForm({
             {timeLabel ? `, ${timeLabel}` : ""}
           </p>
           <p className="border border-mustard-400 bg-mustard-50 px-4 py-3 text-base text-rich-black/80">
-            This booking has already been moved the most times allowed online, so the time
-            can&apos;t be changed here. You can still update your details below. To move it, call or
-            text me{phoneLink ? <> on {phoneLink}</> : ""}.
+            This booking has already been moved the most times allowed online, so the time can't be
+            changed here. You can still update your details below. To move it, call or text me
+            {phoneLink ? <> on {phoneLink}</> : ""}.
           </p>
         </section>
       ) : (
@@ -834,8 +834,8 @@ export default function BookingForm({
         {travelDropped && meetingType === "in-person" && (
           <Notice tone="warn" role="status" className="px-4 py-3">
             <p className="text-rich-black">
-              The time you picked doesn&apos;t leave me enough travel time to get to you, so
-              I&apos;ve cleared it. The times shown now all fit your address.
+              The time you picked doesn't leave me enough travel time to get to you, so I've cleared
+              it. The times shown now all fit your address.
             </p>
             <button
               type="button"

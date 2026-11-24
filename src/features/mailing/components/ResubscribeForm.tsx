@@ -52,11 +52,11 @@ export function ResubscribeForm({
       {onList ? (
         <>
           <p className="text-lg font-semibold text-rich-black" role="status">
-            You&apos;re on my list. Thanks!
+            You're on my list. Thanks!
           </p>
           <p className="text-base text-rich-black/80">
-            You&apos;ll get the occasional email about offers, holiday hours or scam warnings. Every
-            one has an unsubscribe link if you change your mind.
+            You'll get the occasional email about offers, holiday hours or scam warnings. Every one
+            has an unsubscribe link if you change your mind.
           </p>
         </>
       ) : (

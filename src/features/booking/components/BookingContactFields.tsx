@@ -155,8 +155,7 @@ export function BookingEmailField({
       />
       {locked && (
         <p className="text-base text-rich-black/70">
-          Your email can&apos;t be changed here. If it&apos;s wrong, call or text me and I&apos;ll
-          update it.
+          Your email can't be changed here. If it's wrong, call or text me and I'll update it.
         </p>
       )}
       {contactHint && <p className="text-base text-rich-black/70">{contactHint}</p>}

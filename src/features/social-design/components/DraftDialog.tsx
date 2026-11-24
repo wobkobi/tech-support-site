@@ -130,7 +130,7 @@ export function DraftDialog({
         {room.quote && (
           <p className="text-sm text-admin-text-secondary">
             The review quote is only ever cut from words you paste in here. A review post with no
-            review words in the brief isn&apos;t written.
+            review words in the brief isn't written.
           </p>
         )}
       </div>

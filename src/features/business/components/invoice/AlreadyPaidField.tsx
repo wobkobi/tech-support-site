@@ -106,7 +106,7 @@ export function AlreadyPaidField({
       {amount > 0 &&
         (over > 0 ? (
           <p className="text-sm font-medium text-coquelicot-700" role="alert">
-            That&apos;s {formatNZD(over)} more than {totalName}.
+            That's {formatNZD(over)} more than {totalName}.
           </p>
         ) : (
           <p className="text-sm opacity-75">

@@ -262,9 +262,9 @@ export function SocialAnalyticsView({
       {!hasAny && (
         <Card>
           <p className="text-base text-admin-text">
-            No figures for these days yet. They&apos;re read every 6 hours once the stats sync is
-            running, and each post&apos;s figures an hour after it goes out. Press Refresh to read
-            them now.
+            No figures for these days yet. They're read every 6 hours once the stats sync is
+            running, and each post's figures an hour after it goes out. Press Refresh to read them
+            now.
           </p>
         </Card>
       )}
@@ -659,7 +659,7 @@ function BestTimes({ times }: { times: AnalyticsData["times"] }): React.ReactEle
       {times.counted < MIN_POSTS_FOR_TIMES ? (
         <p className="text-base text-admin-muted">
           This shows once {MIN_POSTS_FOR_TIMES} posts have figures ({times.counted} so far), so one
-          lucky post can&apos;t make a time look best.
+          lucky post can't make a time look best.
         </p>
       ) : (
         <div className="overflow-x-auto overflow-y-hidden">

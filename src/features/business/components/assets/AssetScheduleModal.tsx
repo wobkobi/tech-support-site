@@ -93,8 +93,8 @@ export function AssetScheduleModal({
     >
       {asset.vehicleMethod === "km" && (
         <Notice className="mb-4">
-          This vehicle is claimed on IRD kilometre rates, so it isn&apos;t depreciated. Its tax
-          value stays at {formatNZD(asset.costBase)}, and selling it brings nothing back as income.
+          This vehicle is claimed on IRD kilometre rates, so it isn't depreciated. Its tax value
+          stays at {formatNZD(asset.costBase)}, and selling it brings nothing back as income.
         </Notice>
       )}
       {asset.schedule.length === 0 ? (

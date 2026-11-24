@@ -308,7 +308,7 @@ export function BlockEditor({
             </AdminButton>
           )}
           <p className="ml-auto hidden text-sm text-admin-muted sm:block">
-            Alt+Up or Alt+Down moves the block you&apos;re in.
+            Alt+Up or Alt+Down moves the block you're in.
           </p>
         </div>
       )}

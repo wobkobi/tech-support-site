@@ -227,8 +227,8 @@ export default async function ServiceDetailPage({
                 {line.shortPhrase}
               </Fragment>
             ))}
-            {rateDiscounted && " with the current offer"}. I&apos;ll tell you the expected cost
-            before I start. Home visits also include travel time; the{" "}
+            {rateDiscounted && " with the current offer"}. I'll tell you the expected cost before I
+            start. Home visits also include travel time; the{" "}
             <Link href="/pricing" className={TEXT_LINK}>
               pricing page
             </Link>{" "}

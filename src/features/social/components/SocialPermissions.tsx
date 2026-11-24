@@ -56,7 +56,7 @@ export function SocialPermissions({
           description="Facebook and Instagram go by the Meta token's permissions. Google goes by whether each of its APIs answers."
         />
         {error && permissions === null && (
-          <p className="mb-3 text-sm text-admin-text-secondary">Couldn&apos;t check: {error}</p>
+          <p className="mb-3 text-sm text-admin-text-secondary">Couldn't check: {error}</p>
         )}
         {permissions && <TokenLine permissions={permissions} />}
 
@@ -94,7 +94,7 @@ export function SocialPermissions({
 
         <details className="mt-4 rounded-md border border-admin-border p-3">
           <summary className="cursor-pointer font-semibold text-admin-text">
-            Make a Meta token that doesn&apos;t run out
+            Make a Meta token that doesn't run out
           </summary>
           <ol className="mt-3 flex list-decimal flex-col gap-2 pl-5 text-base text-admin-text">
             <li>
@@ -110,9 +110,8 @@ export function SocialPermissions({
               .
             </li>
             <li>
-              Swap it for the Page&apos;s own token: in the Graph API Explorer, using the new token,
-              ask for{" "}
-              <span className="font-mono text-sm">{"<your Page id>?fields=access_token"}</span>.
+              Swap it for the Page's own token: in the Graph API Explorer, using the new token, ask
+              for <span className="font-mono text-sm">{"<your Page id>?fields=access_token"}</span>.
             </li>
             <li>
               Put that token in META_PAGE_ACCESS_TOKEN on Vercel and in .env.local, redeploy, then
@@ -120,8 +119,8 @@ export function SocialPermissions({
             </li>
           </ol>
           <p className="mt-3 text-sm text-admin-muted">
-            Comments from people outside your app and messages can also need Meta&apos;s App Review
-            and the app in Live mode.
+            Comments from people outside your app and messages can also need Meta's App Review and
+            the app in Live mode.
           </p>
         </details>
       </Card>
@@ -141,7 +140,7 @@ function TokenLine({ permissions }: { permissions: Permissions }): React.ReactEl
     if (!tokenError) return null;
     return (
       <p className="mb-3 text-sm text-admin-text-secondary">
-        Couldn&apos;t read the Meta token: {tokenError}
+        Couldn't read the Meta token: {tokenError}
       </p>
     );
   }

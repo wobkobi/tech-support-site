@@ -129,8 +129,8 @@ function LinkProblem({
           ) : (
             <>
               This link may be from an older email. I can email you fresh links to change or cancel,
-              or you can call or text me on <PhoneLink phone={phone} phoneTel={phoneTel} /> and
-              I&apos;ll sort it out.
+              or you can call or text me on <PhoneLink phone={phone} phoneTel={phoneTel} /> and I'll
+              sort it out.
             </>
           )}
         </p>
@@ -361,7 +361,7 @@ export default async function EditBookingPage({
                     <strong>
                       {changesLeft} more {changesLeft === 1 ? "time" : "times"}
                     </strong>
-                    . Changing only your details doesn&apos;t count.{" "}
+                    . Changing only your details doesn't count.{" "}
                   </>
                 )}
                 {reschedule.cutoffHours > 0 && (

@@ -50,8 +50,8 @@ export function FiledChangesNotice({
   if (unreadable) {
     return (
       <Notice tone="warn" className="mb-6">
-        This year&apos;s filed figures couldn&apos;t be read, so these are fresh figures. Unfile and
-        file it again to save them.
+        This year's filed figures couldn't be read, so these are fresh figures. Unfile and file it
+        again to save them.
       </Notice>
     );
   }

@@ -47,7 +47,7 @@ export default function Reviews({ items }: { items: ReviewItem[] }): React.React
                   scroll={false}
                   className="text-base font-bold text-coquelicot-700 underline underline-offset-4"
                 >
-                  Read more
+                  Read more<span className="sr-only"> of {r.name}'s review</span>
                 </Link>
               )}
             </figcaption>

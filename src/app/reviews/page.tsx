@@ -71,7 +71,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
           { name: "Reviews", path: "/reviews" },
         ]}
         title="What clients say"
-        intro={<p>Feedback from people I&apos;ve helped.</p>}
+        intro={<p>Feedback from people I've helped.</p>}
         action={
           <Button
             href={GOOGLE_BUSINESS_PROFILE_URL}
@@ -92,14 +92,14 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
             <Link href="/booking" className={TEXT_LINK}>
               Book an appointment
             </Link>{" "}
-            and you&apos;ll get a review link after your visit.
+            and you'll get a review link after your visit.
           </p>
         </Section>
       ) : (
         <Section aria-label="Client reviews">
           <ReviewsList reviews={normalisedRows} />
           <p className="mt-8 text-seasalt-700">
-            Had an appointment? You&apos;ll receive a review link by email after your visit.
+            Had an appointment? You'll receive a review link by email after your visit.
           </p>
         </Section>
       )}
