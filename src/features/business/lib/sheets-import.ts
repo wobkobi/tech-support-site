@@ -784,7 +784,7 @@ const HELD_REASON_TEXT: Record<NonNullable<DeletionReportRow["held"]>, string> =
   recent: "written in the last two hours",
   "half-edited": "its Sheet row is half-filled",
   "invoice-payment":
-    "it's the payment record of a paid invoice - mark the invoice unpaid or void it to remove it",
+    "it's linked to an invoice's payment - delete it from the Income page if it really should go",
 };
 
 /**
