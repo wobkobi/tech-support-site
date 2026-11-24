@@ -1733,4 +1733,6 @@ model AdminSignIn {
 
   @@index([at])
   @@index([sessionId])
+  // The daily cap on failed attempts per IP.
+  @@index([ip, at])
 }
