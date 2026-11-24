@@ -408,7 +408,8 @@ export default async function InvoiceViewPage({
             sentAt={invoice.sentAt?.toISOString() ?? null}
             paidAt={invoice.paidAt?.toISOString() ?? null}
             linkedIncome={linkedIncome}
-            autoOpenSend={send === "1"}
+            // Only a draft opens it: a sent one reopened from history must not offer to send again.
+            autoOpenSend={send === "1" && invoice.status === "DRAFT"}
             isOverdue={isInvoiceOverdue(invoice)}
             reminderCount={invoice.reminderCount}
             reminderLastSentAt={invoice.reminderLastSentAt?.toISOString() ?? null}
