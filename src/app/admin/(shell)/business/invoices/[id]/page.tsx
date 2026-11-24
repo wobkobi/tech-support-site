@@ -13,6 +13,7 @@ import {
   balanceDue,
   formatNZD,
   goldCardLineLabel,
+  lineItemPriceLabel,
   lineItemQtyLabel,
   promoLineLabel,
   quoteAcceptLine,
@@ -552,7 +553,7 @@ export default async function InvoiceViewPage({
                     {lineItemQtyLabel(item)}
                   </td>
                   <td className="px-2 py-2 text-right align-top whitespace-nowrap text-slate-700 sm:px-3">
-                    {formatNZD(item.unitPrice)}
+                    {lineItemPriceLabel(item)}
                   </td>
                   <td className="px-2 py-2 text-right align-top font-bold whitespace-nowrap text-slate-800 sm:px-3">
                     {formatNZD(item.lineTotal)}

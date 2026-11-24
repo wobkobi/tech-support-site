@@ -5,6 +5,7 @@
 import {
   formatNZD,
   goldCardLineLabel,
+  lineItemPriceLabel,
   lineItemQtyLabel,
   promoLineLabel,
   quoteAcceptLine,
@@ -458,7 +459,8 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
   const COL = {
     desc: MARGIN,
     qty: MARGIN + CONTENT_W * 0.61,
-    price: MARGIN + CONTENT_W * 0.76,
+    // Wide enough for "$100.00/hr" on hourly rows.
+    price: MARGIN + CONTENT_W * 0.73,
     total: MARGIN + CONTENT_W * 0.87,
   };
   const ROW_H = 28;
@@ -533,7 +535,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
       color: DARK,
     });
 
-    const priceStr = formatNZD(item.unitPrice);
+    const priceStr = lineItemPriceLabel(item);
     ctx.page.drawText(priceStr, {
       x: COL.total - ctx.font.widthOfTextAtSize(priceStr, CELL_SIZE) - 4,
       y: firstBaselineY,

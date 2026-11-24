@@ -76,6 +76,18 @@ export function lineItemQtyLabel(item: { qty: number; minutes?: number | null })
 }
 
 /**
+ * Price column text for one invoice line: an hourly labour row reads "$100.00/hr", so "0:45"
+ * next to it isn't mistaken for a count of 0.45; a flat row is the plain amount.
+ * @param item - Invoice line item.
+ * @param item.unitPrice - Hourly rate on labour rows, unit price on flat rows.
+ * @param item.minutes - Billed minutes; present only on hourly labour rows.
+ * @returns Text for the Price cell.
+ */
+export function lineItemPriceLabel(item: { unitPrice: number; minutes?: number | null }): string {
+  return item.minutes == null ? formatNZD(item.unitPrice) : `${formatNZD(item.unitPrice)}/hr`;
+}
+
+/**
  * Converts a duration in minutes to a human-readable label.
  * @param mins - Duration in minutes
  * @returns Formatted label (e.g. "1h 30min")
