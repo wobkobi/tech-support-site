@@ -14,7 +14,12 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { resolveAddress } from "@/shared/lib/normalise-address";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
-import { normaliseContactPhone, storedPhoneForms, toE164NZ } from "@/shared/lib/normalise-phone";
+import {
+  isNZMobileKey,
+  normaliseContactPhone,
+  storedPhoneForms,
+  toE164NZ,
+} from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -107,8 +112,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Two saves at once both miss and both create. Recheck now: the oldest live match wins and
   // the newer twin is removed, so both requests answer with the same contact.
-  if (created) {
-    const key = byPhone ? normaliseContactPhone(phoneE164) : null;
+  // A landline isn't rechecked: it is meant to get its own contact even when shared.
+  const recheckKey = byPhone ? normaliseContactPhone(phoneE164) : null;
+  if (created && (!byPhone || isNZMobileKey(recheckKey))) {
+    const key = recheckKey;
     const forms = key ? storedPhoneForms(key) : [];
     const oldest = await prisma.contact.findFirst({
       where: {

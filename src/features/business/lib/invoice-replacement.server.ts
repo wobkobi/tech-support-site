@@ -105,8 +105,11 @@ export async function resolveReplacedInvoice(args: {
     select: { number: true },
     take: 5,
   });
+  // Any replacement counts here, voided or not: INV-1 > INV-2 (voided) > INV-3 leaves INV-1
+  // replaced, and only INV-2 is still open for a new bill to take.
   for (const c of candidates) {
-    if (!(await findLiveReplacement(c.number))) return { ok: true, number: c.number };
+    const replaced = await prisma.invoice.count({ where: { replacesNumber: c.number } });
+    if (replaced === 0) return { ok: true, number: c.number };
   }
   return { ok: true, number: null };
 }

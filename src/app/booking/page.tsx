@@ -288,11 +288,12 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     <div className="flex flex-col gap-5">
       {sameDayClosed && (
         <div className="border border-moonstone-500/40 bg-moonstone-400/10 p-4 text-rich-black">
-          {/* The notice changes with where I am, so only the fixed cut-off is named as a reason. */}
+          {/* Today can be closed by notice, bookings or blocks, so only the fixed cut-off is
+              named as a reason. */}
           <p className="text-base">
             {cutoffPassed && sameDayCutoffHour !== null
               ? `Same-day bookings are closed for today (${hourLabel(sameDayCutoffHour)} cut-off).`
-              : "Same-day times depend on where I am, and there's no time left today that I can get to you."}{" "}
+              : "There are no times left today."}{" "}
             The earliest available time is tomorrow.
           </p>
         </div>
