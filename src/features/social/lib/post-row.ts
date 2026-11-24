@@ -2,6 +2,7 @@
 // Plain-data social post shape for the server > client boundary and the social API.
 
 import { formatOf, type MediaItem, type SocialFormatKey } from "@/features/social/lib/media";
+import { neverWentUp } from "@/features/social/lib/targets";
 import { dateKey, type GooglePostCta, type GooglePostType } from "@/features/social/lib/validate";
 import type { SocialMedia, SocialPost } from "@prisma/client";
 
@@ -47,6 +48,8 @@ export interface SocialPostRow {
   tagIds: string[];
   isPreset: boolean;
   status: SocialPostStatus;
+  /** A failed post no app has any part of, which can go back to a draft (the server's check). */
+  canReopen: boolean;
   scheduledAt: string | null;
   postedAt: string | null;
   promoId: string | null;
@@ -120,6 +123,7 @@ export function toPostRow(p: SocialPost): SocialPostRow {
     tagIds: p.tagIds ?? [],
     isPreset: p.isPreset,
     status: p.status,
+    canReopen: p.status === "failed" && neverWentUp(p.targets),
     scheduledAt: p.scheduledAt?.toISOString() ?? null,
     postedAt: p.postedAt?.toISOString() ?? null,
     promoId: p.promoId,
