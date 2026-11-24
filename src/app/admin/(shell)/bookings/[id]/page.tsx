@@ -345,6 +345,7 @@ export default async function BookingDetailPage({
             endAt={booking.endAt.toISOString()}
             lockHours={settings.scheduling.pastEditLockHours}
             calendarEventId={booking.calendarEventId}
+            hasEmail={!!booking.email}
             phone={booking.phone || null}
             address={meetingType === "remote" ? null : booking.address || null}
             invoiceId={liveInvoice?.id ?? null}

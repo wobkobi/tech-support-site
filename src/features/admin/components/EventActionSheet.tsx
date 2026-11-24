@@ -177,11 +177,13 @@ export function EventActionSheet({
         />
       </div>
     ) : pending?.target.kind === "cancel" ? (
-      // Deleting the Google event is the only cancellation notice the customer gets.
       <div className="flex flex-col gap-2">
         <p>{pending.body}</p>
         <p className="font-medium text-admin-text">
-          Google Calendar emails the customer that the visit is cancelled.
+          {/* The site's own email only goes out for a visit still to come. */}
+          {isPast
+            ? "Google Calendar emails the customer that the visit is cancelled."
+            : "The customer gets a cancellation email, and Google Calendar removes the visit from their calendar."}
         </p>
       </div>
     ) : (
