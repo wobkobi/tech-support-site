@@ -55,8 +55,10 @@ export async function revokeSession(rowId: string): Promise<boolean> {
 
 /**
  * Signs out every session except the caller's. Moves the cutoff to now, which ends every cookie
- * (logged or not), then gives the caller a fresh cookie issued at the cutoff second, which
+ * (logged or not), and gives the caller a fresh cookie issued at the cutoff second, which
  * passes because the check is strictly "issued before". The caller's log row takes the new id.
+ * The cutoff moves last: should an earlier write fail, the caller's current cookie still works
+ * and the route never got to set the new one.
  * @param currentCookie - The caller's verified session cookie.
  * @returns The replacement cookie value for the caller and when it expires.
  */
@@ -70,20 +72,24 @@ export async function revokeAllOtherSessions(
   const fresh = readSessionPayload(cookieValue);
   const expiresAt = new Date(now.getTime() + ADMIN_SESSION_MAX_AGE_SECONDS * 1000);
 
-  await prisma.setting.upsert({
-    where: { key: CUTOFF_KEY },
-    create: { key: CUTOFF_KEY, value: String(cutoff) },
-    update: { value: String(cutoff) },
-  });
-  await prisma.adminSignIn.updateMany({
-    where: { outcome: "ok", signedOutAt: null, sessionId: { not: current?.id ?? "" } },
-    data: { signedOutAt: now },
-  });
   if (current && fresh) {
     await prisma.adminSignIn.updateMany({
       where: { sessionId: current.id },
       data: { sessionId: fresh.id, expiresAt, lastSeenAt: now },
     });
   }
+  await prisma.adminSignIn.updateMany({
+    where: {
+      outcome: "ok",
+      signedOutAt: null,
+      sessionId: { notIn: [current?.id, fresh?.id].filter((id) => id !== undefined) },
+    },
+    data: { signedOutAt: now },
+  });
+  await prisma.setting.upsert({
+    where: { key: CUTOFF_KEY },
+    create: { key: CUTOFF_KEY, value: String(cutoff) },
+    update: { value: String(cutoff) },
+  });
   return { cookieValue, expiresAt };
 }
