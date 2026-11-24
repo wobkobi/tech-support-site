@@ -329,14 +329,17 @@ export function askPersonStatus(
     if (input.hasPhone) return "text_only";
     return input.mailingOptOut ? "mailing_opt_out" : "no_details";
   }
-  if (hadGoogleAsk(input.lastAskedAt)) return "google_asked";
-  if (input.reviewed) return "reviewed";
+  // Before google_asked: every ask inside the gap is a Google ask, so checked after, `recent`
+  // could never show. A review on file still outranks it.
   if (
+    !input.reviewed &&
     gapDays > 0 &&
     input.lastAskedAt &&
     now.getTime() - input.lastAskedAt.getTime() < gapDays * DAY_MS
   ) {
     return "recent";
   }
+  if (hadGoogleAsk(input.lastAskedAt)) return "google_asked";
+  if (input.reviewed) return "reviewed";
   return "ready";
 }

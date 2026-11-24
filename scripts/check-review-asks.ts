@@ -399,6 +399,11 @@ function main(): void {
     "google_asked",
   );
   expectEqual(
+    "a Google ask inside the gap is recent",
+    askPersonStatus(person({ lastAskedAt: new Date("2027-01-05T00:00:00Z") }), 30, pastSwitch),
+    "recent",
+  );
+  expectEqual(
     "Google ask outranks reviewed",
     askPersonStatus(person({ reviewed: true, lastAskedAt: GOOGLE_ASKS_FROM }), 30, pastSwitch),
     "google_asked",
