@@ -351,7 +351,7 @@ export default async function InvoiceViewPage({
     invoice.status === "SENT" && !invoice.isQuote ? await findRecordedPayment(invoice) : null;
   // A paid or voided invoice asks for nothing, so its box says so instead of the bank details.
   const replacedBy = invoice.status === "VOIDED" ? await findLiveReplacement(invoice.number) : null;
-  const settled = settledCallout(invoice);
+  const settled = settledCallout(invoice, replacedBy?.number ?? null);
   const quoteLines = quoteCalloutLines(invoice.lineItems, invoice.quoteValidUntil);
 
   return (

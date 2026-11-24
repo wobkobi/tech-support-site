@@ -249,10 +249,13 @@ export function settlementRows(invoice: SettlementSource): SettlementRow[] {
 /**
  * The box that takes the bank details' place once nothing is owed.
  * @param invoice - The invoice's status and dates.
+ * @param replacedByNumber - Live invoice that replaced a voided one, named so the customer
+ *   knows which one to pay; null when nothing replaced it.
  * @returns Heading and line, or null while the invoice still asks for payment.
  */
 export function settledCallout(
   invoice: SettlementSource,
+  replacedByNumber: string | null = null,
 ): { heading: string; text: string } | null {
   if (invoice.status === "PAID") {
     return {
@@ -263,11 +266,14 @@ export function settledCallout(
     };
   }
   if (invoice.status === "VOIDED") {
+    const when = invoice.voidedAt
+      ? `was voided on ${formatDateShort(invoice.voidedAt)}`
+      : "has been voided";
     return {
       heading: "Voided",
-      text: invoice.voidedAt
-        ? `This invoice was voided on ${formatDateShort(invoice.voidedAt)}, so there's nothing to pay.`
-        : "This invoice has been voided, so there's nothing to pay.",
+      text: replacedByNumber
+        ? `This invoice ${when} and replaced by ${replacedByNumber}. There's nothing to pay on this one.`
+        : `This invoice ${when}, so there's nothing to pay.`,
     };
   }
   return null;
