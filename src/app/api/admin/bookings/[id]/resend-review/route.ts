@@ -3,6 +3,7 @@
 
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { sendReviewAsk } from "@/features/reviews/lib/email-review-ask";
+import { isRemoteBooking } from "@/features/reviews/lib/review-ask-job-type.server";
 import { reviewAskBlockedBy } from "@/features/reviews/lib/review-ask-opt-out";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -31,7 +32,14 @@ export async function POST(
 
   const booking = await prisma.booking.findUnique({
     where: { id },
-    select: { id: true, name: true, email: true, reviewToken: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      reviewToken: true,
+      meetingType: true,
+      notes: true,
+    },
   });
 
   if (!booking) {
@@ -60,6 +68,7 @@ export async function POST(
     firstName: booking.name.split(" ")[0] ?? "",
     contactId: contact.id,
     reviewToken: booking.reviewToken,
+    remote: isRemoteBooking(booking),
   });
   if (result === "not_configured") {
     return errorResponse("Email isn't set up, so nothing was sent.", 503);

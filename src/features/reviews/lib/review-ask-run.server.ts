@@ -6,6 +6,7 @@ import { ensureContactReviewToken } from "@/features/business/lib/contact-review
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
 import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
 import { sendReviewAsk } from "@/features/reviews/lib/email-review-ask";
+import { isRemoteInvoiceJob } from "@/features/reviews/lib/review-ask-job-type.server";
 import {
   loadReviewAskCandidates,
   type ReviewAskCandidate,
@@ -182,12 +183,17 @@ async function sendOne(
     return "failed";
   }
 
+  const billed = await prisma.invoice.findUnique({
+    where: { id: invoice.id },
+    select: { bookingId: true, lineItems: { select: { description: true } } },
+  });
   const result = await sendReviewAsk(
     {
       to: address,
       firstName: invoiceRecipient(invoice.clientName, contact).greetingName,
       contactId: contact.id,
       reviewToken,
+      remote: billed ? await isRemoteInvoiceJob(billed) : false,
     },
     // One key per invoice: a retry after an interrupted run is a no-op at Resend.
     `review-ask:${invoice.id}`,
