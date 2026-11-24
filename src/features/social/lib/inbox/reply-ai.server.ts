@@ -384,11 +384,16 @@ async function recentReviewReplies(): Promise<string[]> {
  * @returns The suggestion; an empty reply with hide set for spam.
  */
 export async function suggestReply(req: ReplyRequest): Promise<ReplySuggestion> {
-  const [settings, facts, recent] = await Promise.all([
+  const [settings, facts, replies] = await Promise.all([
     getSettings(),
     loadBusinessFacts(),
     req.kind === "review" ? recentReviewReplies() : [],
   ]);
+  // A reply already on this review is in `earlier`; as a "recent reply" it would steer the new
+  // suggestion away from the very reply being redone.
+  // A prefix match, since the request cuts long text.
+  const ours = req.earlier.filter((m) => m.fromUs && m.text.trim()).map((m) => m.text.trim());
+  const recent = replies.filter((r) => !ours.some((o) => r.trim().startsWith(o)));
   const { name, company, location, phone } = settings.identity;
   const who = `${name}, who runs ${company}${location ? ` in ${location}` : ""}`;
   const { text } = await jsonCompletion({
@@ -405,6 +410,7 @@ export async function suggestReply(req: ReplyRequest): Promise<ReplySuggestion> 
     ],
     user: userMessage(req, recent),
     maxTokens: 400,
+    // OpenAI only: Claude rejects a set temperature, so varietyLines does that job there.
     temperature: 0.9,
     timeoutMs: 20_000,
     maxRetries: 0,
