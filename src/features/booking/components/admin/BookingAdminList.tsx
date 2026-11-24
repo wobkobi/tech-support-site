@@ -26,6 +26,7 @@ import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { lastCardSpan, StatStrip } from "@/features/admin/components/ui/StatStrip";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { StickyList } from "@/features/admin/components/ui/StickyList";
+import { useNowMinute } from "@/features/admin/hooks/use-now-minute";
 import { type PageQuery, queryValue, useQuerySync } from "@/features/admin/hooks/use-query-sync";
 import { useShowMore } from "@/features/admin/hooks/use-show-more";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
@@ -106,6 +107,7 @@ export function BookingAdminList({
   query: PageQuery;
 }): React.ReactElement {
   const actions = useBookingActions();
+  const nowMs = useNowMinute();
   const [bookings, setBookings] = useState<AdminBookingRow[]>(initial);
   // Default to confirmed, or everything when nothing is confirmed.
   const [defaultFilter] = useState<StatusFilter>(() =>
@@ -229,7 +231,11 @@ export function BookingAdminList({
    */
   function renderActions(b: AdminBookingRow): React.ReactElement {
     const isBusy = busyId === b.id;
-    const reviewable = b.status === "confirmed" || b.status === "completed";
+    // Only once the visit is over (hidden until the clock is read); the route refuses earlier asks too.
+    const reviewable =
+      (b.status === "confirmed" || b.status === "completed") &&
+      nowMs !== null &&
+      new Date(b.endAt).getTime() <= nowMs;
     return (
       <>
         {b.status === "confirmed" && (

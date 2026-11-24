@@ -39,11 +39,17 @@ export async function POST(
       reviewToken: true,
       meetingType: true,
       notes: true,
+      endAt: true,
+      status: true,
     },
   });
 
   if (!booking) {
     return errorResponse("Booking not found.", 404);
+  }
+  // Thanking someone for a visit that hasn't happened reads as a mistake.
+  if (booking.status === "cancelled" || booking.endAt > new Date()) {
+    return errorResponse("Review requests go out after the visit, not before.", 409);
   }
   if (!booking.email) {
     return errorResponse("Booking has no email to send a review request to.", 400);
