@@ -7,6 +7,7 @@ import {
   bookingWindowEnd,
   buildAvailableDays,
   CALENDAR_EVENT_PRESENT_FILTER,
+  isRemoteBooking,
   type AvailabilityConfig,
 } from "@/features/booking/lib/booking";
 import {
@@ -202,7 +203,7 @@ export async function loadTravelTimeline(
     [...bookings.map((b) => b.calendarEventId), exclude.eventId].filter(Boolean),
   );
   return buildTravelTimeline({
-    bookings: bookings.filter((b) => b.meetingType !== "remote"),
+    bookings: bookings.filter((b) => !isRemoteBooking(b)),
     events: calendar.events.filter((e) => !e.allDay && !skipEventIds.has(e.id)),
     personalCalId: process.env.PERSONAL_CALENDAR_ID ?? "",
     homeAddress: identity.baseAddress.line || process.env.HOME_ADDRESS || "",

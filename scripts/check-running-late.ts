@@ -161,17 +161,22 @@ expect("200 m north is within 300 m", distanceM(home, { lat: -36.8687, lng: 174.
 expect("Papakura is far from Pt Chev", distanceM(home, { lat: -37.0657, lng: 174.9439 }) > 20_000);
 expect(
   "leave-by 15 min out with a 10 min lead waits",
-  !shouldRemindLeave(now + 15 * MIN, now, 10, -15, 5),
+  !shouldRemindLeave(now + 15 * MIN, now, 10, -15, 5, 20),
 );
-expect("leave-by 8 min out reminds", shouldRemindLeave(now + 8 * MIN, now, 10, -8, 5));
+expect("leave-by 8 min out reminds", shouldRemindLeave(now + 8 * MIN, now, 10, -8, 5, 20));
 expect(
   "a passed leave-by still reminds before the threshold",
-  shouldRemindLeave(now - 2 * MIN, now, 10, 2, 5),
+  shouldRemindLeave(now - 2 * MIN, now, 10, 2, 5, 20),
 );
 expect(
   "already late is the running-late push's job",
-  !shouldRemindLeave(now - 6 * MIN, now, 10, 6, 5),
+  !shouldRemindLeave(now - 6 * MIN, now, 10, 6, 5, 20),
 );
+expect(
+  "a 2 min drive means you're already there",
+  !shouldRemindLeave(now + 8 * MIN, now, 10, -8, 5, 2),
+);
+expect("a 3 min drive still reminds", shouldRemindLeave(now + 8 * MIN, now, 10, -8, 5, 3));
 expectEqual(
   "leave reminder body",
   leaveReminderText("Jane Smith", nz(14, 30), nz(13, 58), 32, nz(13, 50)).body,
@@ -201,6 +206,10 @@ expect(
 expect("a job inside the grace isn't", !phoneWentQuiet(nz(9), nz(13), jobAt(nz(9, 20)), homeLine));
 expect("a job not started yet isn't", !phoneWentQuiet(nz(9), nz(13), jobAt(nz(14)), homeLine));
 expect("a job at home isn't", !phoneWentQuiet(nz(9), nz(13), jobAt(nz(11), homeLine), homeLine));
+expect(
+  "home written another way isn't",
+  !phoneWentQuiet(nz(9), nz(13), jobAt(nz(11), "Home\n1 Home St, Auckland 1022"), homeLine),
+);
 expectEqual(
   "quiet text, same day",
   phoneQuietText(nz(9, 12), nz(13)).body,

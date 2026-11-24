@@ -25,7 +25,9 @@ interface RefreshResult {
 // settings travel-round buffer (e.g. with +10: 14 > 25, 30 > 40, 60 > 70).
 const TRAVEL_ROUND_INCREMENT_MIN = 5;
 
-// Forward window for chaining a travel-back leg into the next event's travel-to.
+// Forward window for chaining a travel-back leg into the next event's travel-to, counted from
+// the real end. A booking adds its departure buffer on top, so the window still reaches 2h past
+// when you'd actually leave.
 const RETURN_CHAINING_LOOKAHEAD_MS = 2 * 60 * 60 * 1000;
 
 // A cache row's TTL: twice the 30-minute cron, so one late or missed run doesn't expire the
@@ -157,24 +159,29 @@ function findSmartOrigin(
 }
 
 /**
- * Forward-looking counterpart to {@link findSmartOrigin}. Returns the soonest
- * upcoming located event starting within {@link RETURN_CHAINING_LOOKAHEAD_MS} of the
- * current event's end, skipping any calendar in `excludeCalendarEmails`. Measured from the
- * real end, not the wind-down buffer: a job starting inside that buffer (or right at the
- * end) is the clearest chain of all, and missing it left a trip home between back-to-back jobs.
+ * Forward-looking counterpart to {@link findSmartOrigin}. Returns the soonest located event
+ * starting after the current one starts and within {@link RETURN_CHAINING_LOOKAHEAD_MS} plus
+ * `bufferMin` of its end, skipping any calendar in `excludeCalendarEmails`. Measured from the
+ * real end, not the wind-down buffer: a job starting inside that buffer, at the end, or even
+ * overlapping the current one is the clearest chain of all, and missing it left a trip home
+ * between back-to-back jobs.
  * @param allEvents - All calendar events in the current window.
  * @param currentEvent - The event being left.
  * @param eventEnd - The current event's end.
+ * @param bufferMin - The current event's departure buffer, which widens the window.
  * @param excludeCalendarEmails - Calendars that must never be chained into.
  * @returns The candidate next event with its location and start, or null.
  */
-function findNextChainedEvent(
+export function findNextChainedEvent(
   allEvents: CalendarEvent[],
   currentEvent: CalendarEvent,
   eventEnd: Date,
+  bufferMin: number,
   excludeCalendarEmails?: Set<string>,
 ): { event: CalendarEvent; location: string; startAt: Date } | null {
   const departMs = eventEnd.getTime();
+  const currentStartMs = new Date(currentEvent.start).getTime();
+  const lookaheadMs = RETURN_CHAINING_LOOKAHEAD_MS + bufferMin * 60_000;
 
   let best: CalendarEvent | null = null;
   let bestLoc: string | null = null;
@@ -188,7 +195,8 @@ function findNextChainedEvent(
     if (!loc) continue;
     const startAt = new Date(e.start);
     const gap = startAt.getTime() - departMs;
-    if (gap >= 0 && gap <= RETURN_CHAINING_LOOKAHEAD_MS && gap < bestGap) {
+    // A negative gap is an overlap: still the next job, as long as it starts after this one.
+    if (startAt.getTime() > currentStartMs && gap <= lookaheadMs && gap < bestGap) {
       best = e;
       bestLoc = loc;
       bestStart = startAt;
@@ -423,7 +431,13 @@ export async function refreshCalendarCache(options?: {
     // custom back destination.
     const nextEvent = hasCustomBackDestination
       ? null
-      : findNextChainedEvent(timedEvents, event, eventEnd, new Set<string>());
+      : findNextChainedEvent(
+          timedEvents,
+          event,
+          eventEnd,
+          isBookingEvent ? scheduling.travelBackDepartureBufferMin : 0,
+          new Set<string>(),
+        );
     // A personal event never chains into a job: the trip home always stands.
     const chained =
       isPersonalEvent && nextEvent?.event.calendarEmail === bookingCalId ? null : nextEvent;

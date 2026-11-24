@@ -1,10 +1,11 @@
 // scripts/check-calendar-events.ts
 // Google event > CalendarEvent mapping: an all-day block keeps its full NZ-day span for the
 // booking engine and is flagged allDay, so job lists (Today's jobs, the event picker,
-// travel) can skip it.
+// travel) can skip it. Also which next event a job's trip home chains into.
 // Run with: npm test -- calendar-events
 
-import { toCalendarEvent } from "@/features/calendar/lib/google-calendar";
+import { findNextChainedEvent } from "@/features/calendar/lib/calendar-cache";
+import { toCalendarEvent, type CalendarEvent } from "@/features/calendar/lib/google-calendar";
 import { expectEqual, finish } from "./lib/harness.js";
 
 const CAL = "booking@group.calendar.google.com";
@@ -93,6 +94,47 @@ function main(): void {
     ),
     null,
   );
+
+  console.log("\nTrip home chaining:");
+  /**
+   * A located event from NZ hours on 20 Nov 2026 (NZDT, UTC+13).
+   * @param id - Event id.
+   * @param from - Start hour (fractional for minutes).
+   * @param to - End hour.
+   * @returns The event.
+   */
+  const ev = (id: string, from: number, to: number): CalendarEvent => {
+    /**
+     * ISO instant for an NZ hour that day.
+     * @param h - NZ hour (fractional for minutes).
+     * @returns The ISO string.
+     */
+    const at = (h: number): string =>
+      new Date(Date.UTC(2026, 10, 20, 0, (h - 13) * 60)).toISOString();
+    return {
+      id,
+      start: at(from),
+      end: at(to),
+      location: `${id} Road`,
+      calendarEmail: CAL,
+      allDay: false,
+    };
+  };
+  const job = ev("a", 9, 10);
+  const end = new Date(job.end);
+  /**
+   * Id of the event the job's trip home chains into, with a 30 min departure buffer.
+   * @param next - The candidate events after the job.
+   * @returns The chained event's id, or null.
+   */
+  const chainedId = (...next: CalendarEvent[]): string | null =>
+    findNextChainedEvent([job, ...next], job, end, 30)?.event.id ?? null;
+  expectEqual("a job 2h after the end chains", chainedId(ev("b", 12, 13)), "b");
+  expectEqual("2h 30m chains with the departure buffer", chainedId(ev("b", 12.5, 13)), "b");
+  expectEqual("2h 45m doesn't", chainedId(ev("b", 12.75, 14)), null);
+  expectEqual("an overlapping job chains", chainedId(ev("b", 9.75, 11)), "b");
+  expectEqual("the overlap beats a later one", chainedId(ev("c", 11, 12), ev("b", 9.75, 11)), "b");
+  expectEqual("one that started earlier doesn't", chainedId(ev("b", 8.5, 9.5)), null);
 
   finish();
 }

@@ -23,6 +23,15 @@ export function getBookingCalendarId(): string {
 }
 
 /**
+ * The Work calendar (CAR_CALENDAR_ID is the older env name). It holds family events now, which
+ * block booking slots but aren't trips you make.
+ * @returns The calendar id, or "" when none is configured.
+ */
+export function getWorkCalendarId(): string {
+  return process.env.WORK_CALENDAR_ID ?? process.env.CAR_CALENDAR_ID ?? "";
+}
+
+/**
  * Configured calendar IDs from env. Explicit IDs stop subscribed calendars
  * (Holidays, Birthdays) from blocking booking slots.
  * @returns Array of calendar ID strings.
@@ -30,8 +39,7 @@ export function getBookingCalendarId(): string {
 function fetchAccessibleCalendarIds(): string[] {
   const ids = [
     process.env.BOOKING_CALENDAR_ID,
-    // Work calendar; CAR_CALENDAR_ID is accepted as an alternative env name.
-    process.env.WORK_CALENDAR_ID ?? process.env.CAR_CALENDAR_ID,
+    getWorkCalendarId(),
     process.env.PERSONAL_CALENDAR_ID,
   ].filter((id): id is string => Boolean(id));
   return ids.length > 0 ? ids : ["primary"];
