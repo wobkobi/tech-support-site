@@ -4,6 +4,7 @@
 
 import { sendOverdueReminder } from "@/features/business/lib/invoice-reminders";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
+import { parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -25,7 +26,8 @@ export async function POST(
     return errorResponse("Unauthorized", 401);
   }
 
-  const { id } = await params;
+  const id = parseObjectId((await params).id);
+  if (!id) return errorResponse("Invoice not found", 404);
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) return errorResponse("Invoice not found", 404);
 
