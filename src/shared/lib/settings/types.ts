@@ -50,8 +50,12 @@ export interface AvailabilitySettings {
   schedule: WeeklySchedule;
   /** How many days ahead a customer can book. Required, clamped 1-365. */
   maxAdvanceDays: number;
-  /** Minimum hours of notice. 0 = no minimum. */
+  /** Minimum hours of notice while at home or with no usable phone location. 0 = no minimum. */
   minHoursNotice: number;
+  /** While on a job: minutes after it ends before the next customer's drive can start. */
+  gapAfterJobMin: number;
+  /** While out and not on a job: hours of notice on top of the drive back from where you are. */
+  noticeWhileOutHours: number;
   /** After this NZ hour same-day booking closes. null = no same-day cutoff. */
   sameDayCutoffHour: number | null;
   /** Buffer applied around existing calendar events (minutes). */

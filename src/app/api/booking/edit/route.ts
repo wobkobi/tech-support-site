@@ -20,7 +20,10 @@ import {
 import { bookingEventSummary } from "@/features/booking/lib/booking-event.server";
 import { confirmationCoversReminder } from "@/features/booking/lib/booking-reminder";
 import { travelVerdictMessage } from "@/features/booking/lib/booking-travel";
-import { travelVerdictForSlot } from "@/features/booking/lib/booking-travel.server";
+import {
+  travelVerdictForSlot,
+  withCustomerNotice,
+} from "@/features/booking/lib/booking-travel.server";
 import {
   loadBlockingBookings,
   loadBlockingEvents,
@@ -234,7 +237,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         existingForValidation,
         calendarEvents,
         now,
-        config,
+        await withCustomerNotice(now, config),
       );
       if (!validation.valid) {
         return errorResponse(validation.error, 400);

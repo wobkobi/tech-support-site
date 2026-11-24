@@ -1,7 +1,7 @@
 // src/features/booking/lib/booking-travel.server.ts
 // Loads the day's located commitments (and, for slots today, the ring around home your phone is
 // in) and prices the drives around a new in-person booking, for the booking grid's address check
-// and the submit-time re-check.
+// and the submit-time re-check. Also works out the customer notice for right now.
 
 import {
   bookingWindowEnd,
@@ -13,17 +13,22 @@ import {
   buildTravelTimeline,
   legMinutes,
   locationRing,
+  noticeMinutes,
   slotTravelLegs,
   travelLegKey,
   travelVerdict,
   type CurrentSpot,
+  type NoticeState,
   type SlotTravelLegs,
   type TravelBlockedSlot,
   type TravelCommitment,
   type TravelLeg,
   type TravelVerdict,
 } from "@/features/booking/lib/booking-travel";
-import { fetchAllCalendarEventsDetailed } from "@/features/calendar/lib/google-calendar";
+import {
+  fetchAllCalendarEventsDetailed,
+  getBookingCalendarId,
+} from "@/features/calendar/lib/google-calendar";
 import { distanceM, isUsableLocation } from "@/features/calendar/lib/running-late";
 import { homePoint, readPhoneLocation } from "@/features/calendar/lib/running-late.server";
 import { calculateTravelMinutes } from "@/features/calendar/lib/travel-time";
@@ -137,7 +142,7 @@ async function priceLegs(legs: SlotTravelLegs[]): Promise<Map<string, number | n
  * calendar strictly).
  * @param now - Current instant.
  * @param windowEnd - End of the bookable window.
- * @param config - Live availability settings, for the buffers.
+ * @param config - Live availability settings, for the buffers and the gap after a job.
  * @param exclude - A rescheduled booking to leave out, so it isn't its own neighbour.
  * @param exclude.bookingId - The booking's id.
  * @param exclude.eventId - The booking's calendar event id.
@@ -146,7 +151,7 @@ async function priceLegs(legs: SlotTravelLegs[]): Promise<Map<string, number | n
 export async function loadTravelTimeline(
   now: Date,
   windowEnd: Date,
-  config: Pick<AvailabilityConfig, "bufferMin" | "bookingBufferAfterMin">,
+  config: Pick<AvailabilityConfig, "bufferMin" | "bookingBufferAfterMin" | "gapAfterJobMin">,
   exclude: { bookingId?: string; eventId?: string | null } = {},
 ): Promise<TravelCommitment[]> {
   // From NZ midnight: a job that finished earlier today still sets where you drive from.
@@ -204,6 +209,11 @@ export async function loadTravelTimeline(
     backMinByEventId,
     bookingBufferMin: config.bookingBufferAfterMin,
     eventBufferMin: config.bufferMin,
+    currentJob: {
+      nowMs: now.getTime(),
+      gapAfterJobMin: config.gapAfterJobMin,
+      bookingCalId: getBookingCalendarId(),
+    },
   });
 }
 
@@ -232,6 +242,70 @@ export async function loadCurrentSpot(now: Date): Promise<CurrentSpot | null> {
   } catch (error) {
     console.error("[booking-travel] Phone location read failed:", error);
     return null;
+  }
+}
+
+/**
+ * Whether you're on a job, out or home right now, for the notice rule. A job is a confirmed
+ * booking or a booking-calendar event running now; family and personal events aren't. A calendar
+ * that fails to answer only drops its events.
+ * @param now - Current instant.
+ * @returns The state; "home" when nothing says otherwise.
+ */
+export async function loadNoticeState(now: Date): Promise<NoticeState> {
+  const nowMs = now.getTime();
+  const bookingCalId = getBookingCalendarId();
+  const [bookings, calendar, here] = await Promise.all([
+    prisma.booking.findMany({
+      where: {
+        status: "confirmed",
+        startAt: { lte: now },
+        endAt: { gt: now },
+        ...CALENDAR_EVENT_PRESENT_FILTER,
+      },
+      select: { endAt: true },
+    }),
+    fetchAllCalendarEventsDetailed(now, new Date(nowMs + 60_000)).catch((error: unknown) => {
+      console.error("[booking-travel] Calendar read failed; judging notice without it:", error);
+      return { events: [], failedCalendarIds: [] };
+    }),
+    loadCurrentSpot(now),
+  ]);
+  const ends = [
+    ...bookings.map((b) => b.endAt.getTime()),
+    ...calendar.events
+      .filter(
+        (e) =>
+          e.calendarEmail === bookingCalId &&
+          !e.allDay &&
+          new Date(e.start).getTime() <= nowMs &&
+          new Date(e.end).getTime() > nowMs,
+      )
+      .map((e) => new Date(e.end).getTime()),
+  ];
+  if (ends.length > 0) return { kind: "on-job", jobEndMs: Math.max(...ends) };
+  if (here) return { kind: "out", driveMin: here.driveMin };
+  return { kind: "home" };
+}
+
+/**
+ * The availability config with the customer notice for right now in place of the fixed minimum
+ * notice, for the public booking page, its edit page and their submit routes. Admin booking
+ * flows keep the plain setting. Fails safe: an error keeps the configured minimum notice.
+ * @param now - Current instant.
+ * @param config - Live availability settings.
+ * @returns The config, `minHoursNotice` holding this moment's notice in hours.
+ */
+export async function withCustomerNotice(
+  now: Date,
+  config: AvailabilityConfig,
+): Promise<AvailabilityConfig> {
+  try {
+    const minutes = noticeMinutes(await loadNoticeState(now), now.getTime(), config);
+    return { ...config, minHoursNotice: minutes / 60 };
+  } catch (error) {
+    console.error("[booking-travel] Notice check failed; using the minimum notice:", error);
+    return config;
   }
 }
 

@@ -18,7 +18,10 @@ import {
 } from "@/features/booking/lib/booking";
 import { lookupBookingSnapshots } from "@/features/booking/lib/booking-snapshots.server";
 import { travelVerdictMessage } from "@/features/booking/lib/booking-travel";
-import { travelVerdictForSlot } from "@/features/booking/lib/booking-travel.server";
+import {
+  travelVerdictForSlot,
+  withCustomerNotice,
+} from "@/features/booking/lib/booking-travel.server";
 import {
   loadBlockingBookings,
   loadBlockingEvents,
@@ -209,6 +212,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // The notice depends on where you are right now, as the booking page worked it out.
     const validation = validateBookingRequest(
       dateKey,
       timeOfDay,
@@ -217,7 +221,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       existingForValidation,
       calendarEvents,
       now,
-      config,
+      await withCustomerNotice(now, config),
     );
 
     if (!validation.valid) {

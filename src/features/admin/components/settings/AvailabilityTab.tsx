@@ -280,6 +280,27 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
             customised={draft.minHoursNotice !== defaults.minHoursNotice}
             onChange={(v) => setTop({ minHoursNotice: v ?? 0 })}
           />
+          <NumberField
+            id="gapAfterJobMin"
+            meta={m.gapAfterJobMin}
+            value={draft.gapAfterJobMin}
+            min={0}
+            max={240}
+            minutesHint
+            error={fieldErrors.gapAfterJobMin}
+            customised={draft.gapAfterJobMin !== defaults.gapAfterJobMin}
+            onChange={(v) => setTop({ gapAfterJobMin: v ?? 0 })}
+          />
+          <NumberField
+            id="noticeWhileOutHours"
+            meta={m.noticeWhileOutHours}
+            value={draft.noticeWhileOutHours}
+            min={0}
+            max={24}
+            error={fieldErrors.noticeWhileOutHours}
+            customised={draft.noticeWhileOutHours !== defaults.noticeWhileOutHours}
+            onChange={(v) => setTop({ noticeWhileOutHours: v ?? 0 })}
+          />
           <HourField
             id="sameDayCutoffHour"
             meta={m.sameDayCutoffHour}

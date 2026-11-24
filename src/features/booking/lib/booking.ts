@@ -1,6 +1,7 @@
 // src/features/booking/lib/booking.ts
 // Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
 
+import { noticeLabel } from "@/features/booking/lib/booking-travel";
 import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import { isPlausibleName } from "@/shared/lib/normalise-name";
 import type { AvailabilitySettings, MorningGuard } from "@/shared/lib/settings/types";
@@ -847,12 +848,12 @@ export function validateBookingRequest(
     return { valid: false, error: "This time slot is in the past" };
   }
 
-  // Enforce min notice server-side too.
+  // Enforce min notice server-side too. The label never says why it's that long.
   const minNoticeMs = config.minHoursNotice * 60 * 60 * 1000;
   if (slotStart.getTime() - now.getTime() < minNoticeMs) {
     return {
       valid: false,
-      error: `Bookings need at least ${config.minHoursNotice} hours notice`,
+      error: `Bookings need at least ${noticeLabel(config.minHoursNotice * 60)} notice right now`,
     };
   }
 

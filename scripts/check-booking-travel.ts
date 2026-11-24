@@ -10,6 +10,8 @@ import {
   FAR_RING_DRIVE_MIN,
   legMinutes,
   locationRing,
+  noticeLabel,
+  noticeMinutes,
   slotTravelLegs,
   TO_NEXT_DEPARTURE_LEAD_MIN,
   travelLegKey,
@@ -216,6 +218,78 @@ expectEqual("7 km", locationRing(7_000, 300), { ring: "within 10 km", driveMin: 
 expectEqual("15 km", locationRing(15_000, 300), { ring: "within 20 km", driveMin: 40 });
 expectEqual("40 km", locationRing(40_000, 300), { ring: "further", driveMin: FAR_RING_DRIVE_MIN });
 
+// Notice by where you are.
+const NOTICE = { minHoursNotice: 2, gapAfterJobMin: 30, noticeWhileOutHours: 2 };
+expectEqual("home: the minimum notice", noticeMinutes({ kind: "home" }, nz(9), NOTICE), 120);
+expectEqual(
+  "on a job ending 2pm at 1pm: an hour plus the gap",
+  noticeMinutes({ kind: "on-job", jobEndMs: nz(14) }, nz(13), NOTICE),
+  90,
+);
+expectEqual(
+  "on a job ending now: just the gap",
+  noticeMinutes({ kind: "on-job", jobEndMs: nz(13) }, nz(13), NOTICE),
+  30,
+);
+expectEqual(
+  "out within 10 km: the ring's drive plus the notice while out",
+  noticeMinutes({ kind: "out", driveMin: 25 }, nz(13), NOTICE),
+  145,
+);
+expectEqual("label: whole hours", noticeLabel(120), "2 hours");
+expectEqual("label: hour and minutes", noticeLabel(75), "1 hour 15 minutes");
+expectEqual("label: rounds up", noticeLabel(44.2), "45 minutes");
+expectEqual("label: one minute", noticeLabel(1), "1 minute");
+
+// The job running now keeps at least the gap after a job; other commitments keep their buffer.
+const BOOKING_CAL = "bookings@example.com";
+const withJob = buildTravelTimeline({
+  bookings: [
+    { startAt: new Date(nz(12)), endAt: new Date(nz(14)), address: PAPAKURA, notes: null },
+  ],
+  events: [
+    {
+      id: "job-event",
+      start: new Date(nz(12)).toISOString(),
+      end: new Date(nz(14)).toISOString(),
+      location: "Job site, Henderson",
+      calendarEmail: BOOKING_CAL,
+    },
+    {
+      id: "family",
+      start: new Date(nz(12)).toISOString(),
+      end: new Date(nz(14)).toISOString(),
+      location: "School, Grey Lynn",
+      calendarEmail: WORK,
+    },
+    {
+      id: "later-job",
+      start: new Date(nz(16)).toISOString(),
+      end: new Date(nz(17)).toISOString(),
+      location: "Job site, Albany",
+      calendarEmail: BOOKING_CAL,
+    },
+  ],
+  personalCalId: PERSONAL,
+  homeAddress: HOME,
+  backMinByEventId: new Map(),
+  bookingBufferMin: 20,
+  eventBufferMin: 15,
+  currentJob: { nowMs: nz(13), gapAfterJobMin: 45, bookingCalId: BOOKING_CAL },
+});
+/**
+ * The gap kept after the commitment at a location.
+ * @param location - Its location.
+ * @returns Minutes, or undefined when it isn't on the timeline.
+ */
+const gapOf = (location: string): number | undefined =>
+  withJob.find((c) => c.location === location)?.bufferAfterMin;
+expectEqual("running booking gets the gap", gapOf(PAPAKURA), 45);
+expectEqual("running booking-calendar event gets the gap", gapOf("Job site, Henderson"), 45);
+expectEqual("running family event keeps its buffer", gapOf("School, Grey Lynn"), 15);
+expectEqual("a later job keeps its buffer", gapOf("Job site, Albany"), 15);
+const afterJob = slotTravelLegs(nz(14, 30), nz(15, 30), OREWA, withJob, null);
+expectEqual("slot after the job is ready at end + gap", afterJob.from?.readyMs, nz(14, 45));
 expectEqual(
   "too far from here",
   travelVerdict(nz(10), nz(11), 30, morningHere, 150, null),
