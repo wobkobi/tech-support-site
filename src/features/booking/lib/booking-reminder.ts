@@ -45,6 +45,18 @@ export function reminderWindow(
 }
 
 /**
+ * Whether the gap after the confirmation has passed for this run. The query's `bookedBy` bound
+ * counts from when the booking was made, but a confirmation held overnight by quiet hours lands
+ * later, so without this a 22:00 booking's reminder could follow its 07:00 confirmation by hours.
+ * @param confirmationLandedAt - When the confirmation reached the customer (after any hold).
+ * @param window - This run's bounds from {@link reminderWindow}.
+ * @returns True when the reminder may go this run.
+ */
+export function reminderGapCleared(confirmationLandedAt: Date, window: ReminderWindow): boolean {
+  return confirmationLandedAt.getTime() <= window.bookedBy.getTime();
+}
+
+/**
  * Whether a confirmation sent now leaves no run where {@link reminderWindow} would still take
  * the booking, i.e. the gap only clears after the free-cancel floor. A customer's reschedule
  * stamps the reminder done in that case, as a fresh booking would never get one.

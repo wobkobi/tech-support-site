@@ -9,9 +9,10 @@ import {
   CALENDAR_EVENT_PRESENT_FILTER,
   combineUnitAndAddress,
 } from "@/features/booking/lib/booking";
-import { reminderWindow } from "@/features/booking/lib/booking-reminder";
+import { reminderGapCleared, reminderWindow } from "@/features/booking/lib/booking-reminder";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { sendBookingReminderEmail } from "@/features/reviews/lib/email-booking";
+import { outreachHoldUntil } from "@/features/reviews/lib/email-core";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorised } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         unit: true,
         meetingType: true,
         rescheduleCount: true,
+        createdAt: true,
       },
     });
 
@@ -75,6 +77,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const results = { emailsSent: 0, failed: 0, errors: [] as string[] };
 
     for (const b of emailCandidates) {
+      // The confirmation may have been held for quiet hours; a later run picks this up once
+      // the gap from when it landed has passed.
+      const landed = (await outreachHoldUntil(b.createdAt)) ?? b.createdAt;
+      if (!reminderGapCleared(landed, bounds)) continue;
       // Claim before sending, so an overlapping run skips this booking; a failed send hands
       // the claim back for the next run.
       const claimed = await prisma.booking.updateMany({
