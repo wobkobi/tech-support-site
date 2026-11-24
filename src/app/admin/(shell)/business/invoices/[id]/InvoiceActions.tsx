@@ -19,9 +19,9 @@ import {
 import { reissueHref } from "@/features/business/lib/invoice-reissue";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SendInvoiceModal, useInvoiceSend } from "./SendInvoiceModal";
 import { TextInvoiceModal } from "./TextInvoiceModal";
 import { type LinkedIncome, useInvoiceVoid, VoidInvoiceModal } from "./VoidInvoiceModal";
@@ -61,6 +61,8 @@ interface InvoiceActionsProps {
   likelyIncome?: LikelyIncome | null;
   /** True when the row is a quote - swaps email copy, hides payment actions, adds Convert. */
   isQuote?: boolean;
+  /** Live invoice that replaced this voided one; hides Re-issue and Resend void notification. */
+  replacedBy?: { id: string; number: string } | null;
 }
 
 /** Static JSON request headers. */
@@ -90,6 +92,7 @@ const headers = { "Content-Type": "application/json" };
  * @param props.apologySentAt - Apology stamp, passed to the payment dialog.
  * @param props.likelyIncome - Unlinked income row matching this invoice, passed to the payment dialog.
  * @param props.isQuote - Whether the row is a quote.
+ * @param props.replacedBy - Live replacement of this voided invoice, or null.
  * @returns Invoice actions element with its modals.
  */
 export function InvoiceActions({
@@ -113,6 +116,7 @@ export function InvoiceActions({
   apologySentAt = null,
   likelyIncome = null,
   isQuote = false,
+  replacedBy = null,
 }: InvoiceActionsProps): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -155,6 +159,12 @@ export function InvoiceActions({
     () => autoOpenSend && !clientEmail && status !== "VOIDED",
   );
   const [textKey, setTextKey] = useState(0);
+
+  // Drop ?send=1 once it has done its job, so a reload or the app's resume can't reopen it.
+  const pathname = usePathname();
+  useEffect(() => {
+    if (autoOpenSend) router.replace(pathname, { scroll: false });
+  }, [autoOpenSend, pathname, router]);
 
   // Edit-details modal (SENT/PAID): client details and notes stay editable post-send.
   const savedDetails = {
@@ -399,15 +409,24 @@ export function InvoiceActions({
             {isQuote ? "Void quote" : "Void invoice"}
           </AdminButton>
         )}
-        {isVoided && clientEmail && (
+        {/* Once replaced, "nothing to pay" would be wrong and a second re-issue double-bills. */}
+        {isVoided && clientEmail && !replacedBy && (
           <AdminButton variant="secondary" onClick={voidFlow.resendVoidNotification} busy={voiding}>
             Resend void notification
           </AdminButton>
         )}
         {/* Nothing is saved until the calculator saves, so no confirm is needed. */}
-        {isVoided && !isQuote && (
+        {isVoided && !isQuote && !replacedBy && (
           <Link href={reissueHref(invoiceId)} className={adminButtonClass({})}>
             Re-issue in calculator
+          </Link>
+        )}
+        {isVoided && replacedBy && (
+          <Link
+            href={`/admin/business/invoices/${replacedBy.id}`}
+            className={adminButtonClass({ variant: "secondary" })}
+          >
+            Replaced by {replacedBy.number}
           </Link>
         )}
         {isOverdue && !isPaid && !isVoided && clientEmail && (

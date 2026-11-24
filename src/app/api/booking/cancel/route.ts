@@ -10,7 +10,10 @@ import { releaseBookingRedemptions } from "@/features/business/lib/promo-redempt
 import { parseString } from "@/features/business/lib/validation";
 import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
 import { sendOwnerPush } from "@/features/notifications/lib/push";
-import { sendOwnerBookingCancellation } from "@/features/reviews/lib/email-booking";
+import {
+  sendCustomerBookingCancellation,
+  sendOwnerBookingCancellation,
+} from "@/features/reviews/lib/email-booking";
 import { cancelHeldBookingEmails } from "@/features/reviews/lib/email-core";
 import { errorResponse } from "@/shared/lib/api-response";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -165,18 +168,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Wrapped because the settings read can throw, and the cancel has committed -
     // a throw would report success as failure and invite a retry.
     try {
-      await sendOwnerBookingCancellation(
-        {
-          id: updated.id,
-          name: updated.name,
-          email: updated.email,
-          notes: updated.notes ?? "",
-          startAt: updated.startAt,
-          endAt: updated.endAt,
-          cancelToken: updated.cancelToken,
-        },
-        { lateCancellation },
-      );
+      const cancelled = {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        notes: updated.notes ?? "",
+        startAt: updated.startAt,
+        endAt: updated.endAt,
+        cancelToken: updated.cancelToken,
+      };
+      await Promise.all([
+        sendOwnerBookingCancellation(cancelled, { lateCancellation }),
+        sendCustomerBookingCancellation(cancelled, { lateCancellation, cancelledBy: "customer" }),
+      ]);
 
       const { comms } = await getSettings();
       if (comms.pushOnCancellation) {

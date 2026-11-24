@@ -157,7 +157,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     },
   });
 
-  // Next 16's revalidateTag requires a second CacheLifeConfig arg.
-  revalidateTag(ACTIVE_PROMO_TAG, {});
+  // expire: 0 drops the cached copy now; the default profile would serve it once more.
+  revalidateTag(ACTIVE_PROMO_TAG, { expire: 0 });
   return NextResponse.json({ ok: true, promo }, { status: 201 });
 }

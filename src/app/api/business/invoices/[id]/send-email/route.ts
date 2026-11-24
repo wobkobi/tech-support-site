@@ -9,6 +9,7 @@ import {
   toInvoiceEmailPayload,
 } from "@/features/business/lib/invoice-email-request";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
+import { parseObjectId } from "@/features/business/lib/validation";
 import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
 import { sendInvoiceEmail } from "@/features/reviews/lib/email-invoice";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -81,7 +82,8 @@ export async function POST(
     return errorResponse("Unauthorized", 401);
   }
 
-  const { id } = await ctx.params;
+  const id = parseObjectId((await ctx.params).id);
+  if (!id) return errorResponse("Invoice not found", 404);
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) {
     return errorResponse("Invoice not found", 404);

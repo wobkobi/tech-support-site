@@ -1,6 +1,7 @@
 // src/features/booking/lib/booking.ts
 // Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
 
+import { noticeLabel } from "@/features/booking/lib/booking-travel";
 import type { DateSurcharge } from "@/features/business/lib/pricing-policy";
 import { isPlausibleName } from "@/shared/lib/normalise-name";
 import type { AvailabilitySettings, MorningGuard } from "@/shared/lib/settings/types";
@@ -103,6 +104,17 @@ export function meetingTypeFromNotes(raw: string | null): "in_person" | "remote"
   if (meetingType === "in-person") return "in_person";
   if (meetingType === "remote") return "remote";
   return null;
+}
+
+/**
+ * Whether a booking is remote: the meetingType column, else the notes for legacy rows.
+ * @param b - The booking's meeting type and notes.
+ * @param b.meetingType - The stored column, null on legacy rows.
+ * @param b.notes - Raw notes, which may state the meeting type.
+ * @returns True for a remote session.
+ */
+export function isRemoteBooking(b: { meetingType: string | null; notes: string | null }): boolean {
+  return (b.meetingType ?? meetingTypeFromNotes(b.notes)) === "remote";
 }
 
 /**
@@ -847,12 +859,12 @@ export function validateBookingRequest(
     return { valid: false, error: "This time slot is in the past" };
   }
 
-  // Enforce min notice server-side too.
+  // Enforce min notice server-side too. The label never says why it's that long.
   const minNoticeMs = config.minHoursNotice * 60 * 60 * 1000;
   if (slotStart.getTime() - now.getTime() < minNoticeMs) {
     return {
       valid: false,
-      error: `Bookings need at least ${config.minHoursNotice} hours notice`,
+      error: `Bookings need at least ${noticeLabel(config.minHoursNotice * 60)} notice right now`,
     };
   }
 

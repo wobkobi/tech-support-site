@@ -78,6 +78,8 @@ export default async function AdminPage({
   if (runningJob) {
     runningCard = (
       <RunningJobPanel
+        // A new job remounts the panel, so the last job's Undo doesn't carry over.
+        key={runningJob.key}
         source={runningJob.source}
         jobKey={runningJob.key}
         name={runningJob.name}

@@ -45,6 +45,7 @@ export {
   formatNZD,
   goldCardLineLabel,
   goldCardOffText,
+  lineItemPriceLabel,
   lineItemQtyLabel,
   minsToHoursLabel,
   promoLineLabel,

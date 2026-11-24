@@ -7,6 +7,11 @@ import type { BookableDay } from "@/features/booking/lib/booking";
 import {
   applyTravelBlocks,
   buildTravelTimeline,
+  FAR_RING_DRIVE_MIN,
+  legMinutes,
+  locationRing,
+  noticeLabel,
+  noticeMinutes,
   slotTravelLegs,
   TO_NEXT_DEPARTURE_LEAD_MIN,
   travelLegKey,
@@ -163,29 +168,128 @@ const nextDay = slotTravelLegs(nz(14, 0, 1), nz(15, 0, 1), OREWA, timeline);
 expectEqual("next day: previous is that day's job", nextDay.from?.origin, "Work site, Albany");
 expect("next day: no next commitment", nextDay.to === null);
 
-// Current spot: for a slot today, where the phone is replaces the drive in once nothing earlier
-// is still running.
-const PHONE = "-36.9000,174.8000";
-const morningHere = slotTravelLegs(nz(10), nz(11), OREWA, timeline, { origin: PHONE, atMs: nz(8) });
-expectEqual("today, nothing before: drive from the phone", morningHere.from?.origin, PHONE);
-expectEqual("drive from the phone leaves now", morningHere.from?.departMs, nz(8));
-expect("drive from the phone is marked", morningHere.from?.fromHere === true);
+// Current spot: for a slot today, the ring the phone is in replaces the drive in once nothing
+// earlier is still running. Only the ring goes on the leg, never a point.
+const RING = { ring: "within 10 km", driveMin: 25 };
+const morningHere = slotTravelLegs(nz(10), nz(11), OREWA, timeline, { ...RING, atMs: nz(8) });
+expectEqual(
+  "today, nothing before: drive from the ring",
+  morningHere.from?.origin,
+  "ring:within 10 km",
+);
+expectEqual("drive from the ring leaves now", morningHere.from?.departMs, nz(8));
+expect("drive from the ring is marked", morningHere.from?.fromHere === true);
+expectEqual("drive from the ring is fixed", morningHere.from?.fixedMin, 25);
+expectEqual("fixed drive needs no price", legMinutes(morningHere.from, new Map()), 25);
 const duringJob = slotTravelLegs(nz(13, 45), nz(14, 45), OREWA, timeline, {
-  origin: PHONE,
+  ...RING,
   atMs: nz(12, 30),
 });
 expectEqual("a job still running sets the drive in", duringJob.from?.origin, PAPAKURA);
+expectEqual(
+  "a priced leg reads its price",
+  legMinutes(duringJob.from, new Map([[travelLegKey(duringJob.from!), 40]])),
+  40,
+);
+expectEqual("an unpriced leg is open", legMinutes(duringJob.from, new Map()), null);
 const inBuffer = slotTravelLegs(nz(13, 45), nz(14, 45), OREWA, timeline, {
-  origin: PHONE,
+  ...RING,
   atMs: nz(13, 10),
 });
-expectEqual("after the job, the phone wins", inBuffer.from?.origin, PHONE);
+expectEqual("after the job, the ring wins", inBuffer.from?.origin, "ring:within 10 km");
 expectEqual("but you're ready once the buffer's over", inBuffer.from?.readyMs, nz(13, 30));
 const tomorrowHere = slotTravelLegs(nz(10, 0, 2), nz(11, 0, 2), OREWA, timeline, {
-  origin: PHONE,
+  ...RING,
   atMs: nz(8),
 });
 expect("another day ignores the phone", tomorrowHere.from === null);
+
+// Rings: straight-line distance from home, the at-home radius first.
+expectEqual("inside the radius is home", locationRing(250, 300), "home");
+expectEqual("just out of the radius", locationRing(301, 300), {
+  ring: "within 5 km",
+  driveMin: 15,
+});
+expectEqual("5 km is the first ring", locationRing(5_000, 300), {
+  ring: "within 5 km",
+  driveMin: 15,
+});
+expectEqual("7 km", locationRing(7_000, 300), { ring: "within 10 km", driveMin: 25 });
+expectEqual("15 km", locationRing(15_000, 300), { ring: "within 20 km", driveMin: 40 });
+expectEqual("40 km", locationRing(40_000, 300), { ring: "further", driveMin: FAR_RING_DRIVE_MIN });
+
+// Notice by where you are.
+const NOTICE = { minHoursNotice: 2, gapAfterJobMin: 30, noticeWhileOutHours: 2 };
+expectEqual("home: the minimum notice", noticeMinutes({ kind: "home" }, nz(9), NOTICE), 120);
+expectEqual(
+  "on a job ending 2pm at 1pm: an hour plus the gap",
+  noticeMinutes({ kind: "on-job", jobEndMs: nz(14) }, nz(13), NOTICE),
+  90,
+);
+expectEqual(
+  "on a job ending now: just the gap",
+  noticeMinutes({ kind: "on-job", jobEndMs: nz(13) }, nz(13), NOTICE),
+  30,
+);
+expectEqual(
+  "out within 10 km: the ring's drive plus the notice while out",
+  noticeMinutes({ kind: "out", driveMin: 25 }, nz(13), NOTICE),
+  145,
+);
+expectEqual("label: whole hours", noticeLabel(120), "2 hours");
+expectEqual("label: hour and minutes", noticeLabel(75), "1 hour 15 minutes");
+expectEqual("label: rounds up", noticeLabel(44.2), "45 minutes");
+expectEqual("label: one minute", noticeLabel(1), "1 minute");
+
+// The job running now keeps at least the gap after a job; other commitments keep their buffer.
+const BOOKING_CAL = "bookings@example.com";
+const withJob = buildTravelTimeline({
+  bookings: [
+    { startAt: new Date(nz(12)), endAt: new Date(nz(14)), address: PAPAKURA, notes: null },
+  ],
+  events: [
+    {
+      id: "job-event",
+      start: new Date(nz(12)).toISOString(),
+      end: new Date(nz(14)).toISOString(),
+      location: "Job site, Henderson",
+      calendarEmail: BOOKING_CAL,
+    },
+    {
+      id: "family",
+      start: new Date(nz(12)).toISOString(),
+      end: new Date(nz(14)).toISOString(),
+      location: "School, Grey Lynn",
+      calendarEmail: WORK,
+    },
+    {
+      id: "later-job",
+      start: new Date(nz(16)).toISOString(),
+      end: new Date(nz(17)).toISOString(),
+      location: "Job site, Albany",
+      calendarEmail: BOOKING_CAL,
+    },
+  ],
+  personalCalId: PERSONAL,
+  homeAddress: HOME,
+  backMinByEventId: new Map(),
+  bookingBufferMin: 20,
+  eventBufferMin: 15,
+  currentJob: { nowMs: nz(13), gapAfterJobMin: 45, bookingCalId: BOOKING_CAL },
+});
+/**
+ * The gap kept after the commitment at a location.
+ * @param location - Its location.
+ * @returns Minutes, or undefined when it isn't on the timeline.
+ */
+const gapOf = (location: string): number | undefined =>
+  withJob.find((c) => c.location === location)?.bufferAfterMin;
+expectEqual("running booking gets the gap", gapOf(PAPAKURA), 45);
+expectEqual("running booking-calendar event gets the gap", gapOf("Job site, Henderson"), 45);
+expectEqual("running family event keeps its buffer", gapOf("School, Grey Lynn"), 15);
+expectEqual("a later job keeps its buffer", gapOf("Job site, Albany"), 15);
+const afterJob = slotTravelLegs(nz(14, 30), nz(15, 30), OREWA, withJob, null);
+expectEqual("slot after the job is ready at end + gap", afterJob.from?.readyMs, nz(14, 45));
 expectEqual(
   "too far from here",
   travelVerdict(nz(10), nz(11), 30, morningHere, 150, null),

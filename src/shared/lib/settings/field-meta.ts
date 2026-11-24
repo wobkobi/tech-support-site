@@ -85,9 +85,22 @@ export const AVAILABILITY_FIELD_META = {
   },
   minHoursNotice: {
     title: "Minimum notice",
-    description: "How far in advance a customer must book.",
+    description:
+      "How far in advance a customer must book while you're at home, or when your phone location isn't known.",
     unit: "hours",
     off: "Set 0 to allow booking right up to the current time.",
+  },
+  gapAfterJobMin: {
+    title: "Gap after a job",
+    description:
+      "While you're on a job, the earliest time offered is its end plus this gap plus the drive to the new customer.",
+    unit: "minutes",
+  },
+  noticeWhileOutHours: {
+    title: "Notice while out",
+    description:
+      "While you're out but not on a job, the earliest time offered is the rough drive back from where you are plus this.",
+    unit: "hours",
   },
   sameDayCutoffHour: {
     title: "Same-day cutoff",

@@ -451,6 +451,77 @@ export async function sendOwnerBookingCancellation(
 }
 
 /**
+ * Tells the customer their appointment is cancelled, with a link to book again. Held for quiet
+ * hours but not tied to the booking, so the cancel's own recall of held emails can't drop it.
+ * Google's own "event cancelled" email still goes out too: it is what takes the event off a
+ * non-Google calendar, since the invite came from Google under its own event id.
+ * Failures are caught and logged - never throws.
+ * @param booking - The cancelled booking's details.
+ * @param options - Optional flags.
+ * @param options.lateCancellation - True when the cancel landed inside the fee window. The
+ * invoice may stay a draft the operator waives, so the email only says it would follow.
+ * @param options.cancelledBy - "customer" when they cancelled (themselves or through the
+ * operator), "operator" when the operator called it off.
+ */
+export async function sendCustomerBookingCancellation(
+  booking: BookingNotificationData,
+  options: { lateCancellation: boolean; cancelledBy: "customer" | "operator" },
+): Promise<void> {
+  const from = process.env.EMAIL_FROM;
+  const siteUrl = getSiteUrl();
+
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping customer cancellation email.`,
+    );
+    return;
+  }
+
+  const firstName = booking.name.split(" ")[0] ?? "";
+  const start = formatDateTimeLong(booking.startAt);
+  const intro =
+    options.cancelledBy === "operator"
+      ? "I've had to cancel your appointment. Sorry for the change of plans."
+      : "Your appointment has been cancelled, as you asked.";
+  const feeLine = options.lateCancellation
+    ? `<p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">Because this was close to the appointment time, a cancellation fee may apply under the cancellation policy. If it does, the invoice comes in a separate email.</p>`
+    : "";
+
+  const html = renderNotificationEmail(`
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Appointment cancelled, ${escapeHtml(firstName)}</h2>
+    <p style="margin:0 0 20px;color:#444;line-height:1.6">${intro}</p>
+
+    <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancelled appointment</p>
+    <p style="margin:0 0 20px;font-size:16px;font-weight:600;color:#0c0a3e"><s>${escapeHtml(start)}</s></p>
+
+    ${feeLine}
+
+    <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">
+      Still need a hand? You can book a new time whenever suits, or just reply to this email.
+    </p>
+
+    <a href="${siteUrl}/booking" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 0 10px">📅 Book a new time</a>
+${await buildEmailSignature(siteUrl)}
+`);
+
+  try {
+    const result = await sendOutreach({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to: booking.email,
+      subject: `Appointment cancelled - ${start}`,
+      html,
+      text: htmlToText(html),
+    });
+    if (result.error) {
+      console.error(`[email] Resend rejected cancellation for ${booking.id}:`, result.error);
+    }
+  } catch (error) {
+    console.error(`[email] Failed to send cancellation email for booking ${booking.id}:`, error);
+  }
+}
+
+/**
  * Sends the customer a booking confirmation, reschedule or edit notice.
  * Failures are caught and logged - never throws.
  * @param booking - The booking details.
@@ -703,8 +774,9 @@ export interface ManageLinksBooking {
 }
 
 /**
- * Emails manage links after a find-my-booking lookup, held for quiet hours like every
- * customer email. Safe to carry tokens: only sent to the address that owns the bookings.
+ * Emails manage links after a find-my-booking lookup. Sent straight away, even in quiet hours:
+ * the customer asked for it and is waiting. Safe to carry tokens: only sent to the address that
+ * owns the bookings.
  * @param to - Recipient address (the booking email).
  * @param bookings - Their upcoming bookings, soonest first.
  * @returns True if Resend accepted the message, false on misconfig / failure.
@@ -747,7 +819,7 @@ ${await buildEmailSignature(siteUrl)}
 `);
 
   try {
-    await sendOutreach({
+    const result = await sendNow({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to,
@@ -755,6 +827,11 @@ ${await buildEmailSignature(siteUrl)}
       html,
       text: htmlToText(html),
     });
+    // Resend rejects with { error }, not a throw.
+    if (result.error) {
+      console.error("[email] Resend rejected manage-links email:", result.error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error("[email] Failed to send manage-links email:", error);

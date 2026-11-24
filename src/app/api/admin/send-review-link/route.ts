@@ -8,6 +8,7 @@ import {
 } from "@/features/contacts/lib/find-or-create";
 import { brandName } from "@/features/reviews/lib/email-core";
 import { reviewFormUrl, sendReviewAsk } from "@/features/reviews/lib/email-review-ask";
+import { latestJobWasRemote } from "@/features/reviews/lib/review-ask-job-type.server";
 import { reviewAskBlockedBy } from "@/features/reviews/lib/review-ask-opt-out";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -111,6 +112,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const reviewUrl = `${siteUrl}/review?token=${reviewToken}`;
 
     const blockedBy = await reviewAskBlockedBy(contact.id);
+    // A hand-sent ask names a person, not a job, so their last visit decides the wording.
+    const remote = await latestJobWasRemote(normalisedEmail ?? contact.email ?? null);
+    const thanks = remote ? "Thanks for letting me help" : "Thanks for having me out";
 
     if (mode === "sms") {
       // A mailing unsubscribe doesn't stop a hand-sent text; a review opt-out does.
@@ -127,7 +131,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const first = name.trim().split(" ")[0] ?? "";
       const greeting =
         `Hi ${first.includes("@") ? "there" : first}, ${identity.name.split(" ")[0]} here from ` +
-        `${brandName(identity)}. Thanks for having me out, I hope everything's still working well.`;
+        `${brandName(identity)}. ${thanks}, I hope everything's still working well.`;
       // Google first, like the email; their /review link is the fallback.
       const googleUrl = reviews.googleReviewUrl.trim();
       const smsText = googleUrl
@@ -160,6 +164,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       firstName: name.trim().split(" ")[0] ?? "",
       contactId: contact.id,
       reviewToken,
+      remote,
     });
 
     if (result !== "sent") {

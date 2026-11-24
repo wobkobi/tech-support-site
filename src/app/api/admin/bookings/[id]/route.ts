@@ -34,6 +34,7 @@ import {
 } from "@/features/calendar/lib/google-calendar";
 import { removeBookingEvent } from "@/features/calendar/lib/pending-calendar-deletes";
 import {
+  sendCustomerBookingCancellation,
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email-booking";
@@ -414,6 +415,24 @@ export async function PATCH(
       notifyAttendees: body.markNoShow !== true,
     });
   }
+  // Same rule for the customer's own email: a no-show or a past booking tidied up gets none.
+  if (cancelledNow && body.markNoShow !== true && booking.startAt > now && booking.email) {
+    await sendCustomerBookingCancellation(
+      {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        notes: updated.notes ?? "",
+        startAt: updated.startAt,
+        endAt: updated.endAt,
+        cancelToken: updated.cancelToken,
+      },
+      {
+        lateCancellation: updated.lateCancellation === true,
+        cancelledBy: updated.cancelledBy === "operator" ? "operator" : "customer",
+      },
+    );
+  }
 
   if (movedPromo?.changed) {
     const contact = booking.email
@@ -587,7 +606,7 @@ export async function PATCH(
     }
   }
 
-  revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+  revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
   return NextResponse.json({
     ok: true,
     ...(timeChange ? { notified: timeChange.notify } : {}),
@@ -631,6 +650,6 @@ export async function DELETE(
   await cancelHeldBookingEmails(id);
   await prisma.booking.delete({ where: { id } });
 
-  revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+  revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
   return NextResponse.json({ ok: true });
 }

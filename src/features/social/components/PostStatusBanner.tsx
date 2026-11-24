@@ -71,11 +71,8 @@ export function PostStatusBanner({
   }
 
   const pill = POST_STATUS_PILL[post.status];
-  // A failed post no app has (missed, or blocked at its time) can go back to a draft; the
-  // server checks the same before it does.
-  const canReopen =
-    post.status === "failed" &&
-    post.targets.every((t) => t.status !== "posted" && t.status !== "removed");
+  // A failed post no app has (missed, or blocked at its time) can go back to a draft.
+  const canReopen = post.canReopen;
   const live = post.targets.filter((t) => t.enabled && t.status !== "skipped");
   const waiting = live
     .filter((t) => t.status === "pending")

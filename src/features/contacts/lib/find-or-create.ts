@@ -3,7 +3,11 @@
 // Email is not `@unique`, so prisma.contact.upsert can't be used; find + conditional create replaces it.
 
 import { normaliseEmail } from "@/shared/lib/normalise-email";
-import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
+import {
+  isNZMobileKey,
+  normaliseContactPhone,
+  storedPhoneForms,
+} from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import type { Contact } from "@prisma/client";
 
@@ -71,8 +75,7 @@ export async function findOrCreateContactByEmail(
   }
   const phoneKey = normaliseContactPhone(seed.phone);
   if (phoneKey && isNZMobileKey(phoneKey)) {
-    // Stored phones are E.164, but a few older rows kept the local "021..." form.
-    const forms = phoneKey.startsWith("+64") ? [phoneKey, `0${phoneKey.slice(3)}`] : [phoneKey];
+    const forms = storedPhoneForms(phoneKey);
     const phoneMatches = await prisma.contact.findMany({
       where: {
         OR: [{ phone: { in: forms } }, { altPhones: { hasSome: forms } }],
@@ -152,7 +155,55 @@ export async function attachEmailIfMissing(
 }
 
 /**
- * Finds a live Contact by phone (normalised to E.164).
+ * Keeps an address the owner corrected on an invoice with its contact: fills an empty email,
+ * otherwise adds it to `altEmails` so the review ask and reminders accept it as theirs. The
+ * contact's main email is never replaced, and an address another live contact owns is left.
+ * Best-effort.
+ * @param contactId - The invoice's contact, or null when it isn't linked.
+ * @param email - The corrected address (normalised internally).
+ * @returns True when the contact was changed.
+ */
+export async function rememberBilledEmail(
+  contactId: string | null | undefined,
+  email: string | null | undefined,
+): Promise<boolean> {
+  const normalisedEmail = normaliseEmail(email);
+  if (!contactId || !normalisedEmail) return false;
+  if (await attachEmailIfMissing(contactId, normalisedEmail)) return true;
+  try {
+    const contact = await prisma.contact.findFirst({
+      where: { id: contactId, deletedAt: null },
+      select: { email: true, altEmails: true },
+    });
+    if (!contact?.email?.trim()) return false;
+    const known = [contact.email, ...contact.altEmails].map((e) => e.trim().toLowerCase());
+    if (known.includes(normalisedEmail)) return false;
+    const owner = await prisma.contact.findFirst({
+      where: {
+        id: { not: contactId },
+        deletedAt: null,
+        OR: [
+          { email: { equals: normalisedEmail, mode: "insensitive" } },
+          { altEmails: { has: normalisedEmail } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (owner) return false;
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { altEmails: { push: normalisedEmail } },
+    });
+    return true;
+  } catch (err) {
+    // Constant message: the address stays out of the format string and the logs.
+    console.error("[contacts] Could not add a billed email to contact", contactId, err);
+    return false;
+  }
+}
+
+/**
+ * Finds a live Contact by phone, in any form it may be stored in ({@link storedPhoneForms}).
  * @param phone - Phone number to match on (normalised internally).
  * @param options - Lookup options.
  * @param options.mobileOnly - Never match a landline, which a household shares.
@@ -164,11 +215,10 @@ export async function findContactByPhone(
 ): Promise<Contact | null> {
   const normalisedPhone = normaliseContactPhone(phone) ?? phone.trim();
   if (!normalisedPhone || (mobileOnly && !isNZMobileKey(normalisedPhone))) return null;
+  const forms = storedPhoneForms(normalisedPhone);
   return prisma.contact.findFirst({
-    where: {
-      OR: [{ phone: normalisedPhone }, { altPhones: { has: normalisedPhone } }],
-      deletedAt: null,
-    },
+    where: { OR: [{ phone: { in: forms } }, { altPhones: { hasSome: forms } }], deletedAt: null },
+    orderBy: { createdAt: "asc" },
   });
 }
 

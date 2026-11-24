@@ -80,12 +80,17 @@ export interface SettingsFormApi<G extends SettingsGroup> {
  * @param group - Which settings group this tab edits.
  * @param initial - The server-resolved current value for the group.
  * @param defaults - The code default for the group (used by resetToDefault).
+ * @param options - Save behaviour.
+ * @param options.sparse - Save only the fields changed here, laid over the group as saved now.
+ * For a page that shows part of a group (Travel alerts edits a few comms fields), so a save
+ * can't write back stale copies of the fields it doesn't show.
  * @returns Form state + actions for the tab.
  */
 export function useSettingsForm<G extends SettingsGroup>(
   group: G,
   initial: Settings[G],
   defaults: Settings[G],
+  { sparse = false }: { sparse?: boolean } = {},
 ): SettingsFormApi<G> {
   const [draft, setDraft] = useState<Settings[G]>(initial);
   // Dirty baseline: advances to the saved draft after each save so the bar clears.
@@ -138,11 +143,31 @@ export function useSettingsForm<G extends SettingsGroup>(
       setGoogle(null);
       if (!confirmWarnings) setServerWarns([]);
       try {
+        let value = draft;
+        if (sparse) {
+          const latest = await fetch(`/api/admin/settings/${group}`, {
+            credentials: "same-origin",
+          });
+          const data = (await latest.json().catch(() => ({}))) as { value?: Settings[G] };
+          if (!latest.ok || !data.value) {
+            setServerBlocks(["Couldn't read the saved settings - please try again."]);
+            return false;
+          }
+          // Top-level fields only: each one this page edits is saved whole.
+          const changed = Object.fromEntries(
+            Object.entries(draft).filter(
+              ([k, v]) =>
+                JSON.stringify(v) !==
+                JSON.stringify((baseline as unknown as Record<string, unknown>)[k]),
+            ),
+          );
+          value = { ...data.value, ...changed };
+        }
         const res = await fetch(`/api/admin/settings/${group}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({ value: draft, confirmWarnings }),
+          body: JSON.stringify({ value, confirmWarnings }),
         });
         if (res.ok) {
           const saved = (await res.json().catch(() => ({}))) as {
@@ -151,8 +176,9 @@ export function useSettingsForm<G extends SettingsGroup>(
           setGoogle(saved.google ?? null);
           setSavedAt(Date.now());
           setServerWarns([]);
-          setBaseline(draft);
-          store?.markSaved(group, draft);
+          if (value !== draft) setDraft(value);
+          setBaseline(value);
+          store?.markSaved(group, value);
           return true;
         }
         const data = (await res.json().catch(() => ({}))) as {
@@ -180,7 +206,7 @@ export function useSettingsForm<G extends SettingsGroup>(
         setSaving(false);
       }
     },
-    [group, draft, store],
+    [group, draft, baseline, sparse, store],
   );
 
   const resetToDefault = useCallback(() => setDraft(defaults), [defaults]);

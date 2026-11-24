@@ -10,6 +10,7 @@ import {
 import { buildIcs } from "@/features/booking/lib/ics";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { NextRequest } from "next/server";
 
@@ -21,6 +22,8 @@ export const dynamic = "force-dynamic";
  * @returns The calendar file, or 404 when the token matches nothing usable.
  */
 export async function GET(request: NextRequest): Promise<Response> {
+  const limited = rateLimitOrReject(request, "booking-ics", 30, 60_000);
+  if (limited) return limited;
   const token = request.nextUrl.searchParams.get("token")?.trim();
   if (!token) return new Response("Missing token", { status: 400 });
 

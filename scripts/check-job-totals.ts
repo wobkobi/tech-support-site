@@ -12,7 +12,10 @@ import {
   type JobPromo,
   type LabourSurcharge,
 } from "@/features/business/lib/business";
-import { toggleTaskModifierLine } from "@/features/business/lib/calculator-helpers";
+import {
+  setBusinessOnAllTasks,
+  toggleTaskModifierLine,
+} from "@/features/business/lib/calculator-helpers";
 import type {
   PartLine,
   RateConfig,
@@ -285,9 +288,40 @@ function main(): void {
   const typed = [{ ...task(60, 80, { base: null }), priceOverridden: true }];
   const toggled = toggleTaskModifierLine(typed, 0, "home", RATES)[0]!;
   expectEqual(
-    "a chip on a No base row keeps the typed $/hr",
+    "a chip on a No base row moves the typed $/hr by its delta",
     [toggled.unitPrice, toggled.lineTotal, toggled.modifierIds],
-    [80, 80, ["home"]],
+    [50, 50, ["home"]],
+  );
+  const mate = [{ ...task(60, 60), priceOverridden: true }];
+  const bizOn = setBusinessOnAllTasks(mate, "biz", true, RATES);
+  const bizOff = setBusinessOnAllTasks(bizOn, "biz", false, RATES);
+  expectEqual(
+    "the Business tick adds its delta to a typed rate and takes it back off",
+    [bizOn[0]!.unitPrice, bizOn[0]!.priceOverridden, bizOff[0]!.unitPrice, bizOff[0]!.modifierIds],
+    [100, true, 60, []],
+  );
+  const homeTyped = [{ ...task(60, 45, { mods: ["home"] }), priceOverridden: true }];
+  const swapped = toggleTaskModifierLine(homeTyped, 0, "remote", RATES)[0]!;
+  expectEqual(
+    "swapping channel on a typed rate swaps the delta",
+    [swapped.unitPrice, swapped.modifierIds],
+    [65, ["remote"]],
+  );
+  const free = [{ ...task(60, 0, { base: null }), priceOverridden: true }];
+  const credit = [{ ...task(60, -50, { base: null }), priceOverridden: true }];
+  expectEqual(
+    "a free or credit line keeps its price under the Business tick",
+    [
+      setBusinessOnAllTasks(free, "biz", true, RATES)[0]!.unitPrice,
+      setBusinessOnAllTasks(credit, "biz", true, RATES)[0]!.unitPrice,
+    ],
+    [0, -50],
+  );
+  const cheap = [{ ...task(60, 20, { base: null }), priceOverridden: true }];
+  expectEqual(
+    "a discount never takes a typed rate below $0",
+    toggleTaskModifierLine(cheap, 0, "home", RATES)[0]!.unitPrice,
+    0,
   );
   const based = toggleTaskModifierLine([task(60, 100)], 0, "home", RATES)[0]!;
   expectEqual(

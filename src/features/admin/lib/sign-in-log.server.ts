@@ -8,6 +8,12 @@ import { prisma } from "@/shared/lib/prisma";
 /** Rows older than this are deleted as new attempts come in. */
 const KEEP_DAYS = 180;
 
+/**
+ * Failed attempts kept per IP per 24 hours. Past this an IP's misses go unlogged, so a slow,
+ * patient guesser under the per-minute limit can't grow the log without bound.
+ */
+const MAX_FAILED_PER_IP_PER_DAY = 50;
+
 /** `lastSeenAt` is only rewritten when it is older than this, so page loads stay one cheap query. */
 const TOUCH_EVERY_MS = 5 * 60_000;
 
@@ -54,7 +60,8 @@ export function signInSourceFrom(h: Headers, ip: string): SignInSource {
 }
 
 /**
- * Records one sign-in attempt and prunes rows past {@link KEEP_DAYS}. Swallows errors.
+ * Records one sign-in attempt and prunes rows past {@link KEEP_DAYS}. A failed attempt from an IP
+ * already at {@link MAX_FAILED_PER_IP_PER_DAY} today isn't written. Swallows errors.
  * @param outcome - What happened.
  * @param source - Where it came from.
  * @param session - For a successful sign-in: the new cookie value and when it expires.
@@ -68,6 +75,16 @@ export async function recordSignIn(
 ): Promise<void> {
   try {
     const now = new Date();
+    if (outcome !== "ok") {
+      const failedToday = await prisma.adminSignIn.count({
+        where: {
+          ip: source.ip,
+          outcome: { not: "ok" },
+          at: { gte: new Date(now.getTime() - 86_400_000) },
+        },
+      });
+      if (failedToday >= MAX_FAILED_PER_IP_PER_DAY) return;
+    }
     await prisma.adminSignIn.create({
       data: {
         at: now,

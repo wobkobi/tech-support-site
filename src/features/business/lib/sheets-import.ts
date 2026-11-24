@@ -103,7 +103,7 @@ interface DeletionReportRow {
   amount: number;
   invoiceId: string | null;
   /** Why a held row was left in place. */
-  held?: "half-edited" | "recent";
+  held?: "half-edited" | "recent" | "invoice-payment";
 }
 
 /** What the deletion pass did (or, on a dry run, would do). */
@@ -114,7 +114,10 @@ export interface DeletionReport {
   reason?: string;
   /** Rows removed (applied), that would be removed (dry-run), or held back (blocked). */
   rows: DeletionReportRow[];
-  /** Missing rows left for a later run: half-edited in the Sheet, or written very recently. */
+  /**
+   * Missing rows left in place: half-edited in the Sheet, written very recently, or an
+   * invoice's payment record.
+   */
   held: DeletionReportRow[];
 }
 
@@ -776,6 +779,14 @@ function linkedRowsFrom(state: SyncState): LinkedLedgerRow[] {
   return [...income, ...expenses];
 }
 
+/** Why a missing row was left in place, as the run's warning says it. */
+const HELD_REASON_TEXT: Record<NonNullable<DeletionReportRow["held"]>, string> = {
+  recent: "written in the last two hours",
+  "half-edited": "its Sheet row is half-filled",
+  "invoice-payment":
+    "it's linked to an invoice's payment - delete it from the Income page if it really should go",
+};
+
 /**
  * A ledger row as the import result reports it.
  * @param row - The row.
@@ -1047,7 +1058,7 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
       }
       for (const h of plan.held) {
         warnings.push(
-          `${describeLedgerRow(h.row)} is missing from the Sheet but was left in place (${h.reason === "recent" ? "written in the last two hours" : "its Sheet row is half-filled"})`,
+          `${describeLedgerRow(h.row)} is missing from the Sheet but was left in place (${HELD_REASON_TEXT[h.reason]})`,
         );
       }
     } else {

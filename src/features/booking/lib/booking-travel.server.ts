@@ -1,34 +1,43 @@
 // src/features/booking/lib/booking-travel.server.ts
-// Loads the day's located commitments (and, for slots today, where your phone is) and prices the
-// drives around a new in-person booking, for the booking grid's address check and the submit-time
-// re-check.
+// Loads the day's located commitments (and, for slots today, the ring around home your phone is
+// in) and prices the drives around a new in-person booking, for the booking grid's address check
+// and the submit-time re-check. Also works out the customer notice for right now.
 
 import {
   bookingWindowEnd,
   buildAvailableDays,
   CALENDAR_EVENT_PRESENT_FILTER,
+  isRemoteBooking,
   type AvailabilityConfig,
 } from "@/features/booking/lib/booking";
 import {
   buildTravelTimeline,
+  legMinutes,
+  locationRing,
+  noticeMinutes,
   slotTravelLegs,
   travelLegKey,
   travelVerdict,
   type CurrentSpot,
+  type NoticeState,
   type SlotTravelLegs,
   type TravelBlockedSlot,
   type TravelCommitment,
   type TravelLeg,
   type TravelVerdict,
 } from "@/features/booking/lib/booking-travel";
-import { fetchAllCalendarEventsDetailed } from "@/features/calendar/lib/google-calendar";
-import { isUsableLocation } from "@/features/calendar/lib/running-late";
-import { readPhoneLocation } from "@/features/calendar/lib/running-late.server";
+import {
+  fetchAllCalendarEventsDetailed,
+  getBookingCalendarId,
+} from "@/features/calendar/lib/google-calendar";
+import { distanceM, isUsableLocation } from "@/features/calendar/lib/running-late";
+import { homePoint, readPhoneLocation } from "@/features/calendar/lib/running-late.server";
 import { calculateTravelMinutes } from "@/features/calendar/lib/travel-time";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import {
   dateKeyParts,
+  nzDateKey,
   nzDateParts,
   nzMidnightUtc,
   nzWallClockUtc,
@@ -43,6 +52,37 @@ const PRICE_CACHE_MAX = 500;
 
 /** Priced drives by {@link travelLegKey}; failed lookups are never stored. */
 const priceCache = new Map<string, { minutes: number; at: number }>();
+
+/**
+ * New addresses the public grid check prices per NZ day, per instance. Each can cost two lookups
+ * per located commitment in the window, so a flood of made-up addresses is capped here; past it
+ * the grid stays open and the submit re-check (two lookups at most) still applies.
+ */
+export const TRAVEL_CHECK_DAILY_ADDRESSES = 60;
+
+/** Addresses the grid check has priced today, for {@link claimTravelCheck}. */
+let travelChecksToday: { dayKey: string; addresses: Set<string> } = {
+  dayKey: "",
+  addresses: new Set(),
+};
+
+/**
+ * Whether the grid check may price this address today: one already checked today always may, a
+ * new one only while today's cap has room.
+ * @param address - The customer's address.
+ * @param now - Current instant.
+ * @returns True when the check can go ahead.
+ */
+export function claimTravelCheck(address: string, now: Date): boolean {
+  const dayKey = nzDateKey(now);
+  if (travelChecksToday.dayKey !== dayKey) travelChecksToday = { dayKey, addresses: new Set() };
+  const key = address.trim().toLowerCase();
+  const { addresses } = travelChecksToday;
+  if (addresses.has(key)) return true;
+  if (addresses.size >= TRAVEL_CHECK_DAILY_ADDRESSES) return false;
+  addresses.add(key);
+  return true;
+}
 
 /**
  * Drive minutes for a leg: the cached price when fresh, else one Distance Matrix lookup (traffic
@@ -86,7 +126,8 @@ async function priceLeg(leg: TravelLeg): Promise<number | null> {
 async function priceLegs(legs: SlotTravelLegs[]): Promise<Map<string, number | null>> {
   const unique = new Map<string, TravelLeg>();
   for (const l of legs) {
-    if (l.from) unique.set(travelLegKey(l.from), l.from);
+    // The drive from your ring is fixed, never priced.
+    if (l.from && l.from.fixedMin === undefined) unique.set(travelLegKey(l.from), l.from);
     if (l.to) unique.set(travelLegKey(l.to), l.to);
   }
   const entries = await Promise.all(
@@ -102,7 +143,7 @@ async function priceLegs(legs: SlotTravelLegs[]): Promise<Map<string, number | n
  * calendar strictly).
  * @param now - Current instant.
  * @param windowEnd - End of the bookable window.
- * @param config - Live availability settings, for the buffers.
+ * @param config - Live availability settings, for the buffers and the gap after a job.
  * @param exclude - A rescheduled booking to leave out, so it isn't its own neighbour.
  * @param exclude.bookingId - The booking's id.
  * @param exclude.eventId - The booking's calendar event id.
@@ -111,7 +152,7 @@ async function priceLegs(legs: SlotTravelLegs[]): Promise<Map<string, number | n
 export async function loadTravelTimeline(
   now: Date,
   windowEnd: Date,
-  config: Pick<AvailabilityConfig, "bufferMin" | "bookingBufferAfterMin">,
+  config: Pick<AvailabilityConfig, "bufferMin" | "bookingBufferAfterMin" | "gapAfterJobMin">,
   exclude: { bookingId?: string; eventId?: string | null } = {},
 ): Promise<TravelCommitment[]> {
   // From NZ midnight: a job that finished earlier today still sets where you drive from.
@@ -162,26 +203,31 @@ export async function loadTravelTimeline(
     [...bookings.map((b) => b.calendarEventId), exclude.eventId].filter(Boolean),
   );
   return buildTravelTimeline({
-    bookings: bookings.filter((b) => b.meetingType !== "remote"),
+    bookings: bookings.filter((b) => !isRemoteBooking(b)),
     events: calendar.events.filter((e) => !e.allDay && !skipEventIds.has(e.id)),
     personalCalId: process.env.PERSONAL_CALENDAR_ID ?? "",
     homeAddress: identity.baseAddress.line || process.env.HOME_ADDRESS || "",
     backMinByEventId,
     bookingBufferMin: config.bookingBufferAfterMin,
     eventBufferMin: config.bufferMin,
+    currentJob: {
+      nowMs: now.getTime(),
+      gapAfterJobMin: config.gapAfterJobMin,
+      bookingCalId: getBookingCalendarId(),
+    },
   });
 }
 
 /**
- * Where you are now, from the OwnTracks location when it's fresh and precise enough under the
- * Travel alerts limits. Coordinates are rounded to about 10 m so repeat checks share a price.
- * Never throws: no usable location just means no drive-from-here check.
+ * Where you are now, as the ring around home the OwnTracks location falls in, when it's fresh
+ * and precise enough under the Travel alerts limits. The point itself goes no further. Never
+ * throws: at home, no usable location or no known home all mean no drive-from-here check.
  * @param now - Current instant.
- * @returns The spot, or null.
+ * @returns The ring spot, or null.
  */
 export async function loadCurrentSpot(now: Date): Promise<CurrentSpot | null> {
   try {
-    const [phone, { comms }] = await Promise.all([readPhoneLocation(), getSettings()]);
+    const [phone, { comms, identity }] = await Promise.all([readPhoneLocation(), getSettings()]);
     const usable = isUsableLocation(
       phone,
       now.getTime(),
@@ -189,10 +235,78 @@ export async function loadCurrentSpot(now: Date): Promise<CurrentSpot | null> {
       comms.phoneLocationMaxAccuracyM,
     );
     if (!usable) return null;
-    return { origin: `${phone.lat.toFixed(4)},${phone.lng.toFixed(4)}`, atMs: now.getTime() };
+    const homeAddress = identity.baseAddress.line || process.env.HOME_ADDRESS || "";
+    const home = await homePoint(homeAddress, identity.baseAddress);
+    if (!home) return null;
+    const ring = locationRing(distanceM(phone, home), comms.atHomeRadiusM);
+    return ring === "home" ? null : { ...ring, atMs: now.getTime() };
   } catch (error) {
     console.error("[booking-travel] Phone location read failed:", error);
     return null;
+  }
+}
+
+/**
+ * Whether you're on a job, out or home right now, for the notice rule. A job is a confirmed
+ * booking or a booking-calendar event running now; family and personal events aren't. A calendar
+ * that fails to answer only drops its events.
+ * @param now - Current instant.
+ * @returns The state; "home" when nothing says otherwise.
+ */
+export async function loadNoticeState(now: Date): Promise<NoticeState> {
+  const nowMs = now.getTime();
+  const bookingCalId = getBookingCalendarId();
+  const [bookings, calendar, here] = await Promise.all([
+    prisma.booking.findMany({
+      where: {
+        status: "confirmed",
+        startAt: { lte: now },
+        endAt: { gt: now },
+        ...CALENDAR_EVENT_PRESENT_FILTER,
+      },
+      select: { endAt: true },
+    }),
+    fetchAllCalendarEventsDetailed(now, new Date(nowMs + 60_000)).catch((error: unknown) => {
+      console.error("[booking-travel] Calendar read failed; judging notice without it:", error);
+      return { events: [], failedCalendarIds: [] };
+    }),
+    loadCurrentSpot(now),
+  ]);
+  const ends = [
+    ...bookings.map((b) => b.endAt.getTime()),
+    ...calendar.events
+      .filter(
+        (e) =>
+          e.calendarEmail === bookingCalId &&
+          !e.allDay &&
+          new Date(e.start).getTime() <= nowMs &&
+          new Date(e.end).getTime() > nowMs,
+      )
+      .map((e) => new Date(e.end).getTime()),
+  ];
+  if (ends.length > 0) return { kind: "on-job", jobEndMs: Math.max(...ends) };
+  if (here) return { kind: "out", driveMin: here.driveMin };
+  return { kind: "home" };
+}
+
+/**
+ * The availability config with the customer notice for right now in place of the fixed minimum
+ * notice, for the public booking page, its edit page and their submit routes. Admin booking
+ * flows keep the plain setting. Fails safe: an error keeps the configured minimum notice.
+ * @param now - Current instant.
+ * @param config - Live availability settings.
+ * @returns The config, `minHoursNotice` holding this moment's notice in hours.
+ */
+export async function withCustomerNotice(
+  now: Date,
+  config: AvailabilityConfig,
+): Promise<AvailabilityConfig> {
+  try {
+    const minutes = noticeMinutes(await loadNoticeState(now), now.getTime(), config);
+    return { ...config, minHoursNotice: minutes / 60 };
+  } catch (error) {
+    console.error("[booking-travel] Notice check failed; using the minimum notice:", error);
+    return config;
   }
 }
 
@@ -231,8 +345,8 @@ export async function travelVerdictForSlot(
       slotEnd.getTime(),
       config.bookingBufferAfterMin,
       legs,
-      legs.from ? (prices.get(travelLegKey(legs.from)) ?? null) : null,
-      legs.to ? (prices.get(travelLegKey(legs.to)) ?? null) : null,
+      legMinutes(legs.from, prices),
+      legMinutes(legs.to, prices),
     );
   } catch (error) {
     console.error("[booking-travel] Drive check failed; letting the time through:", error);
@@ -329,8 +443,8 @@ export async function findTravelBlockedSlots(
         entry.endMs,
         config.bookingBufferAfterMin,
         legs,
-        legs.from ? (prices.get(travelLegKey(legs.from)) ?? null) : null,
-        legs.to ? (prices.get(travelLegKey(legs.to)) ?? null) : null,
+        legMinutes(legs.from, prices),
+        legMinutes(legs.to, prices),
       ) !== "ok"
     );
   };

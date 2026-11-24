@@ -45,7 +45,7 @@ export async function completeBilledBookings(
         data: { status: "completed", activeSlotKey: `released:${id}` },
       });
     }
-    if (bookings.length > 0) revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+    if (bookings.length > 0) revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
     return bookings.length;
   } catch (err) {
     console.error(`${logTag} Couldn't mark billed bookings completed:`, err);

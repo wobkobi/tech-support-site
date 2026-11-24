@@ -20,7 +20,10 @@ import {
 import { bookingEventSummary } from "@/features/booking/lib/booking-event.server";
 import { confirmationCoversReminder } from "@/features/booking/lib/booking-reminder";
 import { travelVerdictMessage } from "@/features/booking/lib/booking-travel";
-import { travelVerdictForSlot } from "@/features/booking/lib/booking-travel.server";
+import {
+  travelVerdictForSlot,
+  withCustomerNotice,
+} from "@/features/booking/lib/booking-travel.server";
 import {
   loadBlockingBookings,
   loadBlockingEvents,
@@ -49,7 +52,7 @@ import {
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email-booking";
-import { cancelHeldBookingEmails } from "@/features/reviews/lib/email-core";
+import { cancelHeldBookingEmails, outreachHoldUntil } from "@/features/reviews/lib/email-core";
 import { errorResponse } from "@/shared/lib/api-response";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -234,7 +237,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         existingForValidation,
         calendarEvents,
         now,
-        config,
+        await withCustomerNotice(now, config),
       );
       if (!validation.valid) {
         return errorResponse(validation.error, 400);
@@ -359,6 +362,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // The reschedule notice is held for quiet hours like every customer email, so whether it
+    // covers the reminder is judged from when it lands.
+    const noticeLands = slotMoved ? ((await outreachHoldUntil(now)) ?? now) : now;
     const update = {
       name: cleanName,
       notes: bookingNotes,
@@ -376,11 +382,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             customerRescheduleCount: booking.customerRescheduleCount + 1,
           }
         : {}),
-      // A moved start re-arms the reminder, unless this reschedule notice already does its job
-      // (the same rule that skips a reminder for a booking made close to the start).
-      ...(startMoved
+      // A moved start or length re-arms the reminder (its calendar file changes), unless this
+      // notice already does its job (the same rule that skips one for a booking made close in).
+      ...(slotMoved
         ? {
-            emailReminderSentAt: confirmationCoversReminder(startAt, now, {
+            emailReminderSentAt: confirmationCoversReminder(startAt, noticeLands, {
               leadHours: settings.comms.reminderLeadHours,
               freeNoticeHours: settings.pricing.cancellation.freeNoticeHours,
             })
@@ -566,9 +572,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Held emails name the old time. Same gate as the reminder-stamp clear above,
+    // Held emails carry the old time or length. Same gate as the reminder-stamp clear above,
     // or a recalled reminder would never re-send.
-    if (startMoved) {
+    if (slotMoved) {
       await cancelHeldBookingEmails(booking.id);
     }
 

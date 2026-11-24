@@ -44,9 +44,11 @@ import { isBusinessModifier } from "@/features/business/lib/job-modifiers";
 import {
   chosenSurcharge,
   clampBillableMins,
+  dateSurcharge,
   surchargeOption,
   unsuccessfulShareLabel,
   type DateSurcharge,
+  type SurchargeRules,
 } from "@/features/business/lib/pricing-policy";
 import type { ActivePromo } from "@/features/business/lib/promos";
 import type {
@@ -61,7 +63,7 @@ import {
 } from "@/features/contacts/components/ContactNameInput";
 import { cn } from "@/shared/lib/cn";
 import { roundCents } from "@/shared/lib/money";
-import { nzNowTime } from "@/shared/lib/timezone-utils";
+import { nzNowTime, timeParts } from "@/shared/lib/timezone-utils";
 import Link from "next/link";
 import type React from "react";
 import { useState } from "react";
@@ -128,8 +130,10 @@ interface Props {
   rates: RateConfig[];
   /** The job's promo (its booking's, or whichever ran when it was booked), else today's, or null. */
   promo: ActivePromo | null;
-  /** The job's labour surcharge (public holiday, weekend or after hours), or null. */
+  /** The job's labour surcharge at page load (public holiday, weekend or after hours), or null. */
   surcharge: DateSurcharge | null;
+  /** The job day's holiday, weekday and rules, so a changed Start re-judges after hours. */
+  surchargeDay: { holidayName: string | null; weekday: number; rules: SurchargeRules };
   /** Account number shown under the total for a bank transfer. */
   bankAccount: string;
   /** NZ wall-clock HH:MM at page load; seeds the end time without a hydration mismatch. */
@@ -146,7 +150,8 @@ interface Props {
  * @param props - Component props.
  * @param props.rates - Rate rows; the default hourly row prices labour.
  * @param props.promo - Automatic promo to apply, or null.
- * @param props.surcharge - The job's labour surcharge (public holiday, weekend or after hours), or null.
+ * @param props.surcharge - The job's labour surcharge at page load, or null.
+ * @param props.surchargeDay - The job day's holiday, weekday and rules for re-judging on Start.
  * @param props.bankAccount - Account number for bank transfers.
  * @param props.initialEnd - End time to start with (now, at page load).
  * @param props.events - Today's events to match against.
@@ -157,7 +162,8 @@ interface Props {
 export function QuickPriceView({
   rates,
   promo,
-  surcharge: todaySurcharge,
+  surcharge: loadedSurcharge,
+  surchargeDay,
   bankAccount,
   initialEnd,
   events,
@@ -168,6 +174,18 @@ export function QuickPriceView({
   const [start, setStart] = useState(prefill?.start ?? "");
   const [end, setEnd] = useState(prefill?.end ?? initialEnd);
   const timeCheck = checkRange(start, end);
+  // After hours depends on the start, so a corrected Start re-judges it like the calculator.
+  const [startH, startM] = start ? timeParts(start) : [NaN, NaN];
+  const startMins = Number.isNaN(startH) || Number.isNaN(startM) ? null : startH * 60 + startM;
+  const todaySurcharge =
+    startMins === null
+      ? loadedSurcharge
+      : dateSurcharge(
+          surchargeDay.holidayName,
+          surchargeDay.weekday,
+          surchargeDay.rules,
+          startMins,
+        );
   const [business, setBusiness] = useState(false);
   // Couldn't fix the problem: the labour bills at the unsuccessful-visit share.
   const [unfixed, setUnfixed] = useState(false);

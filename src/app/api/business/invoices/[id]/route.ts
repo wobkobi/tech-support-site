@@ -25,7 +25,7 @@ import {
   parseString,
 } from "@/features/business/lib/validation";
 import type { LineItem } from "@/features/business/types/business";
-import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
+import { attachEmailIfMissing, rememberBilledEmail } from "@/features/contacts/lib/find-or-create";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
@@ -84,7 +84,8 @@ export async function GET(
     return errorResponse("Unauthorized", 401);
   }
 
-  const { id } = await params;
+  const id = parseObjectId((await params).id);
+  if (!id) return errorResponse("Invoice not found", 404);
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) return errorResponse("Not found", 404);
   return NextResponse.json({ ok: true, invoice });
@@ -105,7 +106,8 @@ export async function PATCH(
     return errorResponse("Unauthorized", 401);
   }
 
-  const { id } = await params;
+  const id = parseObjectId((await params).id);
+  if (!id) return errorResponse("Invoice not found", 404);
   const body = await request.json();
 
   // Current row, for the edit rules and the VOIDED-is-immutable invariant.
@@ -288,6 +290,10 @@ export async function PATCH(
         console.error("[invoice-patch] Failed to update promo redemption:", err);
       });
     }
+    // A corrected address belongs to the customer too, so the review ask can use it.
+    if (clientEmail !== undefined && emailAfter && emailAfter !== current.clientEmail) {
+      await rememberBilledEmail(invoice.contactId, emailAfter);
+    }
     const incomeSheetWarning = prepaid ? (await syncAlreadyPaidIncome(id)).sheetSyncWarning : false;
     await syncInvoicePdfToDriveById(id, "[invoice-patch]");
     return NextResponse.json({ ok: true, invoice, incomeSheetWarning });
@@ -338,7 +344,8 @@ export async function DELETE(
     return errorResponse("Unauthorized", 401);
   }
 
-  const { id } = await params;
+  const id = parseObjectId((await params).id);
+  if (!id) return errorResponse("Invoice not found", 404);
   // Only DRAFTs are deletable (audit trail); enforced here against crafted requests.
   const existing = await prisma.invoice.findUnique({
     where: { id },

@@ -17,6 +17,7 @@ import {
   type JobDuration,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import { withCustomerNotice } from "@/features/booking/lib/booking-travel.server";
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { withDateSurcharges } from "@/features/business/lib/pricing-policy.server";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
@@ -64,12 +65,13 @@ async function getAvailableDays(
       : [],
   );
 
-  const [existing, cachedEvents] = await Promise.all([
+  const [existing, cachedEvents, noticeConfig] = await Promise.all([
     loadBlockingBookings(now, { excludeId: booking.id }),
     prisma.calendarEventCache.findMany({
       where: { expiresAt: { gt: now }, endAt: { gte: now } },
       select: { eventId: true, startAt: true, endAt: true },
     }),
+    withCustomerNotice(now, config),
   ]);
 
   let calendarEvents: Array<{ id: string; start: string; end: string }>;
@@ -93,7 +95,7 @@ async function getAvailableDays(
     existing,
     calendarEvents.filter((e) => !own.has(e.id)),
     now,
-    config,
+    noticeConfig,
   ).days;
 }
 

@@ -17,15 +17,16 @@ type Props = Omit<React.ComponentProps<"input">, "type" | "value"> & {
 };
 
 /**
- * Dollar-amount number input. While focused it gets the raw number, which React leaves
- * alone when it equals the typed text ("12.50" stays as typed), so nothing reformats
- * mid-typing; on blur it switches to the two-decimal text.
+ * Dollar-amount number input. While focused it shows exactly what was typed, so "0" on the
+ * way to "0.50" stays put; if the amount changes from outside mid-edit it shows that instead.
+ * On blur it switches to the two-decimal text.
  * @param props - Native input props plus the amount.
  * @param props.amount - The amount in dollars.
  * @param props.showZero - Show 0 as "0" instead of an empty box.
  * @param props.bare - Skip the admin field style and apply `className` as given.
  * @param props.onFocus - Called after the box starts showing what's typed.
  * @param props.onBlur - Called after the box goes back to two-decimal text.
+ * @param props.onChange - Called with each keystroke's change event.
  * @returns The input element.
  */
 export function MoneyInput({
@@ -34,22 +35,30 @@ export function MoneyInput({
   bare = false,
   onFocus,
   onBlur,
+  onChange,
   ...rest
 }: Props): React.ReactElement {
-  const [editing, setEditing] = useState(false);
+  // The typed text while focused; null when not editing.
+  const [typed, setTyped] = useState<string | null>(null);
   const blank = amount === 0 && !showZero;
   const Input: React.ElementType = bare ? "input" : AdminInput;
+  const typedMatches = typed !== null && Number(typed || "0") === amount;
+  const value = typedMatches ? typed : blank ? "" : moneyInputText(amount);
   return (
     <Input
       {...rest}
       type="number"
-      value={blank ? "" : editing ? amount : moneyInputText(amount)}
+      value={value}
       onFocus={(e: React.FocusEvent<HTMLInputElement>) => {
-        setEditing(true);
+        setTyped(blank ? "" : String(amount));
         onFocus?.(e);
       }}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+        setTyped(e.target.value);
+        onChange?.(e);
+      }}
       onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
-        setEditing(false);
+        setTyped(null);
         onBlur?.(e);
       }}
     />

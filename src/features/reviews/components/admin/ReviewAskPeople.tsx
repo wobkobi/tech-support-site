@@ -134,13 +134,22 @@ export function ReviewAskPeople({
   const [bulk, setBulk] = useState<BulkState>({ kind: "closed" });
 
   /**
-   * Moves just-asked rows to "Had their Google ask" at once; every ask now leads with Google.
+   * Moves just-asked rows to "Asked recently" at once, as the server will class them; with no
+   * gap, or a review on file, they're "Had their Google ask", since every ask leads with Google.
    * @param match - Picks the rows that were just asked.
    */
   function markAsked(match: (p: AskPerson) => boolean): void {
     const at = new Date().toISOString();
     setPeople((prev) =>
-      prev.map((p) => (match(p) ? { ...p, lastAskedAt: at, status: "google_asked" } : p)),
+      prev.map((p) =>
+        match(p)
+          ? {
+              ...p,
+              lastAskedAt: at,
+              status: gapDays > 0 && p.status !== "reviewed" ? "recent" : "google_asked",
+            }
+          : p,
+      ),
     );
   }
 
