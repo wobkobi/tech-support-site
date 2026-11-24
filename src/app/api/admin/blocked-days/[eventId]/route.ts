@@ -91,13 +91,13 @@ export async function DELETE(
     const range = removedDay ? await getBlockedDayRange(eventId) : null;
     if (!removedDay || !range) {
       await deleteBookingEvent({ eventId });
-      revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+      revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
       return NextResponse.json({ ok: true, action: "deleted" });
     }
     // The block was changed since the page loaded; unblocking a day it no longer covers must
     // not take the rest of the block with it.
     if (removedDay < range.startDateKey || removedDay >= range.endDateKey) {
-      revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+      revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
       return errorResponse(
         "That day isn't part of this block any more. Refresh and try again.",
         409,
@@ -131,14 +131,14 @@ export async function DELETE(
       }
     }
 
-    revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+    revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
     return NextResponse.json({ ok: true, action });
   } catch (err) {
     // Already gone (404/410) means already unblocked.
     const code =
       (err as { code?: number; status?: number })?.code ?? (err as { status?: number })?.status;
     if (code === 404 || code === 410) {
-      revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+      revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
       return NextResponse.json({ ok: true, action: "already-gone" });
     }
     console.error("[admin/blocked-days/[eventId]] Unblock failed:", err);

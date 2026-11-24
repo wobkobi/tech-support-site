@@ -112,7 +112,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await refreshCalendarCache().catch((error: unknown) =>
       console.error("[jobs/extend] Calendar cache refresh failed:", error),
     );
-    revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+    revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
     // Whether the later finish now puts the next job at risk: pushes "Running late" if so.
     after(() =>
       runRunningLateCheck("live", new Date(), "manual").catch((error: unknown) =>

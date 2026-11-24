@@ -37,7 +37,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const events = await fetchAllCalendarEvents(new Date(from), new Date(to));
     const token = scheduleEventsToken(events);
     const seen = request.nextUrl.searchParams.get("token");
-    if (seen !== null && seen !== token) revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+    if (seen !== null && seen !== token) revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
     return NextResponse.json({ ok: true, token });
   } catch (err) {
     console.error("[schedule/version] failed:", err);

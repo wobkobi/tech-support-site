@@ -29,6 +29,6 @@ export async function refreshPromoCacheAtBoundary(): Promise<boolean> {
   const unchanged =
     (cachedPromo?.id ?? null) === (livePromo?.id ?? null) && cachedHasCode === liveCodeCount > 0;
   if (unchanged) return false;
-  revalidateTag(ACTIVE_PROMO_TAG, {});
+  revalidateTag(ACTIVE_PROMO_TAG, { expire: 0 });
   return true;
 }

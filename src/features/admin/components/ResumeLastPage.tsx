@@ -20,6 +20,22 @@ interface LastPage {
   at: number;
 }
 
+/** One-shot query flags that act on load (send preview, new form, extend card); never resumed. */
+const ONE_SHOT_PARAMS = ["send", "new", "extend"];
+
+/**
+ * The page to remember: the path with its query, minus {@link ONE_SHOT_PARAMS}.
+ * @param pathname - The page's path.
+ * @param search - Its query string, with or without the leading "?".
+ * @returns The path to store.
+ */
+function resumablePath(pathname: string, search: string): string {
+  const params = new URLSearchParams(search);
+  for (const p of ONE_SHOT_PARAMS) params.delete(p);
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
 /**
  * Whether this document load is the installed app opening at its start_url: standalone, on
  * the bare dashboard, and a navigation rather than a pull-to-refresh reload.
@@ -46,7 +62,7 @@ export function ResumeLastPage(): null {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const path = `${pathname}${searchParams.size > 0 ? `?${searchParams.toString()}` : ""}`;
+    const path = resumablePath(pathname, searchParams.toString());
     try {
       if (!launchChecked) {
         launchChecked = true;
@@ -71,7 +87,7 @@ export function ResumeLastPage(): null {
     function onHide(): void {
       if (document.visibilityState !== "hidden") return;
       try {
-        const path = `${window.location.pathname}${window.location.search}`;
+        const path = resumablePath(window.location.pathname, window.location.search);
         localStorage.setItem(LAST_PAGE_KEY, JSON.stringify({ path, at: Date.now() }));
       } catch {
         // Storage unavailable; nothing to record.

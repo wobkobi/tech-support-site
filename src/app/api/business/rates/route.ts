@@ -86,8 +86,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Re-read and bust the public pricing cache only when a migration wrote.
   if (missing.length > 0 || hasRetiredLabels || travelRetired || needsUpdatedAtBackfill) {
     rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
-    // Next 16's revalidateTag requires a second CacheLifeConfig arg.
-    revalidateTag(RATE_CONFIG_TAG, {});
+    // expire: 0 drops the cached copy now; the default profile would serve it once more.
+    revalidateTag(RATE_CONFIG_TAG, { expire: 0 });
   }
 
   return NextResponse.json({ ok: true, rates });
@@ -137,8 +137,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   }
 
-  // Next 16's revalidateTag requires a second CacheLifeConfig arg.
-  revalidateTag(RATE_CONFIG_TAG, {});
+  // expire: 0 drops the cached copy now; the default profile would serve it once more.
+  revalidateTag(RATE_CONFIG_TAG, { expire: 0 });
   return NextResponse.json({ ok: true, rate }, { status: 201 });
 }
 
@@ -155,7 +155,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   await prisma.rateConfig.deleteMany({});
   await prisma.rateConfig.createMany({ data: DEFAULT_RATE_ROWS });
   const rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
-  // Next 16's revalidateTag requires a second CacheLifeConfig arg.
-  revalidateTag(RATE_CONFIG_TAG, {});
+  // expire: 0 drops the cached copy now; the default profile would serve it once more.
+  revalidateTag(RATE_CONFIG_TAG, { expire: 0 });
   return NextResponse.json({ ok: true, rates });
 }

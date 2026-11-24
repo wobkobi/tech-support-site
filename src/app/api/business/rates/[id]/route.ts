@@ -56,8 +56,8 @@ export async function PATCH(
         data: { isDefault: false },
       });
     }
-    // Next 16's revalidateTag requires a second CacheLifeConfig arg.
-    revalidateTag(RATE_CONFIG_TAG, {});
+    // expire: 0 drops the cached copy now; the default profile would serve it once more.
+    revalidateTag(RATE_CONFIG_TAG, { expire: 0 });
     return NextResponse.json({ ok: true, rate });
   } catch {
     return errorResponse("Rate not found", 404);
@@ -87,8 +87,8 @@ export async function DELETE(
 
   try {
     await prisma.rateConfig.delete({ where: { id } });
-    // Next 16's revalidateTag requires a second CacheLifeConfig arg.
-    revalidateTag(RATE_CONFIG_TAG, {});
+    // expire: 0 drops the cached copy now; the default profile would serve it once more.
+    revalidateTag(RATE_CONFIG_TAG, { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch {
     return errorResponse("Rate not found", 404);

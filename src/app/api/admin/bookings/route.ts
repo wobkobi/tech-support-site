@@ -267,7 +267,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+    revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
     return NextResponse.json({ ok: true, bookingId: booking.id });
   } catch (err) {
     // A failed insert rolls the event back. Past the insert the booking is real: keep its

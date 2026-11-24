@@ -19,9 +19,9 @@ import {
 import { reissueHref } from "@/features/business/lib/invoice-reissue";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SendInvoiceModal, useInvoiceSend } from "./SendInvoiceModal";
 import { TextInvoiceModal } from "./TextInvoiceModal";
 import { type LinkedIncome, useInvoiceVoid, VoidInvoiceModal } from "./VoidInvoiceModal";
@@ -159,6 +159,12 @@ export function InvoiceActions({
     () => autoOpenSend && !clientEmail && status !== "VOIDED",
   );
   const [textKey, setTextKey] = useState(0);
+
+  // Drop ?send=1 once it has done its job, so a reload or the app's resume can't reopen it.
+  const pathname = usePathname();
+  useEffect(() => {
+    if (autoOpenSend) router.replace(pathname, { scroll: false });
+  }, [autoOpenSend, pathname, router]);
 
   // Edit-details modal (SENT/PAID): client details and notes stay editable post-send.
   const savedDetails = {

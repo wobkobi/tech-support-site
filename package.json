@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "5.49.2",
+  "version": "5.49.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -63,16 +63,13 @@
     "edge >= 93"
   ],
   "overrides": {
-    "@typescript-eslint/typescript-estree": {
-      "minimatch": "^11.0.5"
+    "@prisma/config": {
+      "effect": "3.22.4"
     },
     "@vercel/cli-config": {
       "zod": "^4.6.6"
     },
-    "deepmerge-ts": "^8.0.2",
-    "openai": {
-      "google-auth-library": "$google-auth-library"
-    }
+    "deepmerge-ts": "^8.0.2"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",

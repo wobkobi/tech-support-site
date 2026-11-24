@@ -606,7 +606,7 @@ export async function PATCH(
     }
   }
 
-  revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+  revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
   return NextResponse.json({
     ok: true,
     ...(timeChange ? { notified: timeChange.notify } : {}),
@@ -650,6 +650,6 @@ export async function DELETE(
   await cancelHeldBookingEmails(id);
   await prisma.booking.delete({ where: { id } });
 
-  revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+  revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
   return NextResponse.json({ ok: true });
 }
