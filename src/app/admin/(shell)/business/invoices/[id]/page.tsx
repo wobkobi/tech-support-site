@@ -23,6 +23,7 @@ import {
 } from "@/features/business/lib/business";
 import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
+import { findLiveReplacement } from "@/features/business/lib/invoice-replacement.server";
 import { invoiceShareUrl } from "@/features/business/lib/invoice-share";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
@@ -349,6 +350,7 @@ export default async function InvoiceViewPage({
   const recordedPayment =
     invoice.status === "SENT" && !invoice.isQuote ? await findRecordedPayment(invoice) : null;
   // A paid or voided invoice asks for nothing, so its box says so instead of the bank details.
+  const replacedBy = invoice.status === "VOIDED" ? await findLiveReplacement(invoice.number) : null;
   const settled = settledCallout(invoice);
   const quoteLines = quoteCalloutLines(invoice.lineItems, invoice.quoteValidUntil);
 
@@ -422,6 +424,7 @@ export default async function InvoiceViewPage({
                 : null
             }
             isQuote={invoice.isQuote === true}
+            replacedBy={replacedBy}
           />
         }
       />

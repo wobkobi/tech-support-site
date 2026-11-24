@@ -22,6 +22,7 @@ import {
 } from "@/features/business/lib/invoice-numbering";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
+import { resolveReplacedInvoice } from "@/features/business/lib/invoice-replacement.server";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import {
   releaseBookingRedemptions,
@@ -278,15 +279,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ? requestedContactId
       : null;
 
-  // The voided invoice this re-issues, named under the new number so the customer knows
-  // which one it replaces.
+  // The voided invoice this replaces, named under the new number so the customer knows which
+  // one it replaces. Checked before a number is allocated, so a refusal burns none.
   const reissuedId = parseObjectId(reissueOf);
-  const replaced = reissuedId
-    ? await prisma.invoice.findFirst({
-        where: { id: reissuedId, status: "VOIDED" },
-        select: { number: true },
-      })
-    : null;
+  const replaced = await resolveReplacedInvoice({
+    reissuedId,
+    isQuote: isQuote === true,
+    bookingId: parseObjectId(bookingId),
+    calendarEventIds: [
+      ...mergedEventIds,
+      ...(typeof calendarEventId === "string" && calendarEventId ? [calendarEventId] : []),
+    ],
+  });
+  if (!replaced.ok) return errorResponse(replaced.error, replaced.status);
 
   // Retry on a number collision (concurrent creates or a stale sheet counter).
   let invoice: Awaited<ReturnType<typeof prisma.invoice.create>> | null = null;
@@ -309,7 +314,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           dueDate: dueDateValue,
           jobDate:
             typeof jobDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(jobDate) ? jobDate : null,
-          replacesNumber: replaced?.number ?? null,
+          replacesNumber: replaced.number,
           lineItems: lines,
           gst: gstAmount > 0,
           subtotal,
