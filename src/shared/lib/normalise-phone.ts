@@ -123,6 +123,18 @@ export function isValidPhone(normalised: string): boolean {
 }
 
 /**
+ * Every form a phone key may be stored in: E.164, and for an NZ number the local "021..." form
+ * bare and spaced, which a few older rows kept.
+ * @param key - A normalised phone key from {@link normaliseContactPhone}.
+ * @returns The forms to look the number up by, without repeats.
+ */
+export function storedPhoneForms(key: string): string[] {
+  if (!key.startsWith("+64")) return [key];
+  const local = `0${key.slice(3)}`;
+  return [...new Set([key, local, formatNZPhone(local)])];
+}
+
+/**
  * Whether a phone key is an NZ mobile (02x). Only mobiles are personal enough to auto-merge on.
  * @param key - A normalised phone key from {@link normaliseContactPhone} (E.164 "+642x...", or a domestic "02x" form).
  * @returns Whether the number is an NZ mobile.
