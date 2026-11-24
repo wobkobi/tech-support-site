@@ -307,6 +307,22 @@ function main(): void {
     [swapped.unitPrice, swapped.modifierIds],
     [65, ["remote"]],
   );
+  const free = [{ ...task(60, 0, { base: null }), priceOverridden: true }];
+  const credit = [{ ...task(60, -50, { base: null }), priceOverridden: true }];
+  expectEqual(
+    "a free or credit line keeps its price under the Business tick",
+    [
+      setBusinessOnAllTasks(free, "biz", true, RATES)[0]!.unitPrice,
+      setBusinessOnAllTasks(credit, "biz", true, RATES)[0]!.unitPrice,
+    ],
+    [0, -50],
+  );
+  const cheap = [{ ...task(60, 20, { base: null }), priceOverridden: true }];
+  expectEqual(
+    "a discount never takes a typed rate below $0",
+    toggleTaskModifierLine(cheap, 0, "home", RATES)[0]!.unitPrice,
+    0,
+  );
   const based = toggleTaskModifierLine([task(60, 100)], 0, "home", RATES)[0]!;
   expectEqual(
     "a chip on a based row still re-prices it",
