@@ -232,6 +232,7 @@ export function SocialOverview({
             {dayLabel(data.views.from)} to {dayLabel(data.views.to)}.{" "}
             {data.views.series.includes("google") &&
               `Google figures run about ${GOOGLE_LAG_DAYS} days behind, so the week ends when every app's figures are in. `}
+            {data.views.stale.map((line) => `${line} `)}
             <Link href={SOCIAL_ANALYTICS_PATH} className="font-semibold text-russian-violet">
               See Analytics
             </Link>

@@ -87,6 +87,14 @@ function main(): void {
     { others: [], repeated: false },
   );
   expectEqual(
+    "a bare suburb isn't a repeat, though the site's address names it",
+    otherGoogleAddresses(
+      [{ formattedValue: site }, { formattedValue: "Westmere, Auckland", type: "work" }],
+      site,
+    ),
+    { others: [{ formattedValue: "Westmere, Auckland", type: "work" }], repeated: false },
+  );
+  expectEqual(
     "no site address keeps every extra",
     otherGoogleAddresses([{ formattedValue: site }, { formattedValue: site }], null),
     { others: [{ formattedValue: site }], repeated: false },

@@ -120,6 +120,38 @@ async function addressFields(raw: string): Promise<{
 }
 
 /**
+ * An address stripped to the fields Google lets a write set, keeping its label and parts.
+ * @param a - The address as Google returned it.
+ * @returns The writable copy.
+ */
+function writableAddress(a: people_v1.Schema$Address): people_v1.Schema$Address {
+  return {
+    formattedValue: a.formattedValue,
+    type: a.type,
+    streetAddress: a.streetAddress,
+    extendedAddress: a.extendedAddress,
+    poBox: a.poBox,
+    city: a.city,
+    region: a.region,
+    postalCode: a.postalCode,
+    country: a.country,
+    countryCode: a.countryCode,
+  };
+}
+
+/**
+ * Whether a Google address repeats the site's place: it starts with a street number and says
+ * nothing the site's doesn't. Without the number a bare suburb or street ("Westmere", "Point
+ * Chevalier Road") would count, and those can be other places.
+ * @param siteAddress - The site's address.
+ * @param other - Google's formatted address.
+ * @returns True when it's the same place written another way.
+ */
+function repeatsSiteAddress(siteAddress: string | null, other: string | null): boolean {
+  return /^\s*\d/.test(other ?? "") && addressCovers(siteAddress, other);
+}
+
+/**
  * Google's addresses after the first, minus repeats of the site's place. A merge in Google keeps
  * every address from both contacts, so one place can turn up twice in two formats.
  * @param addresses - The person's addresses as Google returned them; the first pairs with the site's.
@@ -132,28 +164,19 @@ export function otherGoogleAddresses(
 ): { others: people_v1.Schema$Address[]; repeated: boolean } {
   const extras = (addresses ?? []).slice(1);
   const others = extras
-    .filter((a) => !addressCovers(siteAddress, a.formattedValue ?? null))
-    .map((a) => ({
-      formattedValue: a.formattedValue,
-      type: a.type,
-      streetAddress: a.streetAddress,
-      extendedAddress: a.extendedAddress,
-      poBox: a.poBox,
-      city: a.city,
-      region: a.region,
-      postalCode: a.postalCode,
-      country: a.country,
-      countryCode: a.countryCode,
-    }));
+    .filter((a) => !repeatsSiteAddress(siteAddress, a.formattedValue ?? null))
+    .map(writableAddress);
   return { others, repeated: others.length < extras.length };
 }
 
 /**
- * Writes a person's addresses back with the site's place once, when Google holds it twice.
- * Never throws: a failed tidy is retried the next time Google's copy changes.
+ * Writes a person's addresses back without the repeats of the site's place, when Google holds
+ * it twice. Google's first address goes back as it was, label and parts included; a first with
+ * no formatted text is left alone. Never throws: a failed tidy is retried the next time
+ * Google's copy changes.
  * @param people - People API client.
  * @param person - The person as Google returned it.
- * @param siteAddress - The site's address for them, standing in for Google's first.
+ * @param siteAddress - The site's address for them, which the repeats are judged against.
  * @returns The person's etag after the write, or the one it had when nothing was written.
  */
 async function tidyRepeatedAddresses(
@@ -162,6 +185,8 @@ async function tidyRepeatedAddresses(
   siteAddress: string | null,
 ): Promise<string | null> {
   const etag = person.etag ?? null;
+  const first = person.addresses?.[0];
+  if (!first?.formattedValue?.trim()) return etag;
   const { others, repeated } = otherGoogleAddresses(person.addresses, siteAddress);
   if (!repeated || !siteAddress || !etag || !person.resourceName) return etag;
   const resourceName = person.resourceName;
@@ -172,7 +197,7 @@ async function tidyRepeatedAddresses(
         updatePersonFields: "addresses",
         // The etag varies with the field mask; the listing's mask returns the one it will see.
         personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
-        requestBody: { etag, addresses: [{ formattedValue: siteAddress }, ...others] },
+        requestBody: { etag, addresses: [writableAddress(first), ...others] },
       }),
     );
     return updated.data.etag ?? etag;
@@ -689,13 +714,44 @@ async function createGoogleContact(
 }
 
 /**
+ * The Google person holding a phone number, paging the connections until it turns up.
+ * @param people - People API client.
+ * @param key - The number as {@link normaliseContactPhone} keys it.
+ * @returns The person, or null when no one in Google has it.
+ */
+async function findGooglePersonByPhone(
+  people: people_v1.People,
+  key: string,
+): Promise<people_v1.Schema$Person | null> {
+  let pageToken: string | undefined;
+  do {
+    const response = await peopleCall(() =>
+      people.people.connections.list({
+        resourceName: "people/me",
+        personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
+        pageSize: 1000,
+        ...(pageToken ? { pageToken } : {}),
+      }),
+    );
+    const person = (response.data.connections ?? []).find((p) =>
+      (p.phoneNumbers ?? []).some((n) => normaliseContactPhone(n.value) === key),
+    );
+    if (person) return person;
+    pageToken = response.data.nextPageToken ?? undefined;
+  } while (pageToken);
+  return null;
+}
+
+/**
  * Puts a phone-only contact the operator has just added into Google Contacts, so it shows in
  * the invoice calculator's picker and on their phone. {@link syncContactToGoogle} leaves
  * phone-only contacts to the import, so this is their one push; Google owns them after it.
- * The caller has already ruled out a contact with this mobile in the site's table, which the
- * import fills from Google.
+ * The caller has already ruled out a contact with this mobile in the site's table, but Google
+ * can have it from the phone since the last import, so a match there is linked, not copied.
  * @param contactId - The new contact.
- * @returns "created", "skipped" when it has an email or a Google link already, or the failure.
+ * @returns "created", "synced" when linked to the Google person who already has the number,
+ * "skipped" when it has an email or a Google link already (or that person is another
+ * contact's), or the failure.
  */
 export async function pushPhoneOnlyContactToGoogle(contactId: string): Promise<ContactSyncOutcome> {
   try {
@@ -703,7 +759,29 @@ export async function pushPhoneOnlyContactToGoogle(contactId: string): Promise<C
     if (!contact?.phone || contact.deletedAt || contact.email || contact.googleContactId) {
       return "skipped";
     }
-    return await createGoogleContact(getPeopleClient(), contact);
+    const people = getPeopleClient();
+    const key = normaliseContactPhone(contact.phone);
+    const match = key ? await findGooglePersonByPhone(people, key) : null;
+    if (match?.resourceName) {
+      const taken = await prisma.contact.findFirst({
+        where: { googleContactId: match.resourceName, id: { not: contact.id } },
+        select: { id: true },
+      });
+      if (taken) return "skipped";
+      // Same-instant stamp: see the pushOk stamp in syncContactToGoogle for why.
+      const stampedAt = new Date();
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          googleContactId: match.resourceName,
+          lastSyncedAt: stampedAt,
+          updatedAt: stampedAt,
+          lastGoogleEtag: match.etag ?? null,
+        },
+      });
+      return "synced";
+    }
+    return await createGoogleContact(people, contact);
   } catch (err) {
     console.error(`[google-contacts] pushPhoneOnlyContactToGoogle failed for ${contactId}:`, err);
     return failureOutcome(err);

@@ -192,6 +192,7 @@ function row(item: Partial<SocialPostRow>, over: Partial<ContentListRow> = {}): 
       tagIds: [],
       isPreset: false,
       status: "draft",
+      canReopen: false,
       scheduledAt: null,
       postedAt: null,
       promoId: null,

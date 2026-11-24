@@ -3,7 +3,11 @@
 // Email is not `@unique`, so prisma.contact.upsert can't be used; find + conditional create replaces it.
 
 import { normaliseEmail } from "@/shared/lib/normalise-email";
-import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
+import {
+  isNZMobileKey,
+  normaliseContactPhone,
+  storedPhoneForms,
+} from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import type { Contact } from "@prisma/client";
 
@@ -71,8 +75,7 @@ export async function findOrCreateContactByEmail(
   }
   const phoneKey = normaliseContactPhone(seed.phone);
   if (phoneKey && isNZMobileKey(phoneKey)) {
-    // Stored phones are E.164, but a few older rows kept the local "021..." form.
-    const forms = phoneKey.startsWith("+64") ? [phoneKey, `0${phoneKey.slice(3)}`] : [phoneKey];
+    const forms = storedPhoneForms(phoneKey);
     const phoneMatches = await prisma.contact.findMany({
       where: {
         OR: [{ phone: { in: forms } }, { altPhones: { hasSome: forms } }],
@@ -200,7 +203,7 @@ export async function rememberBilledEmail(
 }
 
 /**
- * Finds a live Contact by phone (normalised to E.164).
+ * Finds a live Contact by phone, in any form it may be stored in ({@link storedPhoneForms}).
  * @param phone - Phone number to match on (normalised internally).
  * @param options - Lookup options.
  * @param options.mobileOnly - Never match a landline, which a household shares.
@@ -212,11 +215,10 @@ export async function findContactByPhone(
 ): Promise<Contact | null> {
   const normalisedPhone = normaliseContactPhone(phone) ?? phone.trim();
   if (!normalisedPhone || (mobileOnly && !isNZMobileKey(normalisedPhone))) return null;
+  const forms = storedPhoneForms(normalisedPhone);
   return prisma.contact.findFirst({
-    where: {
-      OR: [{ phone: normalisedPhone }, { altPhones: { has: normalisedPhone } }],
-      deletedAt: null,
-    },
+    where: { OR: [{ phone: { in: forms } }, { altPhones: { hasSome: forms } }], deletedAt: null },
+    orderBy: { createdAt: "asc" },
   });
 }
 

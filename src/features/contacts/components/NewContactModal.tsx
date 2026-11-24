@@ -16,7 +16,7 @@ import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 /**
  * Dialog for adding a contact by hand. On save it opens the contact: the new one, or the
@@ -35,10 +35,14 @@ export function NewContactModal({ onClose }: { onClose: () => void }): React.Rea
   const [unit, setUnit] = useState("");
   const [address, setAddress] = useState("");
   const [saving, setSaving] = useState(false);
+  // State lags a render, so two presses in one tick would both read saving as false.
+  const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   /** Validates, saves, then opens the saved contact. */
   async function handleSave(): Promise<void> {
+    // The button and Enter both submit; a second press while saving would create a twin.
+    if (savingRef.current) return;
     if (!name.trim()) {
       setError("Add a name.");
       return;
@@ -47,6 +51,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }): React.Rea
       setError("Add an email or a mobile number.");
       return;
     }
+    savingRef.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -84,6 +89,7 @@ export function NewContactModal({ onClose }: { onClose: () => void }): React.Rea
       router.push(`/admin/contacts/${data.contact.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save the contact.");
+      savingRef.current = false;
       setSaving(false);
     }
   }

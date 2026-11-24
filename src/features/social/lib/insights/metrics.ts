@@ -793,6 +793,47 @@ export function dayLabel(key: string): string {
   return `${WEEKDAY_SHORT[weekday]} ${d} ${MONTHS[m - 1]}`;
 }
 
+/** Days past an app's usual lag before its silence counts as stopped, not just late. */
+export const STALE_AFTER_DAYS = 3;
+
+/** An app that has stopped sending figures, with the last day it gave one. */
+export interface StaleApp {
+  platform: SocialPlatformKey;
+  lastDay: string;
+}
+
+/**
+ * Apps whose newest figure is more than {@link STALE_AFTER_DAYS} behind where their usual lag
+ * puts it (yesterday for Meta, {@link GOOGLE_LAG_DAYS} back for Google): a lost connection or a
+ * broken read. Left to {@link reportedThrough}, one would end the chart on its last day for
+ * every app. Apps with no figure at all aren't listed; that function skips them already.
+ * @param days - Account days.
+ * @param days.platform - Its app.
+ * @param days.day - Its key.
+ * @param days.value - The figure, or null when the app didn't give it.
+ * @param today - Today's key.
+ * @param platforms - The apps on show.
+ * @returns The stopped apps, in `platforms` order.
+ */
+export function staleApps(
+  days: readonly { platform: SocialPlatformKey; day: string; value: number | null }[],
+  today: string,
+  platforms: readonly SocialPlatformKey[],
+): StaleApp[] {
+  const out: StaleApp[] = [];
+  for (const p of platforms) {
+    let last: string | null = null;
+    for (const d of days) {
+      if (d.platform === p && d.value !== null && (last === null || d.day > last)) last = d.day;
+    }
+    const lag = p === "google" ? GOOGLE_LAG_DAYS : 1;
+    if (last !== null && last < addDaysToDateKey(today, -(lag + STALE_AFTER_DAYS))) {
+      out.push({ platform: p, lastDay: last });
+    }
+  }
+  return out;
+}
+
 /**
  * The last day every app has reported a figure for, so a chart can end there instead of showing
  * days not reported yet as 0. The apps run behind (Meta about a day, Google about 3), and the
