@@ -1,7 +1,7 @@
 // src/features/booking/lib/booking-travel.server.ts
-// Loads the day's located commitments (and, for slots today, where your phone is) and prices the
-// drives around a new in-person booking, for the booking grid's address check and the submit-time
-// re-check.
+// Loads the day's located commitments (and, for slots today, the ring around home your phone is
+// in) and prices the drives around a new in-person booking, for the booking grid's address check
+// and the submit-time re-check.
 
 import {
   bookingWindowEnd,
@@ -11,6 +11,8 @@ import {
 } from "@/features/booking/lib/booking";
 import {
   buildTravelTimeline,
+  legMinutes,
+  locationRing,
   slotTravelLegs,
   travelLegKey,
   travelVerdict,
@@ -22,8 +24,8 @@ import {
   type TravelVerdict,
 } from "@/features/booking/lib/booking-travel";
 import { fetchAllCalendarEventsDetailed } from "@/features/calendar/lib/google-calendar";
-import { isUsableLocation } from "@/features/calendar/lib/running-late";
-import { readPhoneLocation } from "@/features/calendar/lib/running-late.server";
+import { distanceM, isUsableLocation } from "@/features/calendar/lib/running-late";
+import { homePoint, readPhoneLocation } from "@/features/calendar/lib/running-late.server";
 import { calculateTravelMinutes } from "@/features/calendar/lib/travel-time";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -86,7 +88,8 @@ async function priceLeg(leg: TravelLeg): Promise<number | null> {
 async function priceLegs(legs: SlotTravelLegs[]): Promise<Map<string, number | null>> {
   const unique = new Map<string, TravelLeg>();
   for (const l of legs) {
-    if (l.from) unique.set(travelLegKey(l.from), l.from);
+    // The drive from your ring is fixed, never priced.
+    if (l.from && l.from.fixedMin === undefined) unique.set(travelLegKey(l.from), l.from);
     if (l.to) unique.set(travelLegKey(l.to), l.to);
   }
   const entries = await Promise.all(
@@ -173,15 +176,15 @@ export async function loadTravelTimeline(
 }
 
 /**
- * Where you are now, from the OwnTracks location when it's fresh and precise enough under the
- * Travel alerts limits. Coordinates are rounded to about 10 m so repeat checks share a price.
- * Never throws: no usable location just means no drive-from-here check.
+ * Where you are now, as the ring around home the OwnTracks location falls in, when it's fresh
+ * and precise enough under the Travel alerts limits. The point itself goes no further. Never
+ * throws: at home, no usable location or no known home all mean no drive-from-here check.
  * @param now - Current instant.
- * @returns The spot, or null.
+ * @returns The ring spot, or null.
  */
 export async function loadCurrentSpot(now: Date): Promise<CurrentSpot | null> {
   try {
-    const [phone, { comms }] = await Promise.all([readPhoneLocation(), getSettings()]);
+    const [phone, { comms, identity }] = await Promise.all([readPhoneLocation(), getSettings()]);
     const usable = isUsableLocation(
       phone,
       now.getTime(),
@@ -189,7 +192,11 @@ export async function loadCurrentSpot(now: Date): Promise<CurrentSpot | null> {
       comms.phoneLocationMaxAccuracyM,
     );
     if (!usable) return null;
-    return { origin: `${phone.lat.toFixed(4)},${phone.lng.toFixed(4)}`, atMs: now.getTime() };
+    const homeAddress = identity.baseAddress.line || process.env.HOME_ADDRESS || "";
+    const home = await homePoint(homeAddress, identity.baseAddress);
+    if (!home) return null;
+    const ring = locationRing(distanceM(phone, home), comms.atHomeRadiusM);
+    return ring === "home" ? null : { ...ring, atMs: now.getTime() };
   } catch (error) {
     console.error("[booking-travel] Phone location read failed:", error);
     return null;
@@ -231,8 +238,8 @@ export async function travelVerdictForSlot(
       slotEnd.getTime(),
       config.bookingBufferAfterMin,
       legs,
-      legs.from ? (prices.get(travelLegKey(legs.from)) ?? null) : null,
-      legs.to ? (prices.get(travelLegKey(legs.to)) ?? null) : null,
+      legMinutes(legs.from, prices),
+      legMinutes(legs.to, prices),
     );
   } catch (error) {
     console.error("[booking-travel] Drive check failed; letting the time through:", error);
@@ -329,8 +336,8 @@ export async function findTravelBlockedSlots(
         entry.endMs,
         config.bookingBufferAfterMin,
         legs,
-        legs.from ? (prices.get(travelLegKey(legs.from)) ?? null) : null,
-        legs.to ? (prices.get(travelLegKey(legs.to)) ?? null) : null,
+        legMinutes(legs.from, prices),
+        legMinutes(legs.to, prices),
       ) !== "ok"
     );
   };

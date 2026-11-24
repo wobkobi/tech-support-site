@@ -7,6 +7,9 @@ import type { BookableDay } from "@/features/booking/lib/booking";
 import {
   applyTravelBlocks,
   buildTravelTimeline,
+  FAR_RING_DRIVE_MIN,
+  legMinutes,
+  locationRing,
   slotTravelLegs,
   TO_NEXT_DEPARTURE_LEAD_MIN,
   travelLegKey,
@@ -163,29 +166,56 @@ const nextDay = slotTravelLegs(nz(14, 0, 1), nz(15, 0, 1), OREWA, timeline);
 expectEqual("next day: previous is that day's job", nextDay.from?.origin, "Work site, Albany");
 expect("next day: no next commitment", nextDay.to === null);
 
-// Current spot: for a slot today, where the phone is replaces the drive in once nothing earlier
-// is still running.
-const PHONE = "-36.9000,174.8000";
-const morningHere = slotTravelLegs(nz(10), nz(11), OREWA, timeline, { origin: PHONE, atMs: nz(8) });
-expectEqual("today, nothing before: drive from the phone", morningHere.from?.origin, PHONE);
-expectEqual("drive from the phone leaves now", morningHere.from?.departMs, nz(8));
-expect("drive from the phone is marked", morningHere.from?.fromHere === true);
+// Current spot: for a slot today, the ring the phone is in replaces the drive in once nothing
+// earlier is still running. Only the ring goes on the leg, never a point.
+const RING = { ring: "within 10 km", driveMin: 25 };
+const morningHere = slotTravelLegs(nz(10), nz(11), OREWA, timeline, { ...RING, atMs: nz(8) });
+expectEqual(
+  "today, nothing before: drive from the ring",
+  morningHere.from?.origin,
+  "ring:within 10 km",
+);
+expectEqual("drive from the ring leaves now", morningHere.from?.departMs, nz(8));
+expect("drive from the ring is marked", morningHere.from?.fromHere === true);
+expectEqual("drive from the ring is fixed", morningHere.from?.fixedMin, 25);
+expectEqual("fixed drive needs no price", legMinutes(morningHere.from, new Map()), 25);
 const duringJob = slotTravelLegs(nz(13, 45), nz(14, 45), OREWA, timeline, {
-  origin: PHONE,
+  ...RING,
   atMs: nz(12, 30),
 });
 expectEqual("a job still running sets the drive in", duringJob.from?.origin, PAPAKURA);
+expectEqual(
+  "a priced leg reads its price",
+  legMinutes(duringJob.from, new Map([[travelLegKey(duringJob.from!), 40]])),
+  40,
+);
+expectEqual("an unpriced leg is open", legMinutes(duringJob.from, new Map()), null);
 const inBuffer = slotTravelLegs(nz(13, 45), nz(14, 45), OREWA, timeline, {
-  origin: PHONE,
+  ...RING,
   atMs: nz(13, 10),
 });
-expectEqual("after the job, the phone wins", inBuffer.from?.origin, PHONE);
+expectEqual("after the job, the ring wins", inBuffer.from?.origin, "ring:within 10 km");
 expectEqual("but you're ready once the buffer's over", inBuffer.from?.readyMs, nz(13, 30));
 const tomorrowHere = slotTravelLegs(nz(10, 0, 2), nz(11, 0, 2), OREWA, timeline, {
-  origin: PHONE,
+  ...RING,
   atMs: nz(8),
 });
 expect("another day ignores the phone", tomorrowHere.from === null);
+
+// Rings: straight-line distance from home, the at-home radius first.
+expectEqual("inside the radius is home", locationRing(250, 300), "home");
+expectEqual("just out of the radius", locationRing(301, 300), {
+  ring: "within 5 km",
+  driveMin: 15,
+});
+expectEqual("5 km is the first ring", locationRing(5_000, 300), {
+  ring: "within 5 km",
+  driveMin: 15,
+});
+expectEqual("7 km", locationRing(7_000, 300), { ring: "within 10 km", driveMin: 25 });
+expectEqual("15 km", locationRing(15_000, 300), { ring: "within 20 km", driveMin: 40 });
+expectEqual("40 km", locationRing(40_000, 300), { ring: "further", driveMin: FAR_RING_DRIVE_MIN });
+
 expectEqual(
   "too far from here",
   travelVerdict(nz(10), nz(11), 30, morningHere, 150, null),

@@ -1,7 +1,7 @@
 // src/features/booking/lib/booking-travel.ts
 // Drive-time rule for a new in-person booking: the drive from the previous job (or, for a slot
-// today, from where your phone is now) and on to the next one must fit around the slot. Pure, so
-// the booking form can mask its grid with it.
+// today, from the ring around home your phone is in) and on to the next one must fit around the
+// slot. Pure, so the booking form can mask its grid with it.
 
 import type { BookableDay } from "@/features/booking/lib/booking";
 import { buildTimeline, type LocatedCommitment } from "@/features/calendar/lib/travel-timeline";
@@ -45,21 +45,56 @@ export interface TravelLeg {
   departMs: number;
 }
 
-/** Where you are right now, from a fresh phone location. */
+/**
+ * Rings around home the phone position is reduced to, nearest first, each with the drive assumed
+ * from anywhere inside it. Only the ring is used, so the real point is never sent to Google and
+ * the "from where you are" drive costs no lookup. Beyond the last ring, {@link FAR_RING_DRIVE_MIN}.
+ */
+export const LOCATION_RINGS: ReadonlyArray<{ withinKm: number; driveMin: number }> = [
+  { withinKm: 5, driveMin: 15 },
+  { withinKm: 10, driveMin: 25 },
+  { withinKm: 20, driveMin: 40 },
+];
+
+/** Drive assumed from further out than the last of {@link LOCATION_RINGS}. */
+export const FAR_RING_DRIVE_MIN = 60;
+
+/** Where you are right now, reduced to a ring around home (never at home: that's no spot). */
 export interface CurrentSpot {
-  /** "lat,lng" for Distance Matrix. */
-  origin: string;
+  /** Ring label for logs and the leg key, e.g. "within 10 km" or "further". */
+  ring: string;
+  /** Drive assumed from this ring to any customer. */
+  driveMin: number;
   /** Now (ms). */
   atMs: number;
+}
+
+/**
+ * The ring a phone position falls in, from its straight-line distance to home.
+ * @param distanceM - Metres from home.
+ * @param atHomeRadiusM - Within this, you count as home.
+ * @returns "home", or the ring label and its drive minutes.
+ */
+export function locationRing(
+  distanceM: number,
+  atHomeRadiusM: number,
+): "home" | { ring: string; driveMin: number } {
+  if (distanceM <= atHomeRadiusM) return "home";
+  for (const r of LOCATION_RINGS) {
+    if (distanceM <= r.withinKm * 1000) {
+      return { ring: `within ${r.withinKm} km`, driveMin: r.driveMin };
+    }
+  }
+  return { ring: "further", driveMin: FAR_RING_DRIVE_MIN };
 }
 
 /** The drives a slot depends on; null where there's no commitment that side of it that day. */
 export interface SlotTravelLegs {
   /**
    * Drive in from the previous commitment, or from where you are now; `readyMs` is when you can
-   * set off, `fromHere` marks the phone-location drive.
+   * set off, `fromHere` marks the drive from your ring, whose fixed minutes are `fixedMin`.
    */
-  from: (TravelLeg & { readyMs: number; fromHere?: boolean }) | null;
+  from: (TravelLeg & { readyMs: number; fromHere?: boolean; fixedMin?: number }) | null;
   /** Drive on to the next commitment; `arriveByMs` is its start. */
   to: (TravelLeg & { arriveByMs: number }) | null;
 }
@@ -154,12 +189,13 @@ export function slotTravelLegs(
   return {
     from: fromHere
       ? {
-          origin: here.origin,
+          origin: `ring:${here.ring}`,
           destination: address,
           departMs: here.atMs,
           // Still inside the last job's buffer: you set off once it's over.
           readyMs: Math.max(here.atMs, prev ? prev.endMs + prev.bufferAfterMin * MIN : 0),
           fromHere: true,
+          fixedMin: here.driveMin,
         }
       : prev
         ? {
@@ -178,6 +214,20 @@ export function slotTravelLegs(
         }
       : null,
   };
+}
+
+/**
+ * Drive minutes for a slot's leg: the ring's fixed drive, else its Distance Matrix price.
+ * @param leg - The leg, or null when that side has nothing.
+ * @param prices - Priced legs by {@link travelLegKey}.
+ * @returns Minutes, or null when there's no leg or it couldn't be priced.
+ */
+export function legMinutes(
+  leg: (TravelLeg & { fixedMin?: number }) | null,
+  prices: Map<string, number | null>,
+): number | null {
+  if (!leg) return null;
+  return leg.fixedMin ?? prices.get(travelLegKey(leg)) ?? null;
 }
 
 /**
