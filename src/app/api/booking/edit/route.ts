@@ -361,7 +361,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // The reschedule notice is held for quiet hours like every customer email, so whether it
     // covers the reminder is judged from when it lands.
-    const noticeLands = startMoved ? ((await outreachHoldUntil(now)) ?? now) : now;
+    const noticeLands = slotMoved ? ((await outreachHoldUntil(now)) ?? now) : now;
     const update = {
       name: cleanName,
       notes: bookingNotes,
@@ -379,9 +379,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             customerRescheduleCount: booking.customerRescheduleCount + 1,
           }
         : {}),
-      // A moved start re-arms the reminder, unless this reschedule notice already does its job
-      // (the same rule that skips a reminder for a booking made close to the start).
-      ...(startMoved
+      // A moved start or length re-arms the reminder (its calendar file changes), unless this
+      // notice already does its job (the same rule that skips one for a booking made close in).
+      ...(slotMoved
         ? {
             emailReminderSentAt: confirmationCoversReminder(startAt, noticeLands, {
               leadHours: settings.comms.reminderLeadHours,
@@ -569,9 +569,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Held emails name the old time. Same gate as the reminder-stamp clear above,
+    // Held emails carry the old time or length. Same gate as the reminder-stamp clear above,
     // or a recalled reminder would never re-send.
-    if (startMoved) {
+    if (slotMoved) {
       await cancelHeldBookingEmails(booking.id);
     }
 
