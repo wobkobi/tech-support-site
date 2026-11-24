@@ -14,6 +14,7 @@ import {
   releaseBookingRedemptions,
   settlePromoRedemption,
 } from "@/features/business/lib/promo-redemption";
+import { parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -36,7 +37,8 @@ export async function POST(
     return errorResponse("Unauthorized", 401);
   }
 
-  const { id } = await params.params;
+  const id = parseObjectId((await params.params).id);
+  if (!id) return errorResponse("Invoice not found", 404);
   let existing;
   try {
     existing = await prisma.invoice.findUnique({ where: { id } });

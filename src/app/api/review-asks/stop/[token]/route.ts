@@ -6,6 +6,7 @@ import { followMerges } from "@/features/contacts/lib/merge-links";
 import { verifyReviewAskStopToken } from "@/features/mailing/lib/unsubscribe-token";
 import { allowReviewAsks, optOutOfReviewAsks } from "@/features/reviews/lib/review-ask-opt-out";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 /** Token the admin preview carries, so its link works without touching a real contact. */
@@ -34,6 +35,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ): Promise<NextResponse> {
+  // Generous: one-click unsubscribes after a send all come from the mail providers' servers.
+  const limited = rateLimitOrReject(request, "review-ask-stop", 60, 60_000);
+  if (limited) return limited;
   const { token } = await params;
   const action = await readAction(request);
   if (!action) return errorResponse('action must be "stop" or "allow".', 400);

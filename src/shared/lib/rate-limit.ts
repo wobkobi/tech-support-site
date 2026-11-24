@@ -47,16 +47,40 @@ function rateLimit(
 
 /**
  * Client IP from the first `x-forwarded-for` entry, then `x-real-ip`, else "unknown".
- * @param request - Incoming request.
+ * @param request - Incoming request, or anything with its headers (a page's `headers()`).
+ * @param request.headers - The request headers.
  * @returns Client IP string.
  */
-export function getClientIp(request: NextRequest): string {
+export function getClientIp(request: { headers: Pick<Headers, "get"> }): string {
   const fwd = request.headers.get("x-forwarded-for");
   if (fwd) {
     const first = fwd.split(",")[0]?.trim();
     if (first) return first;
   }
   return request.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
+/**
+ * Whether the request's IP has used up a failure budget, without counting this request. Pair with
+ * {@link recordFailure} for credential checks: once locked out, even a right guess is refused.
+ * @param request - Incoming request used to derive the client IP.
+ * @param scope - Short identifier for the check.
+ * @param limit - Failures allowed within the window.
+ * @returns True when the IP is locked out.
+ */
+export function isFailureLimited(request: NextRequest, scope: string, limit: number): boolean {
+  const bucket = buckets.get(`${scope}:${getClientIp(request)}`);
+  return !!bucket && bucket.resetAt > Date.now() && bucket.count >= limit;
+}
+
+/**
+ * Counts one failure against the request's IP for {@link isFailureLimited}.
+ * @param request - Incoming request used to derive the client IP.
+ * @param scope - Short identifier for the check.
+ * @param windowMs - Window length in milliseconds.
+ */
+export function recordFailure(request: NextRequest, scope: string, windowMs: number): void {
+  rateLimit(`${scope}:${getClientIp(request)}`, Number.POSITIVE_INFINITY, windowMs);
 }
 
 /**

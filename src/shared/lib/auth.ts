@@ -3,68 +3,13 @@
 
 import { isSessionRevoked } from "@/features/admin/lib/session-revocation.server";
 import { touchSession } from "@/features/admin/lib/sign-in-log.server";
+import { checkAdminSecretHeader, isOverAuthFailLimit } from "@/shared/lib/admin-secret";
 import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/shared/lib/admin-session";
 import { getClientIp } from "@/shared/lib/rate-limit";
 import { timingSafeEqual } from "crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after, NextRequest } from "next/server";
-
-/**
- * Validates a token against ADMIN_SECRET using constant-time comparison.
- * @param token - Token to validate.
- * @returns True if the token matches ADMIN_SECRET.
- */
-function isValidAdminToken(token: string | null | undefined): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret || !token) return false;
-  try {
-    return timingSafeEqual(Buffer.from(token), Buffer.from(secret));
-  } catch {
-    return false;
-  }
-}
-
-// Per-IP failed-auth bucket. Only wrong/missing X-Admin-Secret attempts count,
-// so the operator's legitimate (successful) traffic never hits the limit.
-interface AuthFailBucket {
-  count: number;
-  resetAt: number;
-}
-const authFailBuckets = new Map<string, AuthFailBucket>();
-const AUTH_FAIL_LIMIT = 30;
-const AUTH_FAIL_WINDOW_MS = 60_000;
-const AUTH_FAIL_MAX_BUCKETS = 1_000;
-
-/**
- * Whether the IP is over its failed-auth budget. Read-only.
- * @param ip - Client IP from {@link getClientIp}.
- * @returns Whether to fast-fail this request.
- */
-function isOverAuthFailLimit(ip: string): boolean {
-  const b = authFailBuckets.get(ip);
-  if (!b || b.resetAt <= Date.now()) return false;
-  return b.count > AUTH_FAIL_LIMIT;
-}
-
-/**
- * Records a failed admin-auth attempt for the IP, evicting stale buckets to cap memory.
- * @param ip - Client IP from {@link getClientIp}.
- */
-function recordAuthFail(ip: string): void {
-  const now = Date.now();
-  let b = authFailBuckets.get(ip);
-  if (!b || b.resetAt <= now) {
-    b = { count: 0, resetAt: now + AUTH_FAIL_WINDOW_MS };
-    authFailBuckets.set(ip, b);
-  }
-  b.count++;
-  if (authFailBuckets.size > AUTH_FAIL_MAX_BUCKETS) {
-    for (const [k, v] of authFailBuckets) {
-      if (v.resetAt <= now) authFailBuckets.delete(k);
-    }
-  }
-}
 
 /**
  * Checks for valid admin credentials: a signed, not signed-out cookie or the X-Admin-Secret
@@ -83,9 +28,7 @@ export async function isAdminRequest(req: NextRequest): Promise<boolean> {
     // failure budget, which a signed-in device on the same wifi shares.
     return !(await isSessionRevoked(cookieValue));
   }
-  const ok = isValidAdminToken(req.headers.get("x-admin-secret"));
-  if (!ok) recordAuthFail(ip);
-  return ok;
+  return checkAdminSecretHeader(ip, req.headers.get("x-admin-secret"));
 }
 
 /**
@@ -108,13 +51,10 @@ export async function requireAdminAuth(redirectPath = "/admin"): Promise<void> {
   // Accept X-Admin-Secret too, so scripts get the page instead of a login redirect (browsers can't
   // set it on navigation). Rate-limited per IP as on the API side.
   const headerStore = await headers();
-  const ip =
-    headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headerStore.get("x-real-ip")?.trim() ||
-    "unknown";
-  if (!isOverAuthFailLimit(ip)) {
-    if (isValidAdminToken(headerStore.get("x-admin-secret"))) return;
-    recordAuthFail(ip);
+  if (
+    checkAdminSecretHeader(getClientIp({ headers: headerStore }), headerStore.get("x-admin-secret"))
+  ) {
+    return;
   }
 
   redirect(`/admin/login?next=${encodeURIComponent(redirectPath)}`);

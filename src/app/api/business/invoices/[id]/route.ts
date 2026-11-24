@@ -84,7 +84,8 @@ export async function GET(
     return errorResponse("Unauthorized", 401);
   }
 
-  const { id } = await params;
+  const id = parseObjectId((await params).id);
+  if (!id) return errorResponse("Invoice not found", 404);
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) return errorResponse("Not found", 404);
   return NextResponse.json({ ok: true, invoice });
@@ -105,7 +106,8 @@ export async function PATCH(
     return errorResponse("Unauthorized", 401);
   }
 
-  const { id } = await params;
+  const id = parseObjectId((await params).id);
+  if (!id) return errorResponse("Invoice not found", 404);
   const body = await request.json();
 
   // Current row, for the edit rules and the VOIDED-is-immutable invariant.
@@ -342,7 +344,8 @@ export async function DELETE(
     return errorResponse("Unauthorized", 401);
   }
 
-  const { id } = await params;
+  const id = parseObjectId((await params).id);
+  if (!id) return errorResponse("Invoice not found", 404);
   // Only DRAFTs are deletable (audit trail); enforced here against crafted requests.
   const existing = await prisma.invoice.findUnique({
     where: { id },

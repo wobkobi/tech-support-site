@@ -1,8 +1,11 @@
 // src/proxy.ts
-// Edge gate for admin/business routes: a signed session cookie or the `x-admin-secret` header.
-// Per-route checks still run as well.
+// Gate for admin/business routes: a signed session cookie or the `x-admin-secret` header.
+// Per-route checks still run as well. Runs on Node (the Next 16 proxy default), so the header
+// check counts wrong guesses per IP like the route gates do.
 
+import { checkAdminSecretHeader } from "@/shared/lib/admin-secret";
 import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/shared/lib/admin-session";
+import { getClientIp } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 const PROTECTED_API_PREFIXES = ["/api/admin/", "/api/business/"];
@@ -13,19 +16,6 @@ const PROTECTED_PAGE_PREFIX = "/admin";
 const PUBLIC_EXCEPTIONS = ["/admin/login", "/api/admin/login", "/api/admin/logout"];
 
 /**
- * Edge-safe near-constant-time compare against `ADMIN_SECRET` (no `timingSafeEqual` on Edge;
- * Node handlers re-check properly).
- * @param provided - Secret value pulled from a header.
- * @returns True when the value matches `process.env.ADMIN_SECRET`.
- */
-function hasValidHeaderSecret(provided: string | null): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret || !provided) return false;
-  if (provided.length !== secret.length) return false;
-  return provided === secret;
-}
-
-/**
  * Whether the request has a valid admin session cookie or `x-admin-secret` header.
  * @param request - Incoming Next.js request.
  * @returns Whether the request should be allowed through.
@@ -33,7 +23,10 @@ function hasValidHeaderSecret(provided: string | null): boolean {
 async function hasAdminAccess(request: NextRequest): Promise<boolean> {
   const cookieValue = request.cookies.get(ADMIN_SESSION_COOKIE)?.value ?? null;
   if (cookieValue && (await verifySessionCookieValue(cookieValue))) return true;
-  return hasValidHeaderSecret(request.headers.get("x-admin-secret"));
+  // A browser visit with no header isn't a guess, so it doesn't use up the IP's budget.
+  const provided = request.headers.get("x-admin-secret");
+  if (!provided) return false;
+  return checkAdminSecretHeader(getClientIp(request), provided);
 }
 
 /**
