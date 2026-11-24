@@ -35,7 +35,7 @@ calls the endpoints over HTTPS on a schedule. Every job is a plain `GET` route u
 
 ## Auth
 
-Every cron route checks `Authorization: Bearer <CRON_SECRET>` via `isCronAuthorized`
+Every cron route checks `Authorization: Bearer <CRON_SECRET>` via `isCronAuthorised`
 (`src/shared/lib/auth.ts`); the old `x-vercel-cron` header path was removed in 1.49.4. In each
 cron-job.org job, add a request header:
 
@@ -242,7 +242,7 @@ above are local and keep across DST changes.
 
 ## Adding a new job
 
-1. Create `src/app/api/cron/<name>/route.ts` with a `GET` handler that checks `isCronAuthorized`
+1. Create `src/app/api/cron/<name>/route.ts` with a `GET` handler that checks `isCronAuthorised`
    first and returns 401 otherwise.
 2. Don't export `maxDuration` - the 300 s project default covers it, and a per-route value adds a
    function bundle (see Notes).

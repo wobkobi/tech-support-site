@@ -22,6 +22,7 @@ import {
 } from "@/features/business/lib/invoice-numbering";
 import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
+import { resolveReplacedInvoice } from "@/features/business/lib/invoice-replacement.server";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import {
   releaseBookingRedemptions,
@@ -267,8 +268,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Already paid is more than the invoice total", 400);
   }
 
+  // A re-issue keeps the voided invoice's booking and contact when the calculator has none
+  // (no event backs the job), so the promo and review ask still find them.
+  const reissuedId = parseObjectId(reissueOf);
+  const reissuedLinks = reissuedId
+    ? await prisma.invoice.findFirst({
+        where: { id: reissuedId, status: "VOIDED" },
+        select: { bookingId: true, contactId: true },
+      })
+    : null;
+  const billedBookingId = parseObjectId(bookingId) ?? reissuedLinks?.bookingId ?? null;
+
   // A missing or deleted contact saves the invoice unlinked rather than pointing nowhere.
-  const requestedContactId = parseObjectId(contactId);
+  const requestedContactId = parseObjectId(contactId) ?? reissuedLinks?.contactId ?? null;
   const linkedContactId =
     requestedContactId &&
     (await prisma.contact.findFirst({
@@ -278,15 +290,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ? requestedContactId
       : null;
 
-  // The voided invoice this re-issues, named under the new number so the customer knows
-  // which one it replaces.
-  const reissuedId = parseObjectId(reissueOf);
-  const replaced = reissuedId
-    ? await prisma.invoice.findFirst({
-        where: { id: reissuedId, status: "VOIDED" },
-        select: { number: true },
-      })
-    : null;
+  // The voided invoice this replaces, named under the new number so the customer knows which
+  // one it replaces. Checked before a number is allocated, so a refusal burns none.
+  const replaced = await resolveReplacedInvoice({
+    reissuedId,
+    isQuote: isQuote === true,
+    bookingId: billedBookingId,
+    calendarEventIds: [
+      ...mergedEventIds,
+      ...(typeof calendarEventId === "string" && calendarEventId ? [calendarEventId] : []),
+    ],
+    customer: {
+      contactId: linkedContactId,
+      email: emailValue || null,
+      phone: phone.e164 || null,
+    },
+  });
+  if (!replaced.ok) return errorResponse(replaced.error, replaced.status);
 
   // Retry on a number collision (concurrent creates or a stale sheet counter).
   let invoice: Awaited<ReturnType<typeof prisma.invoice.create>> | null = null;
@@ -309,7 +329,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           dueDate: dueDateValue,
           jobDate:
             typeof jobDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(jobDate) ? jobDate : null,
-          replacesNumber: replaced?.number ?? null,
+          replacesNumber: replaced.number,
           lineItems: lines,
           gst: gstAmount > 0,
           subtotal,
@@ -329,7 +349,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           alreadyPaidMethod: prepaid.method,
           // Prisma throws on a malformed ObjectId; calendarEventId is a free-form Google id.
           contactId: linkedContactId,
-          bookingId: parseObjectId(bookingId),
+          bookingId: billedBookingId,
           calendarEventId:
             typeof calendarEventId === "string" && calendarEventId ? calendarEventId : null,
           // Merged jobs only; empty means "see calendarEventId" (the earliest).
@@ -356,7 +376,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Settle the booking-time redemption with its real value, so one job is one use.
   // A quote is not a use of the promo.
-  const billedBookingId = parseObjectId(bookingId);
   if (!isQuote && promoId && discount > 0) {
     await settlePromoRedemption({
       promoId,
@@ -399,7 +418,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       address: tripRequest.address,
       date: tripRequest.date,
       clientName: invoice.clientName,
-      contactId: parseObjectId(contactId),
+      contactId: linkedContactId,
       invoiceNumber: invoice.number,
     });
   }

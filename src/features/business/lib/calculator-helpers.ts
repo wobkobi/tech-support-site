@@ -120,8 +120,9 @@ export function updateTaskField(
 }
 
 /**
- * Toggles a modifier rate on a task and re-prices it from base + modifiers. A line with no
- * live base keeps its typed price.
+ * Toggles a modifier rate on a task and re-prices it from base + modifiers. A typed $/hr or a
+ * line with no live base moves by the modifier's difference instead; a free or credit line
+ * ($0 or less) keeps its price.
  * @param prev - Current task lines.
  * @param idx - Task index.
  * @param modifierId - Modifier rate ID being toggled on/off.
@@ -149,11 +150,21 @@ export function toggleTaskModifierLine(
   } else {
     next = [...current, modifierId];
   }
-  // A "No base" row (or one whose base row is gone) has no rate to rebuild from, so its
-  // typed $/hr stays rather than dropping to $0.
+  // A typed $/hr, or a "No base" row with no rate to rebuild from, moves by the modifier
+  // instead of being re-priced from the rate table, so $60 + Business reads $80, not $105.
   const hasBase = rates.some((r) => r.id === target.baseRateId && r.ratePerHour !== null);
-  if (!hasBase) {
-    arr[idx] = { ...target, modifierIds: next };
+  if (!hasBase || target.priceOverridden) {
+    // Free and credit lines stay as typed, as surchargeByTask leaves them.
+    const unitPrice =
+      target.unitPrice > 0
+        ? shiftTypedRate(target.unitPrice, current, next, rates)
+        : target.unitPrice;
+    arr[idx] = {
+      ...target,
+      modifierIds: next,
+      unitPrice,
+      lineTotal: roundCents(target.qty * unitPrice),
+    };
     return arr;
   }
   const newPrice = effectiveHourlyRate(rates, target.baseRateId, next);
@@ -165,6 +176,43 @@ export function toggleTaskModifierLine(
     priceOverridden: false,
   };
   return arr;
+}
+
+/**
+ * Re-prices a typed $/hr when its modifiers change. The typed rate is read as
+ * `(own base + current deltas) * current percents`, so the own base is recovered and the new
+ * modifiers applied the same way {@link effectiveHourlyRate} prices a rate-table line.
+ * @param price - The typed $/hr.
+ * @param fromIds - Modifier ids the price already includes.
+ * @param toIds - Modifier ids it should include.
+ * @param rates - Rate configs holding each modifier's delta.
+ * @returns The new $/hr, in cents; never below $0, so a discount can't turn a charge into a credit.
+ */
+function shiftTypedRate(
+  price: number,
+  fromIds: readonly string[],
+  toIds: readonly string[],
+  rates: RateConfig[],
+): number {
+  /**
+   * Summed $/hr delta and multiplied percent factor of a modifier set.
+   * @param ids - Modifier ids.
+   * @returns The delta and factor.
+   */
+  const parts = (ids: readonly string[]): { delta: number; factor: number } => {
+    const mods = ids
+      .map((id) => rates.find((r) => r.id === id))
+      .filter((m): m is RateConfig => !!m);
+    return {
+      delta: mods.reduce((s, m) => s + (m.hourlyDelta ?? 0), 0),
+      factor: mods.reduce((f, m) => f * (1 + (m.percentDelta ?? 0)), 1),
+    };
+  };
+  const from = parts(fromIds);
+  const to = parts(toIds);
+  if (from.factor === 0) return price;
+  const ownBase = price / from.factor - from.delta;
+  return Math.max(0, roundCents((ownBase + to.delta) * to.factor));
 }
 
 /**

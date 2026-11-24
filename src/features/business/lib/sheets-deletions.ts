@@ -48,7 +48,7 @@ export interface SheetDeletionInput {
 /** A row left in place this run, and why. */
 export interface HeldRow {
   row: LinkedLedgerRow;
-  reason: "half-edited" | "recent";
+  reason: "half-edited" | "recent" | "invoice-payment";
 }
 
 /** Which guard stopped a deletion pass. */
@@ -82,7 +82,10 @@ export function planSheetDeletions(input: SheetDeletionInput): SheetDeletionPlan
   for (const row of input.linked) {
     if (input.seen.has(row.syncId)) continue;
     const touched = Math.max(row.createdAt.getTime(), row.updatedAt?.getTime() ?? 0);
-    if (input.partial.has(row.syncId)) held.push({ row, reason: "half-edited" });
+    // An invoice's payment record stays: removing it would leave the invoice PAID with no
+    // money behind it. The owner un-pays or voids the invoice instead.
+    if (row.kind === "income" && row.invoiceId) held.push({ row, reason: "invoice-payment" });
+    else if (input.partial.has(row.syncId)) held.push({ row, reason: "half-edited" });
     else if (touched > cutoff) held.push({ row, reason: "recent" });
     else candidates.push(row);
   }

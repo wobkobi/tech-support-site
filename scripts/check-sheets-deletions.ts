@@ -95,6 +95,14 @@ expectEqual("row edited 30 minutes ago is held", summary(planSheetDeletions(fres
   [["id3", "recent"]],
 ]);
 
+const paid = input(50, [4]);
+paid.linked[3]!.invoiceId = "inv4";
+expectEqual("an invoice's payment record is held, not deleted", summary(planSheetDeletions(paid)), [
+  "ok",
+  [],
+  [["id4", "invoice-payment"]],
+]);
+
 console.log("\nGuards:");
 expectEqual(
   "a workbook failed to read",

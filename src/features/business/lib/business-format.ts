@@ -76,6 +76,18 @@ export function lineItemQtyLabel(item: { qty: number; minutes?: number | null })
 }
 
 /**
+ * Price column text for one invoice line: an hourly labour row reads "$100.00/hr", so "0:45"
+ * next to it isn't mistaken for a count of 0.45; a flat row is the plain amount.
+ * @param item - Invoice line item.
+ * @param item.unitPrice - Hourly rate on labour rows, unit price on flat rows.
+ * @param item.minutes - Billed minutes; present only on hourly labour rows.
+ * @returns Text for the Price cell.
+ */
+export function lineItemPriceLabel(item: { unitPrice: number; minutes?: number | null }): string {
+  return item.minutes == null ? formatNZD(item.unitPrice) : `${formatNZD(item.unitPrice)}/hr`;
+}
+
+/**
  * Converts a duration in minutes to a human-readable label.
  * @param mins - Duration in minutes
  * @returns Formatted label (e.g. "1h 30min")
@@ -210,6 +222,7 @@ export function unsuccessfulNote(tasks: string[], base: number, factor: number):
 /** The invoice fields that say what's been paid. */
 interface SettlementSource {
   status: string;
+  isQuote?: boolean | null;
   total: number;
   alreadyPaid?: number | null;
   paidAt?: Date | string | null;
@@ -249,10 +262,13 @@ export function settlementRows(invoice: SettlementSource): SettlementRow[] {
 /**
  * The box that takes the bank details' place once nothing is owed.
  * @param invoice - The invoice's status and dates.
+ * @param replacedByNumber - Live invoice that replaced a voided one, named so the customer
+ *   knows which one to pay; null when nothing replaced it.
  * @returns Heading and line, or null while the invoice still asks for payment.
  */
 export function settledCallout(
   invoice: SettlementSource,
+  replacedByNumber: string | null = null,
 ): { heading: string; text: string } | null {
   if (invoice.status === "PAID") {
     return {
@@ -263,11 +279,17 @@ export function settledCallout(
     };
   }
   if (invoice.status === "VOIDED") {
+    const kind = invoice.isQuote ? "quote" : "invoice";
+    const when = invoice.voidedAt
+      ? `was voided on ${formatDateShort(invoice.voidedAt)}`
+      : "has been voided";
     return {
       heading: "Voided",
-      text: invoice.voidedAt
-        ? `This invoice was voided on ${formatDateShort(invoice.voidedAt)}, so there's nothing to pay.`
-        : "This invoice has been voided, so there's nothing to pay.",
+      text: replacedByNumber
+        ? `This ${kind} ${when} and replaced by ${replacedByNumber}. There's nothing to pay on this one.`
+        : invoice.isQuote
+          ? `This quote ${when}, so it no longer stands.`
+          : `This invoice ${when}, so there's nothing to pay.`,
     };
   }
   return null;

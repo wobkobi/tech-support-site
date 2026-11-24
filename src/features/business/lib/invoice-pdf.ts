@@ -5,6 +5,7 @@
 import {
   formatNZD,
   goldCardLineLabel,
+  lineItemPriceLabel,
   lineItemQtyLabel,
   promoLineLabel,
   quoteAcceptLine,
@@ -14,6 +15,7 @@ import {
   UNSUCCESSFUL_LINE_LABEL,
 } from "@/features/business/lib/business";
 import { nzFinancialYearCode } from "@/features/business/lib/financial-year";
+import { findLiveReplacement } from "@/features/business/lib/invoice-replacement.server";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
 import type { Invoice } from "@/features/business/types/business";
@@ -457,7 +459,8 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
   const COL = {
     desc: MARGIN,
     qty: MARGIN + CONTENT_W * 0.61,
-    price: MARGIN + CONTENT_W * 0.76,
+    // Wide enough for "$100.00/hr" on hourly rows.
+    price: MARGIN + CONTENT_W * 0.73,
     total: MARGIN + CONTENT_W * 0.87,
   };
   const ROW_H = 28;
@@ -532,7 +535,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
       color: DARK,
     });
 
-    const priceStr = formatNZD(item.unitPrice);
+    const priceStr = lineItemPriceLabel(item);
     ctx.page.drawText(priceStr, {
       x: COL.total - ctx.font.widthOfTextAtSize(priceStr, CELL_SIZE) - 4,
       y: firstBaselineY,
@@ -885,11 +888,13 @@ function drawFooter(ctx: PdfCtx, page: PDFPage, pageNo: number, pageCount: numbe
  * @param invoice - The invoice record to render.
  * @param identity - Business identity to print; the live settings when omitted. The fixture
  *   check passes the defaults, since live settings need a request.
+ * @param replacedByNumber - Live replacement of a voided invoice; looked up when omitted.
  * @returns PDF content as a Buffer.
  */
 export async function generateInvoicePdf(
   invoice: Invoice,
   identity?: IdentitySettings,
+  replacedByNumber?: string | null,
 ): Promise<Buffer> {
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
@@ -913,8 +918,13 @@ export async function generateInvoicePdf(
   y = drawLineItemsTable(ctx, invoice, y);
   y = drawTotalsBlock(ctx, invoice, y);
   // A paid or voided invoice asks for nothing, so its box says so instead of the bank details.
-  const settled = settledCallout(invoice);
-  if (invoice.isQuote) y = drawQuoteCallout(ctx, invoice, y);
+  // A voided quote gets the same box, never the "go ahead" one.
+  const replacement =
+    invoice.status === "VOIDED" && replacedByNumber === undefined
+      ? await voidedReplacementNumber(invoice.number)
+      : (replacedByNumber ?? null);
+  const settled = settledCallout(invoice, replacement);
+  if (invoice.isQuote && !settled) y = drawQuoteCallout(ctx, invoice, y);
   else if (settled) y = drawCallout(ctx, y, settled.heading, [{ text: settled.text }]);
   else y = drawPaymentCallout(ctx, invoice, y);
   drawNotes(ctx, invoice, y);
@@ -922,6 +932,20 @@ export async function generateInvoicePdf(
   pages.forEach((p, i) => drawFooter(ctx, p, i + 1, pages.length));
 
   return Buffer.from(await doc.save());
+}
+
+/**
+ * Number of the live invoice that replaced a voided one. Never throws: without the database
+ * (the fixture check) the box just says voided.
+ * @param voidedNumber - The voided invoice's number.
+ * @returns The replacement's number, or null.
+ */
+async function voidedReplacementNumber(voidedNumber: string): Promise<string | null> {
+  try {
+    return (await findLiveReplacement(voidedNumber))?.number ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**

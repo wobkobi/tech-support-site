@@ -188,13 +188,17 @@ export function buildInvoiceText(
     intro = `here's your receipt from ${brand} for ${formatNZD(invoice.total)} - it's all paid.`;
   } else {
     const kind = invoice.replacesNumber ? "corrected invoice" : "invoice";
+    // Names the one it replaces, so they don't pay both.
+    const replaces = invoice.replacesNumber
+      ? ` It replaces ${invoice.replacesNumber}, so please ignore that one.`
+      : "";
     // A part-paid invoice asks for the rest, as the email does.
     const owed = formatNZD(balanceDue(invoice));
     const due = formatDateShort(invoice.dueDate);
     intro =
       state === "overdue"
-        ? `here's your ${kind} from ${brand}. ${owed} was due on ${due} - the bank details are on it.`
-        : `here's your ${kind} from ${brand}. ${owed} is due by ${due}, and the bank details are on it.`;
+        ? `here's your ${kind} from ${brand}.${replaces} ${owed} was due on ${due} - the bank details are on it.`
+        : `here's your ${kind} from ${brand}.${replaces} ${owed} is due by ${due}, and the bank details are on it.`;
   }
   const signOff = identity.name.trim().split(/\s+/)[0] || brand;
   return [`Hi ${defaultGreetingFor(invoice)}, ${intro}`, invoice.viewUrl, `Thanks, ${signOff}`]

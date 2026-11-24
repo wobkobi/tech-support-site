@@ -41,11 +41,14 @@ const BODY_STYLE = "margin:0 0 14px;color:#444;font-size:16px;line-height:1.6";
  * Renders the review ask.
  * @param firstName - Who it greets; blank greets "there".
  * @param links - Google, site-form and stop links.
+ * @param remote - True for a remote or phone job, which thanks them for "letting me help"
+ * rather than "having me out".
  * @returns Subject, HTML and plain-text bodies.
  */
 export async function buildReviewAskEmail(
   firstName: string,
   links: ReviewAskLinks,
+  remote = false,
 ): Promise<ReviewAskEmail> {
   // Contacts saved with only an email have it as their name; greet "there" instead.
   const first = firstName.trim();
@@ -61,7 +64,7 @@ export async function buildReviewAskEmail(
 
   const html = renderNotificationEmail(`
     <h2 style="margin:0 0 14px;color:#0c0a3e;font-size:22px">Hi ${escapeHtml(name)},</h2>
-    <p style="${BODY_STYLE}">${escapeHtml(sender)}. Thanks for having me out, I hope everything's still working well.</p>
+    <p style="${BODY_STYLE}">${escapeHtml(sender)}. ${remote ? "Thanks for letting me help" : "Thanks for having me out"}, I hope everything's still working well.</p>
     <p style="margin:0 0 24px;color:#444;font-size:16px;line-height:1.6">If you've got a minute, a quick ${google ? "Google " : ""}review would really help other people find me.</p>
     ${mainButton}
     <p style="margin:28px 0 20px;color:#444;font-size:16px;line-height:1.6">If anything still isn't right, just reply to this email.</p>
@@ -70,7 +73,7 @@ ${await buildEmailSignature(getSiteUrl())}
 `);
 
   return {
-    subject: `Thanks for having me${name === "there" ? "" : `, ${name}`} - would you leave a quick review?`,
+    subject: `${remote ? "Thanks for letting me help" : "Thanks for having me"}${name === "there" ? "" : `, ${name}`} - would you leave a quick review?`,
     html,
     text: htmlToText(html),
   };
@@ -89,6 +92,8 @@ export interface ReviewAskRecipient {
   contactId: string;
   /** Review token for the site-form link (a contact's or a booking's). */
   reviewToken: string;
+  /** True when the job was remote or over the phone; changes the thank-you line. */
+  remote?: boolean;
 }
 
 /**
@@ -124,11 +129,15 @@ export async function sendReviewAsk(
     // Throws when UNSUBSCRIBE_SECRET is unset: no working stop link, no send.
     const stopToken = signReviewAskStopToken(recipient.contactId);
     const { reviews } = await getSettings();
-    const email = await buildReviewAskEmail(recipient.firstName, {
-      googleUrl: reviews.googleReviewUrl,
-      siteFormUrl: reviewFormUrl(recipient.reviewToken),
-      stopUrl: `${siteUrl}/review-asks/stop/${stopToken}`,
-    });
+    const email = await buildReviewAskEmail(
+      recipient.firstName,
+      {
+        googleUrl: reviews.googleReviewUrl,
+        siteFormUrl: reviewFormUrl(recipient.reviewToken),
+        stopUrl: `${siteUrl}/review-asks/stop/${stopToken}`,
+      },
+      recipient.remote === true,
+    );
     const result = await sendOutreach(
       {
         from,

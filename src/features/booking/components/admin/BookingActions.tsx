@@ -28,6 +28,8 @@ interface BookingActionsProps {
   lockHours: number;
   /** Google event id; cancel emails and the bill link depend on it. */
   calendarEventId: string | null;
+  /** Whether the booking has a customer email; cancelling an upcoming one emails them. */
+  hasEmail: boolean;
   /** Customer phone for the phone bar's Call button. */
   phone: string | null;
   /** Visit address for the phone bar's Maps button; null for remote jobs. */
@@ -97,6 +99,7 @@ const CONFIRM_COPY: Record<
  * @param props.endAt - Appointment end (ISO).
  * @param props.lockHours - Live past-edit lock window (hours).
  * @param props.calendarEventId - Google event id, if the booking has one.
+ * @param props.hasEmail - Whether the booking has a customer email to send the cancellation to.
  * @param props.phone - Customer phone for the Call button.
  * @param props.address - Visit address for the Maps button (null for remote).
  * @param props.invoiceId - Newest non-voided invoice for this booking.
@@ -112,6 +115,7 @@ export function BookingActions({
   endAt,
   lockHours,
   calendarEventId,
+  hasEmail,
   phone,
   address,
   invoiceId,
@@ -206,14 +210,20 @@ export function BookingActions({
     </div>
   );
 
-  // The customer hears only through Google deleting their invite.
+  // Mirrors the PATCH route: an upcoming booking with an email gets the site's cancellation
+  // email, and Google emails too when it deletes the invite.
+  const emailsCustomer = hasEmail && isFuture;
   const cancelBody = (
     <div className="flex flex-col gap-2">
       <p>{copy?.body}</p>
       <p className="font-medium text-admin-text">
-        {hasCalendarEvent
-          ? "Google Calendar emails the customer that the visit is cancelled."
-          : "The customer isn't emailed - let them know yourself."}
+        {emailsCustomer
+          ? hasCalendarEvent
+            ? "The customer gets a cancellation email, and Google Calendar removes the visit from their calendar."
+            : "The customer gets a cancellation email."
+          : hasCalendarEvent
+            ? "Google Calendar emails the customer that the visit is cancelled."
+            : "The customer isn't emailed - let them know yourself."}
       </p>
     </div>
   );

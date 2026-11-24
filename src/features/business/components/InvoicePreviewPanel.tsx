@@ -7,6 +7,7 @@ import {
   calcInvoiceTotals,
   formatNZD,
   goldCardLineLabel,
+  lineItemPriceLabel,
   lineItemQtyLabel,
   promoLineLabel,
   quoteAcceptLine,
@@ -241,7 +242,7 @@ function InvoicePreviewPanelImpl({
                     {lineItemQtyLabel(item)}
                   </td>
                   <td className="px-1 py-2 text-right align-top whitespace-nowrap text-slate-700 sm:px-2">
-                    {formatNZD(item.unitPrice)}
+                    {lineItemPriceLabel(item)}
                   </td>
                   <td className="px-1 py-2 text-right align-top font-bold whitespace-nowrap text-slate-700 sm:px-2">
                     {formatNZD(item.lineTotal)}

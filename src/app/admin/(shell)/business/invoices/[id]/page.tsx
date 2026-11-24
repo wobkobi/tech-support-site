@@ -13,6 +13,7 @@ import {
   balanceDue,
   formatNZD,
   goldCardLineLabel,
+  lineItemPriceLabel,
   lineItemQtyLabel,
   promoLineLabel,
   quoteAcceptLine,
@@ -23,6 +24,7 @@ import {
 } from "@/features/business/lib/business";
 import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { invoiceRecipient } from "@/features/business/lib/invoice-recipient";
+import { findLiveReplacement } from "@/features/business/lib/invoice-replacement.server";
 import { invoiceShareUrl } from "@/features/business/lib/invoice-share";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { bankCode, bankParticulars } from "@/features/business/lib/payment-fields";
@@ -349,7 +351,8 @@ export default async function InvoiceViewPage({
   const recordedPayment =
     invoice.status === "SENT" && !invoice.isQuote ? await findRecordedPayment(invoice) : null;
   // A paid or voided invoice asks for nothing, so its box says so instead of the bank details.
-  const settled = settledCallout(invoice);
+  const replacedBy = invoice.status === "VOIDED" ? await findLiveReplacement(invoice.number) : null;
+  const settled = settledCallout(invoice, replacedBy?.number ?? null);
   const quoteLines = quoteCalloutLines(invoice.lineItems, invoice.quoteValidUntil);
 
   return (
@@ -422,6 +425,7 @@ export default async function InvoiceViewPage({
                 : null
             }
             isQuote={invoice.isQuote === true}
+            replacedBy={replacedBy}
           />
         }
       />
@@ -549,7 +553,7 @@ export default async function InvoiceViewPage({
                     {lineItemQtyLabel(item)}
                   </td>
                   <td className="px-2 py-2 text-right align-top whitespace-nowrap text-slate-700 sm:px-3">
-                    {formatNZD(item.unitPrice)}
+                    {lineItemPriceLabel(item)}
                   </td>
                   <td className="px-2 py-2 text-right align-top font-bold whitespace-nowrap text-slate-800 sm:px-3">
                     {formatNZD(item.lineTotal)}
@@ -632,7 +636,7 @@ export default async function InvoiceViewPage({
           </div>
 
           {/* The PDF's box: accept a quote, a settled note, or the bank details to pay. */}
-          {invoice.isQuote ? (
+          {invoice.isQuote && !settled ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
               <p className="mb-1 text-sm font-bold text-russian-violet">Accepting this quote</p>
               <p className="text-slate-700">{quoteAcceptLine(identity.phone)}</p>
