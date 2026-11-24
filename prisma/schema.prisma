@@ -884,6 +884,8 @@ model Invoice {
   // Review-ask run: WHERE reviewAskOutcome = ... (clientEmail lookups are
   // case-insensitive regex, which an index can't serve)
   @@index([reviewAskOutcome, sentAt])
+  // Every customer link looks an invoice up by its code.
+  @@index([shareToken])
 }
 
 model IncomeEntry {
