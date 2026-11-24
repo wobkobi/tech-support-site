@@ -61,6 +61,29 @@ export function getClientIp(request: { headers: Pick<Headers, "get"> }): string 
 }
 
 /**
+ * Whether the request's IP has used up a failure budget, without counting this request. Pair with
+ * {@link recordFailure} for credential checks: once locked out, even a right guess is refused.
+ * @param request - Incoming request used to derive the client IP.
+ * @param scope - Short identifier for the check.
+ * @param limit - Failures allowed within the window.
+ * @returns True when the IP is locked out.
+ */
+export function isFailureLimited(request: NextRequest, scope: string, limit: number): boolean {
+  const bucket = buckets.get(`${scope}:${getClientIp(request)}`);
+  return !!bucket && bucket.resetAt > Date.now() && bucket.count >= limit;
+}
+
+/**
+ * Counts one failure against the request's IP for {@link isFailureLimited}.
+ * @param request - Incoming request used to derive the client IP.
+ * @param scope - Short identifier for the check.
+ * @param windowMs - Window length in milliseconds.
+ */
+export function recordFailure(request: NextRequest, scope: string, windowMs: number): void {
+  rateLimit(`${scope}:${getClientIp(request)}`, Number.POSITIVE_INFINITY, windowMs);
+}
+
+/**
  * Outside production only, a matching admin secret skips rate limiting for the eval harness.
  * @param nodeEnv - `process.env.NODE_ENV`.
  * @param headerSecret - The request's `x-admin-secret` header value (or null).

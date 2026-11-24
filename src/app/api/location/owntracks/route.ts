@@ -9,8 +9,13 @@ import {
 } from "@/features/calendar/lib/running-late.server";
 import { isOwnTracksPassword } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { isFailureLimited, recordFailure } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
+
+/** Wrong passwords an IP gets per window before every report from it is refused. */
+const WRONG_PASSWORD_LIMIT = 10;
+const WRONG_PASSWORD_WINDOW_MS = 15 * 60_000;
 
 /** Setting row holding when a location report last ran the check. */
 const LAST_CHECK_KEY = "running-late:last-location-check";
@@ -65,11 +70,16 @@ function describeReport(body: unknown): string {
  * POST /api/location/owntracks
  * OwnTracks expects a JSON array back on success; `[]` sends it nothing to act on.
  * @param request - OwnTracks report.
- * @returns `[]`, or 401 on a missing or wrong password.
+ * @returns `[]`, 401 on a missing or wrong password, or 429 once an IP has guessed wrong too often.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (isFailureLimited(request, "owntracks-password", WRONG_PASSWORD_LIMIT)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
   const header = request.headers.get("authorization");
   if (!isOwnTracksPassword(basicAuthPassword(header))) {
+    // Only a wrong password counts: the phone's first try has no header, by design.
+    if (header) recordFailure(request, "owntracks-password", WRONG_PASSWORD_WINDOW_MS);
     console.warn(`[owntracks] 401: ${header ? "wrong password" : "no Authorization header"}`);
     // The Basic challenge makes iOS URLSession resend with the stored user and password; without
     // it the iPhone app never sends them.
