@@ -635,7 +635,7 @@ export default async function InvoiceViewPage({
           </div>
 
           {/* The PDF's box: accept a quote, a settled note, or the bank details to pay. */}
-          {invoice.isQuote ? (
+          {invoice.isQuote && !settled ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
               <p className="mb-1 text-sm font-bold text-russian-violet">Accepting this quote</p>
               <p className="text-slate-700">{quoteAcceptLine(identity.phone)}</p>
