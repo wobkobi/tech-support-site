@@ -568,6 +568,7 @@ async function runCheck(
         comms.leaveReminderLeadMin,
         lateMin,
         comms.runningLateThresholdMin,
+        driveMin,
       )
     ) {
       continue;

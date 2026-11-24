@@ -208,15 +208,19 @@ export function distanceM(
   return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
 }
 
+/** A drive this short from the phone means you're already at the job, so no leave reminder. */
+export const ALREADY_THERE_DRIVE_MIN = 2;
+
 /**
- * Whether a leave reminder is due: not already running late (that push covers it) and the
- * leave-by time is within `leadMin` of now. A leave-by already passed still reminds, as "leave
- * now", until lateness crosses the threshold.
+ * Whether a leave reminder is due: not already there, not already running late (that push
+ * covers it) and the leave-by time is within `leadMin` of now. A leave-by already passed still
+ * reminds, as "leave now", until lateness crosses the threshold.
  * @param leaveByMs - Latest departure that arrives on time (ms).
  * @param nowMs - Current time (ms).
  * @param leadMin - Minutes before leave-by a reminder may arrive.
  * @param lateMin - Minutes late leaving now.
  * @param thresholdMin - Running-late threshold.
+ * @param driveMin - Drive minutes from the phone to the job.
  * @returns True when a reminder should go.
  */
 export function shouldRemindLeave(
@@ -225,7 +229,9 @@ export function shouldRemindLeave(
   leadMin: number,
   lateMin: number,
   thresholdMin: number,
+  driveMin: number,
 ): boolean {
+  if (driveMin <= ALREADY_THERE_DRIVE_MIN) return false;
   if (lateMin >= thresholdMin) return false;
   return leaveByMs - nowMs <= leadMin * 60_000;
 }
