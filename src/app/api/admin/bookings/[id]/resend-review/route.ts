@@ -47,8 +47,12 @@ export async function POST(
   if (!booking) {
     return errorResponse("Booking not found.", 404);
   }
-  // Thanking someone for a visit that hasn't happened reads as a mistake.
-  if (booking.status === "cancelled" || booking.endAt > new Date()) {
+  // Thanking someone for a visit that hasn't happened reads as a mistake. A job marked
+  // completed is over, even when it finished before its booked end.
+  if (
+    booking.status === "cancelled" ||
+    (booking.status !== "completed" && booking.endAt > new Date())
+  ) {
     return errorResponse("Review requests go out after the visit, not before.", 409);
   }
   if (!booking.email) {

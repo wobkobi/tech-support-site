@@ -231,11 +231,11 @@ export function BookingAdminList({
    */
   function renderActions(b: AdminBookingRow): React.ReactElement {
     const isBusy = busyId === b.id;
-    // Only once the visit is over (hidden until the clock is read); the route refuses earlier asks too.
+    // Only once the visit is over: marked completed, or past its booked end (hidden until the
+    // clock is read). The route refuses earlier asks too.
     const reviewable =
-      (b.status === "confirmed" || b.status === "completed") &&
-      nowMs !== null &&
-      new Date(b.endAt).getTime() <= nowMs;
+      b.status === "completed" ||
+      (b.status === "confirmed" && nowMs !== null && new Date(b.endAt).getTime() <= nowMs);
     return (
       <>
         {b.status === "confirmed" && (
