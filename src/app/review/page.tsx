@@ -159,7 +159,7 @@ export default async function ReviewPage({
             {googleUrl && (
               <div className="mb-4 space-y-3">
                 <p className="text-base text-rich-black/80">
-                  Or leave a review on Google - that doesn&apos;t need a link from me.
+                  Or leave a review on Google - that doesn't need a link from me.
                 </p>
                 <GoogleReviewButton url={googleUrl} label="Leave a review on Google" />
               </div>
@@ -178,9 +178,8 @@ export default async function ReviewPage({
                 How was your appointment?
               </h1>
               <p className="mb-4 text-base text-rich-black/80">
-                {greeting} Thanks for choosing To the Point Tech. If you&apos;ve got a minute, a
-                review on Google is the biggest help - it&apos;s where most people look for local
-                tech help.
+                {greeting} Thanks for choosing To the Point Tech. If you've got a minute, a review
+                on Google is the biggest help - it's where most people look for local tech help.
               </p>
               <GoogleReviewButton url={googleUrl} label="Leave a review on Google" />
             </section>
@@ -260,8 +259,8 @@ export default async function ReviewPage({
             {googleUrl && (
               <div className="mb-6 space-y-3">
                 <p className="text-base text-rich-black/80">
-                  The quickest way is on Google - no link needed, and it&apos;s where most people
-                  look for local tech help.
+                  The quickest way is on Google - no link needed, and it's where most people look
+                  for local tech help.
                 </p>
                 <GoogleReviewButton url={googleUrl} label="Leave a review on Google" />
               </div>

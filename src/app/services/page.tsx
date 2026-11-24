@@ -144,7 +144,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
           <p className="min-w-0 flex-1">
             <strong>Software</strong>{" "}
             <span className="text-seasalt-700">
-              - coming soon. Apps I&apos;m building to make everyday tech easier.
+              - coming soon. Apps I'm building to make everyday tech easier.
             </span>
           </p>
           <Link
@@ -155,8 +155,8 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
           </Link>
         </div>
         <Notice className="mt-8">
-          Not sure which category your problem fits? That&apos;s fine. Just describe what&apos;s
-          happening and I&apos;ll figure out the best approach.
+          Not sure which category your problem fits? That's fine. Just describe what's happening and
+          I'll figure out the best approach.
         </Notice>
       </Section>
 
@@ -200,8 +200,8 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
       <Section id="seniors" aria-labelledby="seniors-heading">
         <SectionHeading title="Tech help for seniors, at home" id="seniors-heading" />
         <p className="mb-3">
-          If technology isn&apos;t your thing, I come to you and go at your pace. I explain each
-          step in plain English, and no question is too basic.
+          If technology isn't your thing, I come to you and go at your pace. I explain each step in
+          plain English, and no question is too basic.
         </p>
         <TickList>
           <TickItem>
@@ -210,13 +210,11 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
           <TickItem>Video calls with family on FaceTime, WhatsApp or Zoom</TickItem>
           <TickItem>Spotting scam emails, texts and calls, and cleaning up after one</TickItem>
           <TickItem>Getting the TV, streaming apps and remote working the way you want</TickItem>
-          <TickItem>
-            Written notes if you&apos;d like them, so you can do it again yourself
-          </TickItem>
+          <TickItem>Written notes if you'd like them, so you can do it again yourself</TickItem>
         </TickList>
         <p className="mt-4 font-bold">
-          Booking for a parent or relative? Put their address, and mention who I&apos;ll be meeting
-          in the notes.
+          Booking for a parent or relative? Put their address, and mention who I'll be meeting in
+          the notes.
         </p>
       </Section>
 
@@ -253,8 +251,8 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
           })}
         </div>
         <p className="mt-5">
-          These are just some of them - I cover all of Auckland. If your suburb isn&apos;t listed,
-          I&apos;m still more than happy to help!{" "}
+          These are just some of them - I cover all of Auckland. If your suburb isn't listed, I'm
+          still more than happy to help!{" "}
           <Link href="/areas#travel" className={TEXT_LINK}>
             Check what travel costs to your suburb
           </Link>

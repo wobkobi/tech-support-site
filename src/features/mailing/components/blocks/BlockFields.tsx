@@ -590,13 +590,13 @@ export function PictureFields({
         <div className="flex flex-wrap gap-2">{chooser}</div>
         {block.alt.trim() && (
           <p className="text-sm text-admin-text-secondary">
-            Wanted here: {block.alt}. It&apos;s left out of the email until you choose one.
+            Wanted here: {block.alt}. It's left out of the email until you choose one.
           </p>
         )}
         {!canUpload && (
           <p className="text-sm text-admin-muted">
-            Picture uploads aren&apos;t set up yet (BLOB_READ_WRITE_TOKEN). A design&apos;s picture
-            still works.
+            Picture uploads aren't set up yet (BLOB_READ_WRITE_TOKEN). A design's picture still
+            works.
           </p>
         )}
       </div>
@@ -709,8 +709,8 @@ export function QuoteFields({
           onChange={(e) => onChange({ text: e.target.checked ? "{reviewText}" : "", name: "" })}
         />
         <span>
-          Quote each person&apos;s own review. Only works when the email goes to people who left a
-          review on the site; anyone without one gets no quote.
+          Quote each person's own review. Only works when the email goes to people who left a review
+          on the site; anyone without one gets no quote.
         </span>
       </label>
       {!ownReview && (

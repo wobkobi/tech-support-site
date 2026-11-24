@@ -393,8 +393,8 @@ export function ContactDetailActions({
         body={
           <div className="flex flex-col gap-2">
             <p>
-              It&apos;s removed from the list and unlinked from its reviews. Bookings and invoices
-              are kept.
+              It's removed from the list and unlinked from its reviews. Bookings and invoices are
+              kept.
             </p>
             {googleContactId && (
               <AdminCheckbox

@@ -63,7 +63,7 @@ export function PostActionBar({
           {saveState === "unsaved" && "Unsaved changes"}
           {saveState === "error" && (
             <>
-              Couldn&apos;t save.{" "}
+              Couldn't save.{" "}
               <button type="button" onClick={onRetrySave} className={cn("text-sm", ADMIN_LINK_CLS)}>
                 Try again
               </button>

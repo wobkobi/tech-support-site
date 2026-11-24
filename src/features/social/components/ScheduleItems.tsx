@@ -386,8 +386,7 @@ function AddContentDialog({
           </div>
           {over && (
             <p className="text-sm text-coquelicot-700">
-              A schedule holds {MAX_QUEUE_ITEMS} items at most, so there&apos;s room for {room}{" "}
-              more.
+              A schedule holds {MAX_QUEUE_ITEMS} items at most, so there's room for {room} more.
             </p>
           )}
           <ul className="flex max-h-[50vh] flex-col divide-y divide-admin-border overflow-y-auto rounded-lg border border-admin-border">

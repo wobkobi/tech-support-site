@@ -120,18 +120,17 @@ export default async function AreasPage(): Promise<React.ReactElement> {
           >
             <p>
               You pay for the time I work and one round trip. A visit only costs you with no work
-              done if you cancel late or nobody&apos;s home.
+              done if you cancel late or nobody's home.
             </p>
           </RuledBlock>
           <RuledBlock title="A straight answer">
             <p>
-              I keep working on it while you&apos;re happy to. If something can&apos;t be fixed,
-              I&apos;ll tell you straight and you pay{" "}
-              {unsuccessfulShareLabel(policy.UNSUCCESSFUL_WORK_FACTOR)}.
+              I keep working on it while you're happy to. If something can't be fixed, I'll tell you
+              straight and you pay {unsuccessfulShareLabel(policy.UNSUCCESSFUL_WORK_FACTOR)}.
             </p>
           </RuledBlock>
           <RuledBlock title="Plain English">
-            <p>You&apos;ll know what went wrong, what I did, and how to avoid it next time.</p>
+            <p>You'll know what went wrong, what I did, and how to avoid it next time.</p>
           </RuledBlock>
         </RuledGrid>
       </Section>

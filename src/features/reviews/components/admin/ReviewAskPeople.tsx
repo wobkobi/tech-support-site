@@ -453,8 +453,7 @@ export function ReviewAskPeople({
             {bulk.failed.length > 0 && (
               <>
                 <p>
-                  {bulk.failed.length} didn&apos;t go. They&apos;re still ticked if you want to try
-                  again:
+                  {bulk.failed.length} didn't go. They're still ticked if you want to try again:
                 </p>
                 <ul className="list-disc pl-5">
                   {bulk.failed.map((f) => (

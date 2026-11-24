@@ -307,7 +307,7 @@ export function InboxView({
 
       {data.setUp.length === 0 && (
         <Notice tone="warn" onGrey>
-          No apps are connected, so there&apos;s nothing to read.{" "}
+          No apps are connected, so there's nothing to read.{" "}
           <Link href={SOCIAL_OVERVIEW_PATH} className="font-semibold underline">
             See the set-up steps
           </Link>

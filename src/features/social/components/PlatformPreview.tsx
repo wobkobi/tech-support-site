@@ -242,7 +242,7 @@ export function FacebookPreview({
           <p className="text-[13px] leading-4 text-[#65676b]">{domainOf(post.linkUrl)}</p>
           <p className="truncate text-[17px] leading-6 font-semibold">{post.linkUrl}</p>
           <p className="text-[13px] leading-4 text-[#65676b]">
-            Facebook fills in the page&apos;s own picture and title.
+            Facebook fills in the page's own picture and title.
           </p>
         </div>
       )}

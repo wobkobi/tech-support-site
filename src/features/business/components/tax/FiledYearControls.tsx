@@ -141,7 +141,7 @@ export function FiledYearControls({
           filed ? (
             <p>
               This deletes the saved figures for {fyLabel} and goes back to live figures, which may
-              not match the return your accountant filed. The next year&apos;s asset values are
+              not match the return your accountant filed. The next year's asset values are
               recalculated too. Only do this if the return is being amended.
             </p>
           ) : (

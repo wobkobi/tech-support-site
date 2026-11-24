@@ -80,7 +80,7 @@ export default async function SoftwarePage(): Promise<React.ReactElement> {
 
           <div className="mt-8 border-t border-seasalt-200 pt-6 text-center">
             <h3 className="text-xl font-extrabold">Want early access?</h3>
-            <p className="mt-2">Get in touch and I&apos;ll let you try it before it&apos;s out.</p>
+            <p className="mt-2">Get in touch and I'll let you try it before it's out.</p>
             <div className="mt-4 flex flex-wrap justify-center gap-3">
               <Button href={earlyAccessMailto} variant="primary">
                 Email me

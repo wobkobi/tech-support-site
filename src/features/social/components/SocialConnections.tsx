@@ -46,7 +46,7 @@ export function SocialConnections({
           }
         />
         {error && connections === null && (
-          <p className="mb-3 text-sm text-admin-text-secondary">Couldn&apos;t check: {error}</p>
+          <p className="mb-3 text-sm text-admin-text-secondary">Couldn't check: {error}</p>
         )}
         <ul className="flex flex-col gap-3">
           {SOCIAL_PLATFORMS.map((platform) => {

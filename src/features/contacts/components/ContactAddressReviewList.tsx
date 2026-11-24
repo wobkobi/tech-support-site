@@ -154,7 +154,7 @@ function AddressReviewCard({ row, onDone }: AddressReviewCardProps): React.React
       <div>
         {checked !== null && checked.length === 0 && (
           <p className="mt-2 text-sm text-admin-faint">
-            No Auckland match for that. Save it anyway if you know it&apos;s right.
+            No Auckland match for that. Save it anyway if you know it's right.
           </p>
         )}
         {checked !== null && checked.length > 0 && (
@@ -210,8 +210,8 @@ export function ContactAddressReviewList({
       <div>
         <h2 className="text-lg font-semibold text-admin-text">Addresses to check</h2>
         <p className="text-sm text-admin-faint">
-          These came in from an import but didn&apos;t match one Auckland address, so they&apos;re
-          stored exactly as they were typed.
+          These came in from an import but didn't match one Auckland address, so they're stored
+          exactly as they were typed.
         </p>
       </div>
       <ul className="grid gap-3 xl:grid-cols-2">

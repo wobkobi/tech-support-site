@@ -30,7 +30,7 @@ export function SettingsFooter<G extends SettingsGroup>({
       {/* Guardrail blocks - save was refused. */}
       {blocks.length > 0 && (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-700">Can&apos;t save yet:</p>
+          <p className="text-sm font-semibold text-red-700">Can't save yet:</p>
           <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-red-700">
             {blocks.map((b) => (
               <li key={b}>{b}</li>
@@ -64,7 +64,7 @@ export function SettingsFooter<G extends SettingsGroup>({
       {!dirty && google?.status === "failed" && (
         <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-semibold text-amber-800">
-            Saved here, but your Google profile wasn&apos;t updated:
+            Saved here, but your Google profile wasn't updated:
           </p>
           <p className="mt-1 text-sm text-amber-800">{google.error}</p>
         </div>

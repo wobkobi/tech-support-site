@@ -234,7 +234,7 @@ export function TravelSection({
               <div key={index} className="space-y-1">
                 {isRun && (
                   <p className="text-sm font-medium text-admin-muted">
-                    Store run - from the client&apos;s place and back
+                    Store run - from the client's place and back
                   </p>
                 )}
                 <div className="flex items-center gap-2">

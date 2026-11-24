@@ -157,7 +157,7 @@ function PostedRow({
                     <span className="text-admin-muted">{label}: still going</span>
                   )}
                   {t.status === "posted" && t.error && (
-                    <span className="text-coquelicot-600"> (couldn&apos;t take it down)</span>
+                    <span className="text-coquelicot-600"> (couldn't take it down)</span>
                   )}
                 </li>
               );

@@ -120,7 +120,7 @@ export function JobSettingsStrip({
       {/* Verdict is for the job date: a code valid today may not have been then. */}
       {promoCode !== "" && activePromo?.code !== promoCode && (
         <p className="text-sm font-medium text-red-700">
-          {promoCode} isn&apos;t valid on {jobDate} - pricing uses whatever promo applied that day.
+          {promoCode} isn't valid on {jobDate} - pricing uses whatever promo applied that day.
         </p>
       )}
 

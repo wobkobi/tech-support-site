@@ -270,8 +270,8 @@ export function SendDialog({
 
         {heldUntil && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            It&apos;s quiet hours ({hourLabel(quiet.startHour)} to {hourLabel(quiet.endHour)}), so
-            it goes to {people} at {formatDateTimeShort(heldUntil)}.
+            It's quiet hours ({hourLabel(quiet.startHour)} to {hourLabel(quiet.endHour)}), so it
+            goes to {people} at {formatDateTimeShort(heldUntil)}.
           </div>
         )}
 
@@ -286,9 +286,8 @@ export function SendDialog({
             />
             {scheduleMovedTo && (
               <p className="mt-1 text-sm text-amber-800">
-                That&apos;s inside quiet hours ({hourLabel(quiet.startHour)} to{" "}
-                {hourLabel(quiet.endHour)}), so it&apos;ll go at{" "}
-                {formatDateTimeShort(scheduleMovedTo)}.
+                That's inside quiet hours ({hourLabel(quiet.startHour)} to{" "}
+                {hourLabel(quiet.endHour)}), so it'll go at {formatDateTimeShort(scheduleMovedTo)}.
               </p>
             )}
           </AdminField>

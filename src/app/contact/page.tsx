@@ -52,9 +52,7 @@ export default async function ContactPage(): Promise<React.ReactElement> {
         ]}
         title="Get in touch"
         intro={
-          <p>
-            Have a tech problem or question? Call or email and I&apos;ll help you figure it out.
-          </p>
+          <p>Have a tech problem or question? Call or email and I'll help you figure it out.</p>
         }
         note={<p>I usually respond within a few hours during business days.</p>}
         action={null}
@@ -95,8 +93,8 @@ export default async function ContactPage(): Promise<React.ReactElement> {
           .
         </p>
         <p className="mt-3">
-          A lot of software and account problems I can sort out remotely, so there&apos;s no travel
-          to pay for.
+          A lot of software and account problems I can sort out remotely, so there's no travel to
+          pay for.
         </p>
       </Section>
 

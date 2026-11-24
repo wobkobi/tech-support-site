@@ -130,7 +130,7 @@ export function FillSlotDialog({
         )}
         {usable.length === 0 ? (
           <p className="text-sm text-admin-text-secondary">
-            There&apos;s no content that can go out. Add some in{" "}
+            There's no content that can go out. Add some in{" "}
             <Link
               href={SOCIAL_CONTENT_PATH}
               className="font-semibold text-russian-violet underline"

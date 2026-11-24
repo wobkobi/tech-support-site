@@ -48,8 +48,8 @@ export function FiledYearWarning({
         </>
       ) : (
         <>
-          This change reaches {names}, which {verb} marked filed. The saved figures won&apos;t
-          change; the Tax page will list the difference as something an amended return would need.
+          This change reaches {names}, which {verb} marked filed. The saved figures won't change;
+          the Tax page will list the difference as something an amended return would need.
         </>
       )}
     </Notice>

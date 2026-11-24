@@ -138,16 +138,13 @@ export function TravelCheck({
           </p>
         )}
         {state.kind === "not_found" && (
-          <p>I couldn&apos;t find that one. Try just your suburb name, or call me on {callLink}.</p>
+          <p>I couldn't find that one. Try just your suburb name, or call me on {callLink}.</p>
         )}
         {state.kind === "busy" && (
-          <p>That&apos;s a lot of checks at once. Give it a minute and try again.</p>
+          <p>That's a lot of checks at once. Give it a minute and try again.</p>
         )}
         {state.kind === "error" && (
-          <p>
-            The travel check isn&apos;t working right now. Call me on {callLink} and I&apos;ll tell
-            you.
-          </p>
+          <p>The travel check isn't working right now. Call me on {callLink} and I'll tell you.</p>
         )}
       </div>
     </div>

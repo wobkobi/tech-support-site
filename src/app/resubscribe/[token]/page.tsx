@@ -41,9 +41,9 @@ export default async function ResubscribePage({
         </h1>
         {!contactId && (
           <p className="text-base text-rich-black/80">
-            This link doesn&apos;t look right - it may have been cut short when it was copied. Try
-            pressing the button straight from the email, or just reply to the email and say
-            you&apos;d like my emails again.
+            This link doesn't look right - it may have been cut short when it was copied. Try
+            pressing the button straight from the email, or just reply to the email and say you'd
+            like my emails again.
           </p>
         )}
         {contactId && <ResubscribeForm token={token} initiallyOnList={onList} />}

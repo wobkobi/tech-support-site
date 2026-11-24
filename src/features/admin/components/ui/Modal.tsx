@@ -196,7 +196,7 @@ export function Modal({
             className="flex flex-wrap items-center justify-end gap-2 border-t border-l-4 border-admin-border border-l-coquelicot-600 bg-coquelicot-50 px-5 py-3"
           >
             <p role="alert" className="mr-auto text-sm font-bold text-coquelicot-800">
-              Discard what you&apos;ve entered?
+              Discard what you've entered?
             </p>
             <AdminButton variant="secondary" onClick={() => setConfirmingDiscard(false)}>
               Keep editing

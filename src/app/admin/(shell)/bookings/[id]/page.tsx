@@ -217,8 +217,8 @@ export default async function BookingDetailPage({
           <p className="mt-1">
             The event was deleted in Google Calendar on{" "}
             {formatDateTimeShort(booking.calendarEventMissingAt)}, but the booking is still{" "}
-            {booking.status}. Reminder emails are paused until it&apos;s sorted - cancel the booking
-            if the job isn&apos;t happening, or re-book it if it is.
+            {booking.status}. Reminder emails are paused until it's sorted - cancel the booking if
+            the job isn't happening, or re-book it if it is.
           </p>
         </Notice>
       )}

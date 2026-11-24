@@ -111,7 +111,7 @@ function ContentList({
   if (items.length === 0) {
     return (
       <p className="text-sm text-admin-text-secondary">
-        No content yet. Save posts you&apos;ll use again in{" "}
+        No content yet. Save posts you'll use again in{" "}
         <Link href={SOCIAL_CONTENT_PATH} className="font-semibold text-russian-violet underline">
           Content
         </Link>

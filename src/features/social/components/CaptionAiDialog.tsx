@@ -331,7 +331,7 @@ export function CaptionAiDialog({
         ) : (
           <>
             <p className="text-sm text-admin-text-secondary">
-              Changes the post&apos;s words as they are now. Fixing spelling and grammar leaves
+              Changes the post's words as they are now. Fixing spelling and grammar leaves
               everything else alone.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -399,7 +399,7 @@ export function CaptionAiDialog({
                         </AdminButton>
                         {hasWords && tab === "write" && (
                           <AdminButton size="xs" variant="outline" onClick={() => use(text, "add")}>
-                            Add under what&apos;s there
+                            Add under what's there
                           </AdminButton>
                         )}
                         {canAddCaption && hasWords && (

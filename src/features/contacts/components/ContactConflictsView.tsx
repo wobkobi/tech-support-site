@@ -95,7 +95,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
       <div>
         <h2 className="text-lg font-semibold text-admin-text">Fields that changed on both sides</h2>
         <p className="text-sm text-admin-faint">
-          Pick the value to keep. It&apos;s saved here and pushed back to Google Contacts.
+          Pick the value to keep. It's saved here and pushed back to Google Contacts.
         </p>
       </div>
       <ul className="grid gap-3 xl:grid-cols-2">

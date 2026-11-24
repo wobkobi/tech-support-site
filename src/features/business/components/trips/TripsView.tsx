@@ -482,7 +482,7 @@ export function TripsView({
         </StatStrip>
         {needsTotalKm && (
           <p className="mt-2 text-sm text-admin-text-secondary">
-            Enter the car&apos;s total km for the year on the Tax page so the Tier 1 split is right.
+            Enter the car's total km for the year on the Tax page so the Tier 1 split is right.
           </p>
         )}
       </div>
@@ -492,8 +492,8 @@ export function TripsView({
         {beforeVehicleKm > 0 && firstKmDay && (
           <Notice onGrey>
             {formatKm(beforeVehicleKm)} logged before your kilometre-rate car went into service on{" "}
-            {formatDateShort(firstKmDay)}. Those trips were in a car that isn&apos;t on the asset
-            register, so they aren&apos;t claimed at km rates. Fuel you paid for then counts as an
+            {formatDateShort(firstKmDay)}. Those trips were in a car that isn't on the asset
+            register, so they aren't claimed at km rates. Fuel you paid for then counts as an
             expense instead.
           </Notice>
         )}
@@ -514,7 +514,7 @@ export function TripsView({
 
         <Notice onGrey>
           IRD {fuelLabel} rates for {fyLabel}: {formatNZD(rates.tier1)}/km for the business share of
-          the car&apos;s first {KM_TIER1_LIMIT.toLocaleString("en-NZ")} km in the year, then{" "}
+          the car's first {KM_TIER1_LIMIT.toLocaleString("en-NZ")} km in the year, then{" "}
           {formatNZD(rates.tier2)}
           /km. The rate covers fuel, wear and depreciation, so Fuel expenses come out of the tax
           figures for the days the car is on km rates, and only trips on those days earn the rate.

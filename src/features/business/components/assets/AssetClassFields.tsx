@@ -53,7 +53,7 @@ export function AssetClassFields({ form, setForm }: AssetClassFieldsProps): Reac
                 rel="noreferrer"
                 className="font-bold text-russian-violet underline"
               >
-                IRD&apos;s rate finder
+                IRD's rate finder
               </a>
               .
             </>
@@ -98,8 +98,8 @@ export function AssetClassFields({ form, setForm }: AssetClassFieldsProps): Reac
             label="Claim this vehicle on IRD kilometre rates"
           />
           <p className="mt-1 text-sm text-admin-muted">
-            The kilometre rate covers fuel, wear and depreciation, so the vehicle isn&apos;t
-            depreciated and Fuel expenses stop counting while it&apos;s in use.
+            The kilometre rate covers fuel, wear and depreciation, so the vehicle isn't depreciated
+            and Fuel expenses stop counting while it's in use.
           </p>
         </div>
       )}

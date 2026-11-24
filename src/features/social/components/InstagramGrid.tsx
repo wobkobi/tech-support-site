@@ -36,8 +36,8 @@ export function InstagramGrid({
   if (tiles.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-admin-border-strong p-10 text-center text-base text-admin-muted">
-        Nothing for Instagram yet. Posts switched on for Instagram show here once they&apos;re
-        scheduled or posted.
+        Nothing for Instagram yet. Posts switched on for Instagram show here once they're scheduled
+        or posted.
       </p>
     );
   }

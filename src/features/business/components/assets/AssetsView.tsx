@@ -167,8 +167,8 @@ export function AssetsView({
     <div>
       {fromExpenseMissing && searchParams.has("fromExpense") && (
         <Notice tone="warn" role="alert" className="mb-5">
-          That expense wasn&apos;t found, so there was nothing to fill in. Add the asset by hand, or
-          go back to Expenses and try again.
+          That expense wasn't found, so there was nothing to fill in. Add the asset by hand, or go
+          back to Expenses and try again.
         </Notice>
       )}
 
