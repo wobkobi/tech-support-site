@@ -214,7 +214,7 @@ export function TravelAlertsView({
 }: Props): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
-  const form = useSettingsForm("comms", initial, defaults);
+  const form = useSettingsForm("comms", initial, defaults, { sparse: true });
   const { draft, setDraft, fieldErrors, baseline } = form;
   const m = COMMS_FIELD_META;
   const [running, setRunning] = useState<"live" | "morning" | null>(null);
