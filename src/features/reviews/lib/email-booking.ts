@@ -818,7 +818,7 @@ ${await buildEmailSignature(siteUrl)}
 `);
 
   try {
-    await sendOutreach({
+    const result = await sendOutreach({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to,
@@ -826,6 +826,11 @@ ${await buildEmailSignature(siteUrl)}
       html,
       text: htmlToText(html),
     });
+    // Resend rejects with { error }, not a throw.
+    if (result.error) {
+      console.error("[email] Resend rejected manage-links email:", result.error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error("[email] Failed to send manage-links email:", error);
