@@ -8,12 +8,14 @@ import {
   bestTimes,
   contentPerformance,
   dayGroups,
+  dayLabel,
   daysBetween,
   FIGURE_KEYS,
   GOOGLE_LAG_DAYS,
   hasPostStats,
   NO_FIGURES,
   reportedThrough,
+  staleApps,
   sumDays,
   sumFigures,
   type AnalyticsRange,
@@ -24,6 +26,7 @@ import {
   type DayFigures,
   type FigureKey,
   type Figures,
+  type StaleApp,
   type TimeCell,
 } from "@/features/social/lib/insights/metrics";
 import { loadInsightsState } from "@/features/social/lib/insights/sync.server";
@@ -352,13 +355,16 @@ export async function loadAnalytics(
   }
 
   // The chart ends on the last day every app has reported, rather than plotting days not in yet
-  // as 0 (the chart can't draw a gap).
+  // as 0 (the chart can't draw a gap). An app that has stopped doesn't hold the rest back.
   const viewDays = days.map((d) => ({
     platform: d.platform,
     day: d.day,
     value: d.figures.views ?? null,
   }));
-  const through = reportedThrough(viewDays, from, to, apps) ?? to;
+  const stopped = staleApps(viewDays, to, apps);
+  for (const s of stopped) notes.push({ tone: "warn", text: staleNote(s) });
+  const reporting = apps.filter((p) => !stopped.some((s) => s.platform === p));
+  const through = reportedThrough(viewDays, from, to, reporting) ?? to;
 
   return {
     range,
@@ -575,6 +581,15 @@ export async function contentViews(itemIds: readonly string[]): Promise<Map<stri
   );
 }
 
+/**
+ * The line under a chart for an app that has stopped sending figures.
+ * @param s - The app and its last day.
+ * @returns The note.
+ */
+function staleNote(s: StaleApp): string {
+  return `${PLATFORM_LABEL[s.platform]} hasn't sent figures since ${dayLabel(s.lastDay)}, so its days after that show as 0.`;
+}
+
 /** Views by app over the last seven full days, for the Overview's chart. */
 export interface ViewsWeek {
   from: string;
@@ -582,6 +597,8 @@ export interface ViewsWeek {
   /** The apps with figures in those days, one series each. */
   series: SocialPlatformKey[];
   groups: ChartGroup[];
+  /** Notes for apps that have stopped sending figures. */
+  stale: string[];
 }
 
 /**
@@ -600,7 +617,15 @@ export async function loadViewsWeek(now: Date): Promise<ViewsWeek> {
   });
   const series = SOCIAL_PLATFORMS.filter((p) => rows.some((r) => r.platform === p));
   const days = rows.map((r) => ({ ...r, value: r.views }));
-  const to = reportedThrough(days, earliest, yesterday, series) ?? yesterday;
+  const stopped = staleApps(days, nzDateKey(now), series);
+  const reporting = series.filter((p) => !stopped.some((s) => s.platform === p));
+  const to = reportedThrough(days, earliest, yesterday, reporting) ?? yesterday;
   const from = addDaysToDateKey(to, -6);
-  return { from, to, series, groups: dayGroups(days, from, to, series) };
+  return {
+    from,
+    to,
+    series,
+    groups: dayGroups(days, from, to, series),
+    stale: stopped.map(staleNote),
+  };
 }

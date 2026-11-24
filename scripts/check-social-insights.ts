@@ -36,6 +36,7 @@ import {
   reportedThrough,
   scopeIn,
   skipKey,
+  staleApps,
   STORY_AGES,
   sumDays,
   sumFigures,
@@ -495,6 +496,25 @@ function checkSums(): void {
     "days past the range don't count",
     reportedThrough(lagging, "2026-10-15", "2026-10-20", ["facebook"]),
     "2026-10-18",
+  );
+  expectEqual(
+    "apps on their usual lag aren't stopped",
+    staleApps(lagging, "2026-10-22", ["facebook", "google"]),
+    [],
+  );
+  const stopped = [
+    { platform: "facebook" as const, day: "2026-10-17", value: 5 },
+    { platform: "google" as const, day: "2026-10-19", value: 3 },
+  ];
+  expectEqual(
+    "Facebook four days past yesterday has stopped; Google three behind hasn't",
+    staleApps(stopped, "2026-10-22", ["facebook", "google"]),
+    [{ platform: "facebook", lastDay: "2026-10-17" }],
+  );
+  expectEqual(
+    "so the chart runs on to Google's last day",
+    reportedThrough(stopped, "2026-10-15", "2026-10-22", ["google"]),
+    "2026-10-19",
   );
   const quarter = dayGroups([], "2026-07-25", "2026-10-22", ["facebook"]);
   expectEqual("90 days in weeks", quarter.length, 13);
