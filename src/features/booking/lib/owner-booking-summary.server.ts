@@ -39,6 +39,8 @@ export async function loadOwnerBookingSummary(
     const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
     if (!booking) return null;
     const remote = isRemoteBooking(booking);
+    // altEmails are stored lower-cased and `has` can't ignore case; a booking keeps the typing.
+    const email = booking.email.trim().toLowerCase();
 
     const [settings, rateRows, holiday, promo, earlierBookings, contact] = await Promise.all([
       getSettings(),
@@ -49,7 +51,7 @@ export async function loadOwnerBookingSummary(
       ),
       prisma.booking.count({
         where: {
-          email: booking.email,
+          email: { equals: email, mode: "insensitive" },
           id: { not: booking.id },
           status: { not: "cancelled" },
           startAt: { lt: booking.startAt },
@@ -57,7 +59,7 @@ export async function loadOwnerBookingSummary(
       }),
       prisma.contact.findFirst({
         where: {
-          OR: [{ email: booking.email }, { altEmails: { has: booking.email } }],
+          OR: [{ email: { equals: email, mode: "insensitive" } }, { altEmails: { has: email } }],
           deletedAt: null,
         },
         select: { createdAt: true },
