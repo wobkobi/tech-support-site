@@ -190,8 +190,8 @@ export async function PATCH(
       }),
     },
   });
-  // Next 16's revalidateTag requires a second CacheLifeConfig arg.
-  revalidateTag(ACTIVE_PROMO_TAG, {});
+  // expire: 0 drops the cached copy now; the default profile would serve it once more.
+  revalidateTag(ACTIVE_PROMO_TAG, { expire: 0 });
   return NextResponse.json({ ok: true, promo });
 }
 
@@ -212,8 +212,8 @@ export async function DELETE(
   const { id } = await params;
   try {
     await prisma.promo.delete({ where: { id } });
-    // Next 16's revalidateTag requires a second CacheLifeConfig arg.
-    revalidateTag(ACTIVE_PROMO_TAG, {});
+    // expire: 0 drops the cached copy now; the default profile would serve it once more.
+    revalidateTag(ACTIVE_PROMO_TAG, { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch {
     return errorResponse("Promo not found", 404);

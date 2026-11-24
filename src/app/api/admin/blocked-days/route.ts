@@ -124,7 +124,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ({ eventId } = await createBlockedDayEvent({ dateKey, summary }));
     }
 
-    revalidateTag(SCHEDULE_CALENDAR_TAG, {});
+    revalidateTag(SCHEDULE_CALENDAR_TAG, { expire: 0 });
     return NextResponse.json({ ok: true, eventId });
   } catch (err) {
     console.error("[admin/blocked-days] Create failed:", err);
