@@ -193,7 +193,8 @@ export async function rememberBilledEmail(
     });
     return true;
   } catch (err) {
-    console.error(`[contacts] Could not add ${normalisedEmail} to contact ${contactId}:`, err);
+    // Constant message: the address stays out of the format string and the logs.
+    console.error("[contacts] Could not add a billed email to contact", contactId, err);
     return false;
   }
 }
