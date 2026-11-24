@@ -268,8 +268,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Already paid is more than the invoice total", 400);
   }
 
+  // A re-issue keeps the voided invoice's booking and contact when the calculator has none
+  // (no event backs the job), so the promo and review ask still find them.
+  const reissuedId = parseObjectId(reissueOf);
+  const reissuedLinks = reissuedId
+    ? await prisma.invoice.findFirst({
+        where: { id: reissuedId, status: "VOIDED" },
+        select: { bookingId: true, contactId: true },
+      })
+    : null;
+  const billedBookingId = parseObjectId(bookingId) ?? reissuedLinks?.bookingId ?? null;
+
   // A missing or deleted contact saves the invoice unlinked rather than pointing nowhere.
-  const requestedContactId = parseObjectId(contactId);
+  const requestedContactId = parseObjectId(contactId) ?? reissuedLinks?.contactId ?? null;
   const linkedContactId =
     requestedContactId &&
     (await prisma.contact.findFirst({
@@ -281,11 +292,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // The voided invoice this replaces, named under the new number so the customer knows which
   // one it replaces. Checked before a number is allocated, so a refusal burns none.
-  const reissuedId = parseObjectId(reissueOf);
   const replaced = await resolveReplacedInvoice({
     reissuedId,
     isQuote: isQuote === true,
-    bookingId: parseObjectId(bookingId),
+    bookingId: billedBookingId,
     calendarEventIds: [
       ...mergedEventIds,
       ...(typeof calendarEventId === "string" && calendarEventId ? [calendarEventId] : []),
@@ -334,7 +344,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           alreadyPaidMethod: prepaid.method,
           // Prisma throws on a malformed ObjectId; calendarEventId is a free-form Google id.
           contactId: linkedContactId,
-          bookingId: parseObjectId(bookingId),
+          bookingId: billedBookingId,
           calendarEventId:
             typeof calendarEventId === "string" && calendarEventId ? calendarEventId : null,
           // Merged jobs only; empty means "see calendarEventId" (the earliest).
@@ -361,7 +371,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Settle the booking-time redemption with its real value, so one job is one use.
   // A quote is not a use of the promo.
-  const billedBookingId = parseObjectId(bookingId);
   if (!isQuote && promoId && discount > 0) {
     await settlePromoRedemption({
       promoId,
@@ -404,7 +413,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       address: tripRequest.address,
       date: tripRequest.date,
       clientName: invoice.clientName,
-      contactId: parseObjectId(contactId),
+      contactId: linkedContactId,
       invoiceNumber: invoice.number,
     });
   }

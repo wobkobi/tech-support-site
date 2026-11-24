@@ -2,6 +2,7 @@
 // AI job-duration estimator shared by the public /pricing estimate and the calculator's quote
 // lines, so both read the same benchmarks and stacking rules and land on the same times.
 
+import { fitLinesToTotal } from "@/features/business/lib/estimate-lines";
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { jsonCompletion } from "@/shared/lib/ai/json-completion";
@@ -243,7 +244,11 @@ ${lines.map((line, i) => `${i + 1}. ${line}`).join("\n")}`;
   );
   if (result.tasks.length !== lines.length) return null;
   return {
-    mins: result.tasks.map((t) => Math.max(incrementMins, t.mins)),
+    mins: fitLinesToTotal(
+      result.tasks.map((t) => t.mins),
+      result.estimatedMins,
+      incrementMins,
+    ),
     confidence: result.confidence,
   };
 }
