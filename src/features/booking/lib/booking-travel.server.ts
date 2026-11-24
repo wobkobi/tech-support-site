@@ -31,6 +31,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import {
   dateKeyParts,
+  nzDateKey,
   nzDateParts,
   nzMidnightUtc,
   nzWallClockUtc,
@@ -45,6 +46,37 @@ const PRICE_CACHE_MAX = 500;
 
 /** Priced drives by {@link travelLegKey}; failed lookups are never stored. */
 const priceCache = new Map<string, { minutes: number; at: number }>();
+
+/**
+ * New addresses the public grid check prices per NZ day, per instance. Each can cost two lookups
+ * per located commitment in the window, so a flood of made-up addresses is capped here; past it
+ * the grid stays open and the submit re-check (two lookups at most) still applies.
+ */
+export const TRAVEL_CHECK_DAILY_ADDRESSES = 60;
+
+/** Addresses the grid check has priced today, for {@link claimTravelCheck}. */
+let travelChecksToday: { dayKey: string; addresses: Set<string> } = {
+  dayKey: "",
+  addresses: new Set(),
+};
+
+/**
+ * Whether the grid check may price this address today: one already checked today always may, a
+ * new one only while today's cap has room.
+ * @param address - The customer's address.
+ * @param now - Current instant.
+ * @returns True when the check can go ahead.
+ */
+export function claimTravelCheck(address: string, now: Date): boolean {
+  const dayKey = nzDateKey(now);
+  if (travelChecksToday.dayKey !== dayKey) travelChecksToday = { dayKey, addresses: new Set() };
+  const key = address.trim().toLowerCase();
+  const { addresses } = travelChecksToday;
+  if (addresses.has(key)) return true;
+  if (addresses.size >= TRAVEL_CHECK_DAILY_ADDRESSES) return false;
+  addresses.add(key);
+  return true;
+}
 
 /**
  * Drive minutes for a leg: the cached price when fresh, else one Distance Matrix lookup (traffic
