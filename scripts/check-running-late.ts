@@ -201,6 +201,10 @@ expect(
 expect("a job inside the grace isn't", !phoneWentQuiet(nz(9), nz(13), jobAt(nz(9, 20)), homeLine));
 expect("a job not started yet isn't", !phoneWentQuiet(nz(9), nz(13), jobAt(nz(14)), homeLine));
 expect("a job at home isn't", !phoneWentQuiet(nz(9), nz(13), jobAt(nz(11), homeLine), homeLine));
+expect(
+  "home written another way isn't",
+  !phoneWentQuiet(nz(9), nz(13), jobAt(nz(11), "Home\n1 Home St, Auckland 1022"), homeLine),
+);
 expectEqual(
   "quiet text, same day",
   phoneQuietText(nz(9, 12), nz(13)).body,

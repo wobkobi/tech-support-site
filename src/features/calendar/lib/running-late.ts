@@ -3,6 +3,7 @@
 // whether an alert is due given the last one sent, where the drive starts, the push wording,
 // and the OwnTracks location body.
 
+import { isHomeLocation } from "@/features/admin/lib/dashboard-jobs";
 import type { LocatedCommitment } from "@/features/calendar/lib/travel-timeline";
 import { NZ_TZ } from "@/shared/lib/timezone-utils";
 
@@ -261,8 +262,8 @@ export const PHONE_QUIET_GRACE_MS = 30 * 60_000;
  * reports on moves, so a stale location alone is normal; getting to a job without a report isn't.
  * @param phoneAtMs - When the phone last reported (ms).
  * @param nowMs - Current time (ms).
- * @param commitments - Today's located commitments.
- * @param homeAddress - Base address; commitments there need no travel.
+ * @param commitments - Today's located commitments, family-calendar events left out.
+ * @param homeAddress - Base address; commitments there ({@link isHomeLocation}) need no travel.
  * @returns True when a quiet-phone warning is due.
  */
 export function phoneWentQuiet(
@@ -271,12 +272,11 @@ export function phoneWentQuiet(
   commitments: Pick<LocatedCommitment, "startMs" | "location">[],
   homeAddress: string,
 ): boolean {
-  const home = homeAddress.trim().toLowerCase();
   return commitments.some(
     (c) =>
       c.startMs > phoneAtMs + PHONE_QUIET_GRACE_MS &&
       c.startMs <= nowMs &&
-      c.location.trim().toLowerCase() !== home,
+      !isHomeLocation(c.location, homeAddress),
   );
 }
 

@@ -10,6 +10,7 @@ import { CALENDAR_EVENT_PRESENT_FILTER, isRemoteBooking } from "@/features/booki
 import {
   fetchAllCalendarEventsDetailed,
   getBookingCalendarId,
+  getWorkCalendarId,
 } from "@/features/calendar/lib/google-calendar";
 import {
   chooseDriveStart,
@@ -415,18 +416,23 @@ async function runCheck(
   const linkedEventIds = new Set(bookings.map((b) => b.calendarEventId).filter(Boolean));
   const events = calendar.events.filter((e) => !e.allDay && !linkedEventIds.has(e.id));
   const homeAddress = identity.baseAddress.line || process.env.HOME_ADDRESS || "";
-  const timeline = buildTimeline(
-    bookings.filter((b) => !isRemoteBooking(b)),
-    events,
-    process.env.PERSONAL_CALENDAR_ID ?? "",
-    homeAddress,
-    backMinByEventId,
-  );
+  const visits = bookings.filter((b) => !isRemoteBooking(b));
+  const personalCalId = process.env.PERSONAL_CALENDAR_ID ?? "";
+  const timeline = buildTimeline(visits, events, personalCalId, homeAddress, backMinByEventId);
 
-  // Quiet phone: you've been at a job since OwnTracks last reported. Once per NZ day.
+  // Quiet phone: you've been at a job since OwnTracks last reported. Once per NZ day. Family
+  // (Work calendar) events aren't trips you make, so they never count as missed travel.
   if (mode === "live" && comms.pushPhoneQuiet && phone) {
     const dayStartMs = nzMidnightUtc(...dateKeyParts(todayKey)).getTime();
-    const today = timeline.filter((c) => c.startMs >= dayStartMs);
+    const workCalId = getWorkCalendarId();
+    const ownEvents = workCalId ? events.filter((e) => e.calendarEmail !== workCalId) : events;
+    const today = buildTimeline(
+      visits,
+      ownEvents,
+      personalCalId,
+      homeAddress,
+      backMinByEventId,
+    ).filter((c) => c.startMs >= dayStartMs);
     if (phoneWentQuiet(phone.at.getTime(), nowMs, today, homeAddress)) {
       await warnPhoneQuiet(todayKey, phone.at.getTime(), now, result);
     }
