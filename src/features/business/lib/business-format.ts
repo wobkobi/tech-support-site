@@ -210,6 +210,7 @@ export function unsuccessfulNote(tasks: string[], base: number, factor: number):
 /** The invoice fields that say what's been paid. */
 interface SettlementSource {
   status: string;
+  isQuote?: boolean | null;
   total: number;
   alreadyPaid?: number | null;
   paidAt?: Date | string | null;
@@ -266,14 +267,17 @@ export function settledCallout(
     };
   }
   if (invoice.status === "VOIDED") {
+    const kind = invoice.isQuote ? "quote" : "invoice";
     const when = invoice.voidedAt
       ? `was voided on ${formatDateShort(invoice.voidedAt)}`
       : "has been voided";
     return {
       heading: "Voided",
       text: replacedByNumber
-        ? `This invoice ${when} and replaced by ${replacedByNumber}. There's nothing to pay on this one.`
-        : `This invoice ${when}, so there's nothing to pay.`,
+        ? `This ${kind} ${when} and replaced by ${replacedByNumber}. There's nothing to pay on this one.`
+        : invoice.isQuote
+          ? `This quote ${when}, so it no longer stands.`
+          : `This invoice ${when}, so there's nothing to pay.`,
     };
   }
   return null;

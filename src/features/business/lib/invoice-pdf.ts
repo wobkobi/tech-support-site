@@ -916,12 +916,13 @@ export async function generateInvoicePdf(
   y = drawLineItemsTable(ctx, invoice, y);
   y = drawTotalsBlock(ctx, invoice, y);
   // A paid or voided invoice asks for nothing, so its box says so instead of the bank details.
+  // A voided quote gets the same box, never the "go ahead" one.
   const replacement =
     invoice.status === "VOIDED" && replacedByNumber === undefined
       ? await voidedReplacementNumber(invoice.number)
       : (replacedByNumber ?? null);
   const settled = settledCallout(invoice, replacement);
-  if (invoice.isQuote) y = drawQuoteCallout(ctx, invoice, y);
+  if (invoice.isQuote && !settled) y = drawQuoteCallout(ctx, invoice, y);
   else if (settled) y = drawCallout(ctx, y, settled.heading, [{ text: settled.text }]);
   else y = drawPaymentCallout(ctx, invoice, y);
   drawNotes(ctx, invoice, y);
