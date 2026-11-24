@@ -748,8 +748,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return { ...t, minutes: mins, qty: mins / 60 };
       });
       const sumQty = parsed.tasks.reduce((s, t) => s + (t.qty || 0), 0);
-      const diff = Math.round((targetHours - sumQty) * 100) / 100;
-      if (sumQty > 0 && Math.abs(diff) >= incHours) {
+      // Compared in whole minutes: a 5-min gap is 0.08h at 2 dp, just under 5/60.
+      const sumMins = parsed.tasks.reduce((s, t) => s + (t.minutes ?? 0), 0);
+      if (sumMins > 0 && Math.abs(targetMins - sumMins) >= incMins) {
         /**
          * Whether a task's quantity is fixed (stated duration or quick one-shot).
          * @param t - Task to classify.
