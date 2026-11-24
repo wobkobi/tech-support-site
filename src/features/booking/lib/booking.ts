@@ -107,6 +107,17 @@ export function meetingTypeFromNotes(raw: string | null): "in_person" | "remote"
 }
 
 /**
+ * Whether a booking is remote: the meetingType column, else the notes for legacy rows.
+ * @param b - The booking's meeting type and notes.
+ * @param b.meetingType - The stored column, null on legacy rows.
+ * @param b.notes - Raw notes, which may state the meeting type.
+ * @returns True for a remote session.
+ */
+export function isRemoteBooking(b: { meetingType: string | null; notes: string | null }): boolean {
+  return (b.meetingType ?? meetingTypeFromNotes(b.notes)) === "remote";
+}
+
+/**
  * Google Maps search link for a visit address.
  * @param address - Visit address as stored.
  * @returns The Maps URL.

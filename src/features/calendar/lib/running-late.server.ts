@@ -6,7 +6,7 @@
 // Run by the check-running-late cron, by OwnTracks location reports and from the Travel alerts
 // page.
 
-import { CALENDAR_EVENT_PRESENT_FILTER } from "@/features/booking/lib/booking";
+import { CALENDAR_EVENT_PRESENT_FILTER, isRemoteBooking } from "@/features/booking/lib/booking";
 import {
   fetchAllCalendarEventsDetailed,
   getBookingCalendarId,
@@ -416,7 +416,7 @@ async function runCheck(
   const events = calendar.events.filter((e) => !e.allDay && !linkedEventIds.has(e.id));
   const homeAddress = identity.baseAddress.line || process.env.HOME_ADDRESS || "";
   const timeline = buildTimeline(
-    bookings.filter((b) => b.meetingType !== "remote"),
+    bookings.filter((b) => !isRemoteBooking(b)),
     events,
     process.env.PERSONAL_CALENDAR_ID ?? "",
     homeAddress,
@@ -437,7 +437,7 @@ async function runCheck(
   for (const b of bookings) {
     const startMs = b.startAt.getTime();
     if (startMs <= nowMs || startMs >= windowEnd.getTime()) continue;
-    const remote = b.meetingType === "remote";
+    const remote = isRemoteBooking(b);
     targets.push({
       key: `booking:${b.id}`,
       name: b.name,
