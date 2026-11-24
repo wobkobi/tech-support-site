@@ -8,6 +8,7 @@ import { shortNoticeCancelNote } from "@/features/booking/lib/booking-form";
 import {
   confirmationCoversReminder,
   reminderDayPhrase,
+  reminderGapCleared,
   reminderWindow,
 } from "@/features/booking/lib/booking-reminder";
 import { assessCancellation, CANCELLATION } from "@/features/business/lib/pricing-policy";
@@ -33,22 +34,29 @@ function nz(day: number, hour: number, minute = 0): Date {
  * @param now - When the run starts.
  * @param startAt - The appointment start.
  * @param createdAt - When the booking was made.
+ * @param landedAt - When its confirmation landed, after any quiet-hours hold.
  * @returns True when the run would send the reminder.
  */
-function takenAt(now: Date, startAt: Date, createdAt: Date): boolean {
+function takenAt(now: Date, startAt: Date, createdAt: Date, landedAt = createdAt): boolean {
   const w = reminderWindow(now, SETTINGS);
-  return startAt > w.startAfter && startAt <= w.startBy && createdAt <= w.bookedBy;
+  return (
+    startAt > w.startAfter &&
+    startAt <= w.startBy &&
+    createdAt <= w.bookedBy &&
+    reminderGapCleared(landedAt, w)
+  );
 }
 
 /**
  * Every half-hourly run from booking to start, returning the first that sends.
  * @param startAt - The appointment start.
  * @param createdAt - When the booking was made.
+ * @param landedAt - When its confirmation landed, after any quiet-hours hold.
  * @returns Hours before the start the reminder goes, or null when it never does.
  */
-function firstReminder(startAt: Date, createdAt: Date): number | null {
+function firstReminder(startAt: Date, createdAt: Date, landedAt = createdAt): number | null {
   for (let t = createdAt.getTime(); t < startAt.getTime(); t += HOUR / 2) {
-    if (takenAt(new Date(t), startAt, createdAt)) return (startAt.getTime() - t) / HOUR;
+    if (takenAt(new Date(t), startAt, createdAt, landedAt)) return (startAt.getTime() - t) / HOUR;
   }
   return null;
 }
@@ -142,6 +150,11 @@ function main(): void {
   );
   expectEqual("booked 30h out: 18h out", firstReminder(nz(21, 18), nz(20, 12)), 18);
   expectEqual("booked days ahead: at the 24h lead", firstReminder(nz(25, 10), nz(20, 9)), 24);
+  expectEqual(
+    "booked 22:00 with the confirmation held to 07:00: 12h after it lands, not 3h",
+    firstReminder(nz(22, 9), nz(20, 22), nz(21, 7)),
+    14,
+  );
   expectEqual(
     "a reschedule 20h out is covered by its own notice",
     confirmationCoversReminder(nz(21, 10), nz(20, 14), SETTINGS),
