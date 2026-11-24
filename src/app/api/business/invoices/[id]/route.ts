@@ -25,7 +25,7 @@ import {
   parseString,
 } from "@/features/business/lib/validation";
 import type { LineItem } from "@/features/business/types/business";
-import { attachEmailIfMissing } from "@/features/contacts/lib/find-or-create";
+import { attachEmailIfMissing, rememberBilledEmail } from "@/features/contacts/lib/find-or-create";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
@@ -287,6 +287,10 @@ export async function PATCH(
       await syncPromoRedemption(id, current.promoId, promoDiscount).catch((err: unknown) => {
         console.error("[invoice-patch] Failed to update promo redemption:", err);
       });
+    }
+    // A corrected address belongs to the customer too, so the review ask can use it.
+    if (clientEmail !== undefined && emailAfter && emailAfter !== current.clientEmail) {
+      await rememberBilledEmail(invoice.contactId, emailAfter);
     }
     const incomeSheetWarning = prepaid ? (await syncAlreadyPaidIncome(id)).sheetSyncWarning : false;
     await syncInvoicePdfToDriveById(id, "[invoice-patch]");
