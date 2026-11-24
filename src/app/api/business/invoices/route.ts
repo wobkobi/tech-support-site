@@ -300,6 +300,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ...mergedEventIds,
       ...(typeof calendarEventId === "string" && calendarEventId ? [calendarEventId] : []),
     ],
+    customer: {
+      contactId: linkedContactId,
+      email: emailValue || null,
+      phone: phone.e164 || null,
+    },
   });
   if (!replaced.ok) return errorResponse(replaced.error, replaced.status);
 
